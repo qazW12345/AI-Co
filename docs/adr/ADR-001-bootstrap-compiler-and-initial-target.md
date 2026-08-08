@@ -57,7 +57,7 @@ Each stage must have a bounded input/output contract. Diagnostics retain causal 
 
 The first target is little-endian Windows x86-64 using PE/COFF conventions. The default generated instruction baseline must not exceed x86-64 plus SSE2. AVX2 and other host-specific features may not be required by the minimal language or bootstrap compiler.
 
-The project-owned backend will emit deterministic COFF object files. Microsoft `link.exe` or LLVM `lld-link` may perform final linking during early bootstrap. A later AI-Co utility may replace the external linker, but that replacement is not required before the first self-hosting proof unless the Planner determines it is necessary for the stated acceptance contract.
+The project-owned backend will emit deterministic COFF object files. Microsoft `link.exe` or LLVM `lld-link` may perform final linking through the first Stage 0/1/2 self-hosting proof. This exception ends at that milestone: the next milestone, **self-sufficient development baseline**, requires a project-owned linker implemented in AI-Co and used for normal compiler and utility builds. External linkers may remain independent comparison/oracle tools after that point, but AI-Co may not claim a self-sufficient toolchain while they remain required for ordinary builds.
 
 LLVM may be used as an independent comparison tool or later optional backend, but it is not a dependency of the normative compiler pipeline.
 
@@ -104,7 +104,9 @@ The bootstrap line consists of:
 - **Stage 1:** Stage 0 compiles the AI-Co implementation of the compiler.
 - **Stage 2:** Stage 1 compiles the same AI-Co compiler source again.
 
-Stage 1 and Stage 2 outputs must be byte-identical after any explicitly specified normalization. The preferred design is to eliminate timestamps, random identifiers, absolute paths, unstable iteration order, and other nondeterministic fields so normalization is empty or mechanically trivial.
+The primary identity artifacts are the Stage 1 and Stage 2 compiler-produced COFF object files and build manifests. They must be byte-identical with **no normalization step**. Compiler-controlled timestamps are zero, record and section order is canonical, paths are repository-relative and canonically separated, iteration order is deterministic, and random or host-specific identifiers are prohibited.
+
+The same accepted external linker and exact deterministic/reproducible flags are then applied independently to each stage's identical object set. The resulting PE executables must be byte-identical as a secondary identity gate. If an accepted linker cannot satisfy this requirement, that linker is unsuitable for the bootstrap proof; nondeterministic PE fields may not be excused through an unspecified normalization rule. The Planner's bootstrap contract must list the accepted linker modes and every compiler/linker input included in the comparison evidence.
 
 Both outputs must also pass the same conformance, negative-diagnostic, and executable smoke suites. Byte identity without behavioral verification is insufficient; behavioral success without the deterministic comparison is also insufficient for the self-hosting milestone.
 
@@ -145,4 +147,6 @@ The minimal build must be reproducible without network access after the accepted
 
 ### Approval and follow-up
 
-This architecture is Accepted under Marcel's delegated technical direction. The Planner must now produce the minimal language specification and staged acceptance package. Implementation remains blocked until the specification has sufficient requirements and architecture confidence and passes the required review gates.
+This architecture is Accepted under Marcel's delegated technical direction. The independent review in `docs/reviews/INITIAL-ARCHITECTURE-REVIEW-2026-08-08.md` approved it with Minor findings. The clarification above closes the architecture-owned portion of FIND-001 and resolves FIND-002 by time-bounding external linking; the Planner must encode the exact bootstrap comparison inputs and accepted deterministic linker modes in the normative specification.
+
+FIND-003 through FIND-005 remain Planner specification gates: explicit function-pointer necessity evaluation, a complete runtime/platform contract, and diagnostic schema v1 with a stable code-allocation policy. Implementation remains blocked until the specification has sufficient requirements and architecture confidence and passes the required review gates.
