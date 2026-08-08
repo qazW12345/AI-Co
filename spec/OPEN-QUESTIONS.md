@@ -20,7 +20,7 @@
 
 **Resolution (ADR-004):** the minimal language guarantees deterministic allocator behavior but does not guarantee detection or a trap for every stale pointer read or write. The project-owned allocator tracks every allocation and deterministically traps duplicate release and release of a pointer that is not the start of a live allocation; deallocation overwrites the allocation with byte `0xDD` before the block becomes eligible for deterministic reuse; freed blocks remain under the project allocator's controlled address space until deterministic reuse or process exit; before reuse a stale access observes or modifies the poisoned bytes, after reuse it accesses the current allocation under ordinary raw-pointer rules, and an inaccessible address traps as invalid address/access. The compiler may not exploit C-style lifetime undefined behavior. The language explicitly does not claim complete temporal memory safety.
 
-**Specification consequence:** §12.8 states the accepted temporal baseline and compiler obligations exactly; §15.1 defines the deterministic reuse rule (reverse order of release) and resource-exhaustion behavior (`alloc_bytes` returns `null`).
+**Specification consequence:** §12.8 states the accepted temporal baseline and compiler obligations exactly; §15.1 defines the deterministic reuse rule (exact-fit; reverse order of release within a size class), the zero-size allocation rule (`alloc_bytes(0)` returns `null` without allocating), and resource-exhaustion behavior (`alloc_bytes` returns `null` on exhaustion).
 
 **Monitor:** no follow-up item. Stronger temporal checking is a future safety feature that requires a new accepted ADR; it may strengthen detection but may not retroactively justify arbitrary behavior in the minimal language.
 

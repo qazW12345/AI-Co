@@ -355,6 +355,8 @@ Malformed constructs (unbalanced delimiters, missing `;`, missing `)`, unknown t
 - **Reserved runtime modules:** module names beginning with the reserved prefix `rt` (that is, `rt` or `rt.<submodule>`) are compiler-provided and never resolve to user files. `import rt.mem;`, `import rt.io;`, `import rt.proc;`, and `import rt.trap;` bind to the project-owned runtime modules defined in Section 15; the canonical module-to-file mapping above applies only to non-reserved module names. A user module therefore cannot collide with or shadow a reserved runtime module, and no file under `<project_root>/rt/` is ever consulted for a reserved import.
 - A `module` declaration whose name begins with the reserved prefix `rt` is **rejected** with `AIC-N0207` (primary span: the `module` declaration).
 - An import of a reserved `rt` submodule that is not part of the runtime surface in Section 15 is **rejected** with `AIC-N0208` (primary span: the import's qualified name).
+- A bare `import rt;` — importing the runtime module itself rather than one of its submodules — is **rejected** with `AIC-N0209` (primary span: the import's qualified name). The runtime surface is the four submodules of Section 15 (`rt.mem`, `rt.io`, `rt.proc`, `rt.trap`); bare `rt` binds nothing.
+- Runtime members are **not auto-available**: a program must explicitly import each runtime submodule it uses (`import rt.mem;`, etc.) before referencing its members. A reference to a reserved runtime name without the matching import is resolved as an ordinary undeclared name and **rejected** with `AIC-N0202` (primary span: the reference). There is no implicit runtime import.
 - Resolution of non-reserved modules depends **only** on the project root from the build manifest. It must not depend on the current working directory, environment-variable search paths, registry state, network access, or first-match behavior across multiple roots. Violation of this rule is an implementation defect, not a language behavior.
 - A module that is not found at its canonical path is **rejected** with `AIC-N0204` (primary span: the import's qualified name).
 - A module whose `module` declaration does not match its canonical path name is **rejected** with `AIC-N0205` (primary span: the `module` declaration).
@@ -732,8 +734,8 @@ No other conversion pair exists; any other cast is **rejected** with `AIC-T0308`
 - `&expr` (address-of) requires an lvalue operand and yields `T*`. Address of a `const` or of a non-lvalue is **rejected** (`AIC-E0402`).
 - `*p` dereferences; the result is a mutable lvalue of type `T`.
 - Pointer arithmetic:
-  - `p + i`, `p - i` (i integer, any integer type; scaled by `sizeof(T)`); `p += i`, `p -= i`. Result type `T*`.
-  - `p - q` (both `T*`): result `isize`, defined as the exact quotient `(byte_address(p) - byte_address(q)) / sizeof(T)`. If the byte difference is not a multiple of `sizeof(T)`, the expression is **rejected at compile time when both operands are constant** (`AIC-E0411`) and traps at runtime (`AIC-R0810`). This keeps the operation total and deterministic.
+  - `p + i`, `p - i` (i integer, any integer type; scaled by `sizeof(T)`); `p += i`, `p -= i`. Result type `T*`. The address computation is **checked**: the scaling product `i * sizeof(T)` and the resulting byte address `byte_address(p) ± (i * sizeof(T))` must both be representable in the address arithmetic without overflow. Overflow is **rejected at compile time when the expression is constant** (`AIC-E0405`) and traps at runtime (`AIC-R0816`, pointer arithmetic overflow).
+  - `p - q` (both `T*`): result `isize`, defined as the exact quotient `(byte_address(p) - byte_address(q)) / sizeof(T)`. The byte difference is computed as a signed `isize` value; if it is not representable (byte-difference overflow), the expression is **rejected at compile time when both operands are constant** (`AIC-E0405`) and traps at runtime (`AIC-R0816`). If the byte difference is not a multiple of `sizeof(T)`, the expression is **rejected at compile time when both operands are constant** (`AIC-E0411`) and traps at runtime (`AIC-R0810`). This keeps the operation total and deterministic.
   - Pointer relational comparison per Section 11.4 (address ordering).
 - Dereference obligations (raw pointer caveat, Section 12.8): the pointed-to address must be aligned to `alignof(T)` and must be accessible; violating alignment or access causes a hardware-fault-derived deterministic trap `AIC-R0811` (invalid address/alignment) where detectable, and where not detectable the program has violated the raw-pointer contract documented in Section 12.8. The language does **not** claim complete memory safety; it requires deterministic rules and traps for every operation the runtime can observe, and explicitly documents the residual raw-pointer contract.
 - Conversions: `cast<T*>(usize_value)` preserves the value; alignment is checked when the pointer is dereferenced. `cast<usize>(p)` yields the address.
@@ -757,7 +759,7 @@ No other conversion pair exists; any other cast is **rejected** with `AIC-T0308`
 The minimal language provides explicit raw pointers without a complete spatial or temporal safety model. The normative contract is:
 
 1. Every operation on a pointer (dereference, arithmetic, comparison, conversion) has defined semantics in this specification or a deterministic trap.
-2. The runtime guarantees traps for: null dereference (`AIC-R0809`), bounds violations on arrays/slices/str (`AIC-R0807`), double release (`AIC-R0812`), invalid release (`AIC-R0813`), and byte-misalignment/access violations it can observe (`AIC-R0811`).
+2. The runtime guarantees traps for: null dereference (`AIC-R0809`), bounds violations on arrays/slices/str (`AIC-R0807`), pointer arithmetic overflow (`AIC-R0816`), double release (`AIC-R0812`), invalid release (`AIC-R0813`), and byte-misalignment/access violations it can observe (`AIC-R0811`).
 3. **Accepted temporal baseline (ADR-004, Human Sponsor approval):** the project-owned allocator tracks every allocation and deterministically traps duplicate release and release of a pointer that is not the start of a live allocation. Deallocation overwrites the full allocation with byte `0xDD` before the block becomes eligible for deterministic reuse. Freed blocks remain under the project allocator's controlled address space until deterministic reuse or process exit; the allocator must not expose host-allocator or OS-dependent stale-access semantics as a language rule (Section 15.1). Within this model:
    - before reuse, a stale access to still-accessible freed storage observes or modifies the poisoned (`0xDD`) bytes at that address;
    - after deterministic reuse, the address denotes the new allocation and a stale pointer accesses that current allocation according to ordinary raw-pointer rules;
@@ -856,13 +858,18 @@ A build produces a build manifest recording:
 - project root (the single import-resolution root);
 - entry module name and its source path;
 - complete module list compiled (with source file paths relative to project root);
-- compiler version/identity and host compiler used for the executable if applicable;
+- the AI-Co language/specification version string (identical across all bootstrap stages; this is the manifest's only version/identity field);
 - build options that affect output (in normalized, sorted form);
+- the external linker flag set used, when linking (Section 16.3; identical across the compared stage builds);
 - output artifact paths (relative to project root) and SHA-256 hashes of each artifact;
 - diagnostic summary (counts by severity, stable codes emitted);
 - exit status.
 
 The manifest must itself be deterministic and must not contain absolute host paths.
+
+**Hashed artifact set and self-hash exclusion (FIND-G2-02):** the SHA-256 hashes recorded in the manifest cover every compiler-produced artifact named in "output artifact paths" **except the manifest itself**. The manifest does not hash itself and contains no self-referential hash field; a manifest's own identity is established by byte comparison of the manifest file (Section 16.2), never by a hash inside it. The exact hashed artifact set is therefore: every COFF object file produced by the build and, after the link step, the linked executable. No fixed-point or exclusion-by-zeroing rule is needed because the manifest is excluded from its own hash list.
+
+**Stage invariance (FIND-G2-03):** the manifest fields are defined so that the Stage 1 and Stage 2 manifests for the same AI-Co compiler source, inputs, and options are byte-identical (Section 16.2). The only version/identity field is the AI-Co language/specification version string, which is identical across stages. The identity of the producing executable (e.g., the Stage 0 host C compiler versus the Stage 1 AI-Co compiler) is **not** recorded in the manifest; host compiler identity/version and linker identity/version are recorded only in the external comparison evidence (Section 16.3), never in the manifest. Output artifact paths are recorded relative to the project root, and the byte-identity comparison is defined over builds that write to **identical output artifact paths**; the M1 identity comparison therefore invokes both stage builds with the same relative output paths (Section 16.5). No normalization of manifest fields is permitted (Section 16.2).
 
 ---
 
@@ -873,8 +880,9 @@ The runtime is project-owned and small (ADR-002). It is exposed as the reserved 
 ### 15.1 Module `rt.mem` (allocation and bytes)
 
 - `rt.mem.alloc_bytes(count: usize) -> u8*` — allocates `count` zero-initialized bytes; returns `null` if allocation fails (explicit result value, per ADR-002's allowance). The returned pointer is aligned to at least `alignof(max_align)` for the target (16 bytes); the exact allocation alignment is documented in the implementation contract. Allocates storage with static-like lifetime until release.
+  - **Zero-size allocation:** `alloc_bytes(0)` performs no allocation, consumes no allocator state, and returns `null`. It is not a failure and never traps; deallocating the returned value is the documented `null` no-op. There is nothing to release for a zero-size request.
 - `rt.mem.dealloc_bytes(p: u8*) -> void` — deallocates an allocation previously returned by `alloc_bytes`. Passing `null` is a no-op. Releasing a pointer not returned by `alloc_bytes`, or releasing the same allocation twice, is a trap `AIC-R0813` (invalid release) / `AIC-R0812` (double release).
-  - **Deterministic reuse rule (ADR-004):** before a freed block becomes eligible for reuse, the allocator overwrites the full allocation with byte pattern `0xDD`. Freed blocks remain under the allocator's control until deterministic reuse or process exit; the allocator never returns them to a host allocator in a way that exposes host-allocator or OS-dependent stale-access semantics as a language rule. Reuse order is deterministic — freed blocks are reused in reverse order of release (most recently freed first) — and this order is part of the observable contract: it must not depend on host-allocator behavior, timing, environment values, or build options.
+  - **Deterministic reuse rule (ADR-004):** before a freed block becomes eligible for reuse, the allocator overwrites the full allocation with byte pattern `0xDD`. Freed blocks remain under the allocator's control until deterministic reuse or process exit; the allocator never returns them to a host allocator in a way that exposes host-allocator or OS-dependent stale-access semantics as a language rule. Reuse is **exact-fit**: a freed block of size `S` may satisfy only a request of size `S`; the allocator never splits a larger freed block to satisfy a smaller request and never coalesces adjacent freed blocks. Among free blocks of the same size, the block most recently released is reused first (reverse order of release within a size class). If no free block of the exact requested size exists, `alloc_bytes` obtains a fresh block from the allocator's controlled region. The reuse outcome — which address (if any) is returned for a given allocation/release sequence — is part of the observable contract: it must not depend on host-allocator behavior, timing, environment values, or build options.
   - **Resource exhaustion:** if `alloc_bytes` cannot satisfy a request, it returns `null` (an explicit result value, per ADR-002). It never traps for exhaustion, never returns an address outside the allocator's controlled region, and never violates the deterministic reuse rule. Exhaustion is an environmental input (Section 15.6), not language ambiguity.
 - `rt.mem.copy(dst: u8*, src: u8*, count: usize) -> void` — copies `count` bytes; behavior is defined for overlapping regions as if a temporary buffer were used (deterministic; callers must ensure dst/src point to at least `count` accessible bytes, else trap `AIC-R0811`).
 - `rt.mem.fill(dst: u8*, value: u8, count: usize) -> void` — fills `count` bytes with `value`.
@@ -919,6 +927,7 @@ The runtime is project-owned and small (ADR-002). It is exposed as the reserved 
 | invalid release | `AIC-R0813` | 70 |
 | invalid file handle / closed handle | `AIC-R0814` | 70 |
 | stack exhaustion (unbounded recursion) | `AIC-R0815` | 70 |
+| pointer arithmetic overflow (checked scaling / byte-difference overflow) | `AIC-R0816` | 70 |
 | user trap via `rt.trap.report` | caller-supplied code | 70 |
 
 Stack exhaustion: recursion that exhausts the available stack is a deterministic trap `AIC-R0815`. The stack limit is a resource bound declared in the build manifest (default: 8 MiB); exceeding it is a trap, not undefined behavior.
@@ -952,7 +961,7 @@ Functions listed in Sections 15.1–15.4 that do not appear in the table below �
 | file close | `rt.io.close(handle: usize)` | |
 | process args | `rt.proc.args() -> u8[][]` | |
 | process exit | `rt.proc.exit(code: i32)` | noreturn |
-| trap report | `rt.trap.report(code: u32, message: str)` | noreturn; used for every language-defined runtime trap (checked arithmetic, bounds, null dereference, conversion failures, invalid UTF-8, stack exhaustion, etc.) |
+| trap report | `rt.trap.report(code: u32, message: str)` | noreturn; used for every language-defined runtime trap (checked arithmetic, bounds, pointer arithmetic overflow, null dereference, conversion failures, invalid UTF-8, stack exhaustion, etc.) |
 
 Checked operations that can fail at runtime (Section 11.3, Section 12, Section 15.5) must compile to a branch to a trap-report call with the stable trap code, the source span of the failing operation, and the relevant type/value facts, per the diagnostic contract. The stack-exhaustion trap (`AIC-R0815`) may be implemented by a guard mechanism of the implementation's choice (guard page or prologue check); the observable contract is the trap record and exit code.
 
@@ -971,9 +980,10 @@ Checked operations that can fail at runtime (Section 11.3, Section 12, Section 1
 - The **primary identity artifacts** are the Stage 1 and Stage 2 compiler-produced **COFF object files and build manifests** for the same AI-Co compiler source, inputs, and options.
 - These primary artifacts must be **byte-identical with no normalization step** (per ADR-001 §99–109). There is no permitted normalization for compiler-produced artifacts.
 - Zero/canonical metadata rules that make this achievable and that the compiler must obey:
-  - compiler-controlled timestamps are zero (or derived solely from input content, recorded as such);
+  - compiler-controlled timestamps are zero (ADR-001 §107);
   - record and section order in COFF output is canonical (the spec fixes a deterministic order; see Section 14.2);
   - paths embedded in objects/manifests are repository-relative and canonically separated (`/`);
+  - build manifests are emitted per Section 14.4: no self-hash, no stage-dependent version/identity fields, and no absolute host paths;
   - iteration over any collection that affects output order is deterministic (sorted by stable keys);
   - random identifiers, build-machine identity, environment values, and host-specific strings are prohibited in artifacts.
 - Byte identity without behavioral verification is insufficient; behavioral success without the deterministic comparison is also insufficient for the self-hosting milestone.
@@ -986,7 +996,7 @@ Checked operations that can fail at runtime (Section 11.3, Section 12, Section 1
   - LLVM `lld-link` invoked with its documented reproducible-build mode (`/Brepro` or equivalent).
   - The exact flag set used must be recorded in the build manifest.
 - If an accepted linker cannot satisfy byte identity in its reproducible mode, that linker is unsuitable for the bootstrap proof; nondeterministic PE fields may not be excused through any normalization rule.
-- The comparison evidence must record **every compiler and linker input**: source file list with content hashes, build manifest, compiler options, host compiler identity/version, linker identity/version, linker flags, and any libraries or objects passed to the linker.
+- The comparison evidence must record **every compiler and linker input**: source file list with content hashes, build manifest, compiler options, host compiler identity/version, linker identity/version, linker flags, and any libraries or objects passed to the linker. Host compiler identity/version and linker identity/version are recorded **only** in this comparison evidence (and in build logs), never in the build manifest (Section 14.4); the manifest's only version/identity field is the stage-invariant AI-Co language/specification version string.
 
 ### 16.4 Host-compiler independence
 
@@ -995,7 +1005,7 @@ Checked operations that can fail at runtime (Section 11.3, Section 12, Section 1
 ### 16.5 Milestone boundaries (external-linker time bound)
 
 - **Milestone M1 — first self-hosting proof:** the Stage 0/1/2 line above, with external linking permitted through this milestone only. M1 acceptance criteria:
-  - raw byte identity of Stage 1 and Stage 2 primary artifacts (COFF objects and build manifests), with the zero/canonical metadata rules of Section 16.2;
+  - raw byte identity of Stage 1 and Stage 2 primary artifacts (COFF objects and build manifests produced with identical relative output paths, per Section 14.4), with the zero/canonical metadata rules of Section 16.2;
   - PE byte identity under the accepted deterministic linker modes (Section 16.3);
   - full pass of conformance, negative-diagnostic, and executable smoke suites on both outputs;
   - recorded comparison evidence per Section 16.3.
@@ -1010,7 +1020,7 @@ Checked operations that can fail at runtime (Section 11.3, Section 12, Section 1
 The self-hosting milestone is accepted only with:
 
 1. recorded Stage 0/1/2 build logs and tool versions;
-2. byte-identity comparison result for Stage 1 vs Stage 2 primary artifacts (COFF objects and build manifests), with the zero-metadata evidence (Section 16.2);
+2. byte-identity comparison result for Stage 1 vs Stage 2 primary artifacts (COFF objects and build manifests, produced with identical relative output paths per Section 14.4), with the zero-metadata evidence (Section 16.2);
 3. PE byte-identity evidence under the accepted deterministic linker modes, with the full comparison input record (Section 16.3);
 4. full pass of the conformance suite on both Stage 1 and Stage 2 outputs;
 5. full pass of the negative-diagnostic suite (expected stable codes and spans) on both outputs;
@@ -1095,7 +1105,7 @@ var y: i32 = a.b.g();
 ### 18.4 Conversions and arithmetic
 
 ```
-var a: i8 = 100;
+var a: i8 = cast<i8>(100);                 // valid; explicit narrowing cast
 var b: i16 = a;                            // valid (widening)
 // ERROR AIC-T0307: span "200" — 200 is i32; implicit narrowing is absent
 var c: i8 = 200;
@@ -1116,6 +1126,7 @@ fn classify(n: i32) -> str {
     default: { return "other"; }
   }
 }
+// ERROR AIC-N0202: span "x" (undeclared; x is declared inside case 0's block, out of scope)
 // ERROR AIC-E0412: span "case 0" (case body lacks a terminating statement)
 fn bad(n: i32) -> i32 {
   switch (n) {
@@ -1123,7 +1134,7 @@ fn bad(n: i32) -> i32 {
     case 1: { return x; }
   }
 }
-// ERROR AIC-E0416: span "fn bad" (non-void, path without return)
+// ERROR AIC-E0416: span "fn missing" (non-void, path without return)
 fn missing(n: i32) -> i32 {
   if (n > 0) { return n; }
 }
@@ -1137,9 +1148,11 @@ import rt.mem;
 import rt.io;
 
 pub fn main() -> i32 {
-  var buf: u8[16] = [0; 16];
+  var buf: u8[16] = [0u8; 16];             // valid; 0u8 is a u8 literal
+  // ERROR AIC-T0307: span "[0; 16]" — array-literal elements are i32; implicit narrowing to u8 is absent
+  var badbuf: u8[16] = [0; 16];
   var sl: u8[] = buf[..];                  // valid explicit slice
-  sl[0] = 65;                              // valid; buffer element mutated
+  sl[0] = 65u8;                            // valid; buffer element mutated (65u8 is a u8 literal)
   // ERROR AIC-T0307: span "buf" — implicit array→slice conversion is absent
   var s: u8[] = buf;
   var p: u8* = ptr(buf);                   // valid
@@ -1186,6 +1199,15 @@ pub fn main() -> i32 {
 | Review FIND-003 | explicit function-pointer necessity evaluation | §17.3 | spec review |
 | Review FIND-004 | complete runtime/platform API, signatures, error semantics, calling convention, ABI obligations, all compiler-emitted runtime calls | §15, §15.7–15.8 | spec review, smoke suite |
 | Review FIND-005 | diagnostic schema version 1, stable code registry, compatibility rules | `DIAGNOSTIC-CONTRACT.md` | negative-diagnostic suite |
+| Review FIND-G2-01 | normative examples conform to the implicit-conversion rules; explicit conversions/suffixed literals in examples; negative coverage for rejected spellings | §18.4, §18.6 | negative-diagnostic suite |
+| Review FIND-G2-02 | manifest self-hash exclusion and enumerated hashed artifact set | §14.4 | M1 acceptance evidence |
+| Review FIND-G2-03 | stage-invariant manifest fields; identical relative output paths for byte identity; host identity in external evidence only | §14.4, §16.2–16.3 | M1 acceptance evidence |
+| Review FIND-G2-04 | deterministic ordering for null-span diagnostics | `DIAGNOSTIC-CONTRACT.md` §9 | negative-diagnostic suite |
+| Review FIND-G2-05 | allocator zero-size and exact-fit reuse semantics | §15.1 | conformance + trap suite |
+| Review FIND-G2-06 | pointer arithmetic overflow is checked with a stable trap | §12.5, §15.5, `DIAGNOSTIC-CONTRACT.md` §11.8 | trap suite |
+| Review FIND-G2-07 | bare `import rt;` rejected; explicit runtime submodule imports required | §6.5 | negative suite |
+| Review FIND-G2-08 | §18.5 example annotations correct and complete | §18.5 | negative suite |
+| Review FIND-G2-09 | schema-versioning draft exemption | `DIAGNOSTIC-CONTRACT.md` §11.10 | spec review |
 
 ---
 
@@ -1220,7 +1242,9 @@ Self-checklist against the task acceptance criteria:
   - FIND-003 (function-pointer evaluation): closed in Section 17.3 (not necessary; static dispatch design basis documented; trigger preserved).
   - FIND-004 (runtime/platform contract): closed in Section 15.7–15.8 and the runtime tables in Section 15.
   - FIND-005 (diagnostic schema v1, code registry, compatibility): closed in `DIAGNOSTIC-CONTRACT.md` (schema version 1; Sections 5, 11.9, and 11.10 of that document).
+  - FIND-G2-01..09 (gate-2 conformance review, 2026-08-08): corrected in the correction round below; closure pending Reviewer re-check.
 - Changes from review will be recorded as new versions of this document; supersession is handled per organization governance.
 - **v0.1.1 (2026-08-08):** applied the ADR-004 Human Sponsor resolutions (temporal baseline, wrapping baseline, Windows baseline), removed every reference to the deleted, never-committed Main Designer decision-note artifact, and corrected the grammar and contract defects identified by Main Designer inspection. This revision supersedes the v0.1.0 Proposed draft for review purposes.
 - **Planner self-review (2026-08-08):** Pass with one correction. The Planner self-review of the ADR-003/ADR-004-aligned v0.1.1 draft confirmed the three decisions (temporal baseline, wrapping baseline, Windows baseline) are requirements-complete, internally coherent, and implementation-ready; it added the ADR-004 §63 obligation that runtime-facing Windows calls be enumerated and documented against the pinned baseline (§14.3), which the v0.1.1 draft had not carried explicitly. No other corrections required; no new architecture decisions made.
+- **Gate-2 correction round (2026-08-08):** corrected the six Major findings (FIND-G2-01..06) and three Minor findings (FIND-G2-07..09) of the independent gate-2 conformance review (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REVIEW-2026-08-08.md`, verdict "Changes required") and adopted the three Suggestions (SUG-G2-01, SUG-G2-02, SUG-G2-03). Resolution per finding: FIND-G2-01 — §18.4/§18.6 examples corrected to conform to the §4.3/§11.1 conversion rules (explicit `cast` and suffixed literals), with negative coverage for the rejected spellings; FIND-G2-02 — §14.4 defines the hashed artifact set and explicitly excludes the manifest from its own hash list; FIND-G2-03 — §14.4 defines stage-invariant manifest fields (AI-Co language/spec version string only), carries host compiler and linker identity exclusively in the §16.3 external evidence, and requires identical relative output paths for the byte-identity comparison; FIND-G2-04 — deterministic null-span ordering rule added to `DIAGNOSTIC-CONTRACT.md` §9; FIND-G2-05 — §15.1 defines `alloc_bytes(0)` (returns `null`, no allocation) and an exact-fit size/reuse rule (reverse order of release within a size class; no splitting or coalescing); FIND-G2-06 — §12.5 defines checked pointer-arithmetic overflow with new stable trap `AIC-R0816` (registry and trap table updated); FIND-G2-07 — §6.5 rejects bare `import rt;` with new code `AIC-N0209` and requires explicit runtime submodule imports (no auto-availability); FIND-G2-08 — §18.5 annotations repositioned and completed (missing `AIC-N0202` added); FIND-G2-09 — `DIAGNOSTIC-CONTRACT.md` §11.10 gained a draft-exemption clause. Suggestions adopted: SUG-G2-01 (compiler-controlled timestamps are zero, ADR-001 §107), SUG-G2-02 (`U` class exempt from the phase-group digit mapping), SUG-G2-03 (manifest version/identity field is the AI-Co language/spec version string). No ADR, charter, or governance document was modified; this round is specification precision repair within the accepted architecture. The amended set is subject to Reviewer re-review (gate 2) before Main Designer architectural acceptance (gate 3); push remains held pending a passing re-review verdict.
 - Follow-up decision owners: Main Designer (specification acceptance); Coordinator (routing of the Reviewer conformance review and later implementation work packages). No open questions remain; `spec/OPEN-QUESTIONS.md` is the monitored resolution record.

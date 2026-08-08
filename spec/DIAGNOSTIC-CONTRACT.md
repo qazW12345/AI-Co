@@ -73,7 +73,7 @@ Severity semantics:
 
 ## 5. Stable code namespace
 
-Code format: `AIC-<CLASS><NNNN>`, where `<CLASS>` is one of `L` (lex), `S` (syntax), `N` (name), `T` (type), `E` (semantic), `I` (IR), `B` (backend), `O` (object/link), `BL` (build), `R` (runtime trap), `U` (user trap), and `<NNNN>` is a four-digit sequence. The first two digits of `<NNNN>` are a phase group (00 lex, 01 syntax, 02 name, 03 type, 04 semantic, 05 IR, 06 backend, 07 object/link, 08 build/trap, 09 user) for human readability; the last two digits are the rule's sequence within that group. Codes are stable: their meaning never changes; a code is never reused for a different rule; deprecated codes are retained in the namespace table and marked deprecated, never deleted.
+Code format: `AIC-<CLASS><NNNN>`, where `<CLASS>` is one of `L` (lex), `S` (syntax), `N` (name), `T` (type), `E` (semantic), `I` (IR), `B` (backend), `O` (object/link), `BL` (build), `R` (runtime trap), `U` (user trap), and `<NNNN>` is a four-digit sequence. The first two digits of `<NNNN>` are a phase group (00 lex, 01 syntax, 02 name, 03 type, 04 semantic, 05 IR, 06 backend, 07 object/link, 08 build/trap, 09 user) for human readability; the last two digits are the rule's sequence within that group. The `U` class is exempt from the phase-group mapping: `AIC-U0000` is the single user-trap marker, and its `00` digits are a fixed placeholder rather than a phase group (user traps are caller-supplied and not phase-scoped). Codes are stable: their meaning never changes; a code is never reused for a different rule; deprecated codes are retained in the namespace table and marked deprecated, never deleted.
 
 ## 6. Spans
 
@@ -112,9 +112,12 @@ When no deterministic correction exists, `corrections` is omitted.
 Records are emitted in a deterministic total order:
 
 1. by `phase` in a fixed phase order (`lex`, `syntax`, `name`, `type`, `semantic`, `ir`, `backend`, `object`, `link`, `build`);
-2. within a phase, by `primary_span.file` (lexicographic by relative path);
-3. then by `primary_span.start.offset`;
-4. then by `code` lexicographically.
+2. within a phase, records whose `primary_span` is `null` sort **before** all file-bearing records (records with a non-null `primary_span`); among null-span records, order by `code` lexicographically;
+3. within a phase, file-bearing records sort by `primary_span.file` (lexicographic by relative path);
+4. then by `primary_span.start.offset`;
+5. then by `code` lexicographically.
+
+This rule covers the null-span record classes of Sections 11.6 and 11.7 (`AIC-O0701`, `AIC-O0702`, `AIC-BL0801`–`AIC-BL0803`): within their phase they sort before file-bearing records, tie-broken by `code`.
 
 Notes are emitted immediately after their parent error, in the same position. Cascading/recovery-derived records follow their triggering authoritative record. The ordering rule is part of the contract; tests may assert exact record sequences.
 
@@ -163,6 +166,7 @@ User traps via `rt.trap.report(code: u32, message: str)` emit a record with `cod
 | `AIC-N0206` | import cycle | error | the import closing the cycle; secondary spans: cycle members |
 | `AIC-N0207` | module declaration uses the reserved `rt` prefix | error | the module declaration |
 | `AIC-N0208` | import of reserved runtime submodule not in the runtime surface | error | the import qualified name |
+| `AIC-N0209` | bare `import rt;` (import a specific runtime submodule instead) | error | the import qualified name |
 
 ### 11.4 Type (`AIC-T`)
 
@@ -244,6 +248,7 @@ These classes are reserved for internal invariant and artifact failures. In v0.1
 | `AIC-R0813` | invalid release (pointer not from allocator) | failing operation |
 | `AIC-R0814` | invalid/closed file handle | failing operation |
 | `AIC-R0815` | stack exhaustion | failing operation |
+| `AIC-R0816` | pointer arithmetic overflow (checked scaling / byte-difference overflow) | failing operation |
 | `AIC-U0000` | user trap via `rt.trap.report` (numeric code in `trap_code`) | call site |
 
 ### 11.9 Code registry and allocation policy
@@ -253,13 +258,13 @@ These classes are reserved for internal invariant and artifact failures. In v0.1
 - **Stability:** once allocated, a code's meaning is immutable. A code is never deleted, reused, or re-scoped. If a rule is removed, its code is marked `deprecated` and retained in the registry with a note; `deprecated` codes are never re-emitted by conforming compilers.
 - **Reserved ranges:** the numeric ranges within each class are allocated contiguously; gaps are reserved for future rules and may not be used out of sequence. User-defined trap codes never collide with `AIC-` codes: user codes are raw `u32` values carried in `trap_code`, outside the `AIC-` namespace.
 - **Registry updates:** any addition, deprecation, or schema change must be recorded in this document with a version note and reviewed; the registry is the durable record for `FIND-005` closure.
-- **v0.1.1 additions:** `AIC-N0207` and `AIC-N0208` were added for the reserved runtime-module rules of the language specification §6.5 (next unused codes in class `N`). `AIC-E0412`'s meaning text was narrowed to the brace-delimited case-body rule; the code, severity, and primary-span semantics are unchanged.
+- **v0.1.1 additions:** `AIC-N0207` and `AIC-N0208` were added for the reserved runtime-module rules of the language specification §6.5 (next unused codes in class `N`). `AIC-E0412`'s meaning text was narrowed to the brace-delimited case-body rule; the code, severity, and primary-span semantics are unchanged. In the gate-2 correction round, `AIC-N0209` (bare `import rt;`, language spec §6.5) and `AIC-R0816` (pointer arithmetic overflow, language spec §12.5) were added as the next unused codes in classes `N` and `R` respectively.
 
 ### 11.10 Compatibility rules
 
 - **Forward compatibility:** consumers must tolerate unknown codes and unknown optional fields within a known `schema_version`. An unknown code with severity `error` must be treated as a build failure; its meaning may not be guessed.
 - **Backward compatibility:** schema version 1 records remain valid for consumers written against schema version 1. Required fields are never renamed, removed, or re-typed within a schema version. New optional fields may be added within a schema version.
-- **Schema versioning:** a change that alters the meaning of a required field, changes required-field structure, or changes the code allocation rules requires a new schema version (e.g., `"2"`) and a migration note. A conforming compiler emits exactly one `schema_version` for the whole build (except historical records replayed by tools, which preserve their original version).
+- **Schema versioning:** a change that alters the meaning of a required field, changes required-field structure, or changes the code allocation rules requires a new schema version (e.g., `"2"`) and a migration note. **Draft exemption:** a change made while the contract is still Proposed — before any conforming record of the affected shape has ever been emitted — does not trigger a version bump; the first accepted, emitted schema is the baseline that later changes must version. A conforming compiler emits exactly one `schema_version` for the whole build (except historical records replayed by tools, which preserve their original version).
 - **Wording:** `message` text may change without a schema or code change; the stable code, structure, and facts are the contract.
 - **Trap compatibility:** trap codes follow the same immutability rules; trap exit code is defined per Section 10 of this contract and Section 15.5 of `AI-CO-LANGUAGE-SPECIFICATION.md`.
 - **v0.1.1 compatibility note:** this revision makes two structural corrections to the Proposed v0.1.0 draft: `recovery` is now required on `error` and trap records (Section 3), and `corrections` elements are structured objects (Sections 4 and 8). Schema version remains `"1"` because the v0.1.0 draft was never accepted or implemented, no record in the old shape was ever emitted by a conforming compiler, and both changes align the contract with its governing ADR-001 requirement (every diagnostic record carries a deterministic recovery/continuation status) and with this document's own prior prose (§8 already described corrections as replacement text plus optional span). Consumers of the corrected contract are the only conforming consumers; the required-field semantics and code registry defined here are the v1 baseline for implementation.
@@ -293,3 +298,5 @@ Runtime trap record (on stderr at trap time):
 Status: **Proposed**. This contract is reviewed with the language specification: Planner self-review, then Reviewer conformance review and Main Designer architectural acceptance. Code additions/changes require a new schema version or documented deprecation; codes never change meaning after acceptance. This document closes review finding FIND-005 (diagnostic schema version 1, stable code-allocation policy and registry, compatibility rules, deterministic ordering, and runtime-trap code contract).
 
 **v0.1.1 (2026-08-08):** made `recovery` mandatory on error/trap records, defined `corrections` as structured objects, and added `AIC-N0207`/`AIC-N0208` for the reserved runtime-module rules of the language specification §6.5. Schema version remains `"1"` (see §11.10 compatibility note). Status remains Proposed.
+
+**v0.1.1 gate-2 correction round (2026-08-08):** per the gate-2 conformance review (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REVIEW-2026-08-08.md`): §9 now defines deterministic ordering for null-span records (FIND-G2-04), §11.10 now states the draft-exemption clause (FIND-G2-09), the registry gained `AIC-N0209` (bare `import rt;`; language spec §6.5) and `AIC-R0816` (pointer arithmetic overflow; language spec §12.5) (FIND-G2-07, FIND-G2-06), and §5 notes the `U` class exemption from the phase-group digit mapping (SUG-G2-02). Schema version remains `"1"` (the additions follow the class allocation policy; no required-field structure changed). Status remains Proposed.
