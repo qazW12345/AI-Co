@@ -1,0 +1,38 @@
+# Credentials and local environment
+.env
+.env.*
+*.key
+*.token
+GitHub-API.txt
+
+# Native build output
+build/
+out/
+bin/
+obj/
+*.obj
+*.o
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# Generated compiler/bootstrap output
+bootstrap/stage0/
+bootstrap/stage1/
+bootstrap/stage2/
+generated/
+
+# Test and analysis output
+coverage/
+corpus/artifacts/
+*.log
+*.tmp
+
+# Editor and OS artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
