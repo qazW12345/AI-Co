@@ -31,8 +31,11 @@ See:
 - [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md)
 - [`docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md`](docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md)
 - [`docs/adr/ADR-002-minimal-core-language-semantics.md`](docs/adr/ADR-002-minimal-core-language-semantics.md)
-- [`docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md`](docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md)
+- [`docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md`](docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md) — superseded history
 - [`docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md`](docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md)
+- [`spec/AI-CO-LANGUAGE-SPECIFICATION.md`](spec/AI-CO-LANGUAGE-SPECIFICATION.md) — Proposed v0.1.1
+- [`spec/DIAGNOSTIC-CONTRACT.md`](spec/DIAGNOSTIC-CONTRACT.md) — Proposed v0.1.1
+- [`spec/OPEN-QUESTIONS.md`](spec/OPEN-QUESTIONS.md) — resolution and monitoring record
 - [`research/ENVIRONMENT_BASELINE_2026-08-08.md`](research/ENVIRONMENT_BASELINE_2026-08-08.md)
 
 ## Status
