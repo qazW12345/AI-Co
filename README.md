@@ -31,6 +31,7 @@ See:
 - [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md)
 - [`docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md`](docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md)
 - [`docs/adr/ADR-002-minimal-core-language-semantics.md`](docs/adr/ADR-002-minimal-core-language-semantics.md)
+- [`docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md`](docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md)
 - [`research/ENVIRONMENT_BASELINE_2026-08-08.md`](research/ENVIRONMENT_BASELINE_2026-08-08.md)
 
 ## Status
