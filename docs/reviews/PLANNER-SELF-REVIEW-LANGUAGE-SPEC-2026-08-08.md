@@ -88,3 +88,11 @@ No other changes were made. No new architecture decisions were made.
 - Gate state: Specification remains **Proposed**; implementation blocked.
 - Next action: Coordinator to route the independent Reviewer conformance review of the amended v0.1.1 specification and `DIAGNOSTIC-CONTRACT.md` (gate 2), then Main Designer architectural acceptance (gate 3). The prior independent Pass covered the ADR-003/ADR-004-aligned content; the Reviewer should confirm the §14.3 addition as part of the gate-2 review of the amended draft.
 - Documentation state: this report delivered as `docs/reviews/PLANNER-SELF-REVIEW-LANGUAGE-SPEC-2026-08-08.md`; spec corrections committed in the AI-Co repository.
+
+---
+
+## Addendum: repository-state observation (2026-08-08, during self-review)
+
+The parent independent Reviewer Pass report at `docs/reviews/ADR-003-LANGUAGE-SPEC-REVIEW-2026-08-08.md` was read in full at the start of this self-review (content: verdict Pass, no findings, four focus areas). That file is currently **absent from the working tree** and was never committed to the AI-Co repository (verified via `git ls-files`, `git log --all`, `git reflog`, and `find`). It disappeared during the concurrent v0.1.1 publish commit (`dd58eea`, 17:10:19) and has no kanban attachment on the parent task (`t_9c4abb9f`).
+
+Impact: the self-review inputs were complete (the report was inspected before it vanished), but the durable evidence record for the independent Pass is missing. This is a repository-state defect, not a specification defect, and is outside Planner-owned writable records. Recommended follow-up: the Reviewer (or Coordinator) should re-deliver the independent Pass report — restoring it from the Reviewer's own session record and committing it — so the review trail for gate 2 remains complete.
