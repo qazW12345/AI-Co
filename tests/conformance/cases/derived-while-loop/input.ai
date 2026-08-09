@@ -1,0 +1,9 @@
+module main;
+// §5.2 — while loop
+fn countdown(n: i32) -> i32 {
+  var c: i32 = n;
+  while (c > 0) {
+    c -= 1;
+  }
+  return c;
+}

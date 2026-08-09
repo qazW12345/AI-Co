@@ -1,0 +1,4 @@
+module a.b;
+// §18.3 — pub function visible from another module
+pub fn f() -> i32 { return 1; }
+fn g() -> i32 { return 2; }

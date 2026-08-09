@@ -1,0 +1,4 @@
+module main;
+// §7.4 — nested struct layout
+struct Inner { a: i32; b: i32; }
+struct Outer { x: i32; inner: Inner; y: i32; }

@@ -1,0 +1,9 @@
+module main;
+// §5.2 — for loop with init, condition, post
+fn sum_to(n: i32) -> i32 {
+  var s: i32 = 0;
+  for (var i: i32 = 1; i <= n; i += 1) {
+    s += i;
+  }
+  return s;
+}

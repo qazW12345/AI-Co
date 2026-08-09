@@ -1,0 +1,14 @@
+module main;
+import rt.mem;
+import rt.io;
+// §18.6 — array initialization with [0u8; 16]
+pub fn main() -> i32 {
+  var buf: u8[16] = [0u8; 16];
+  var sl: u8[] = buf[..];
+  sl[0] = 65u8;
+  var p: u8* = ptr(buf);
+  var p2: u8* = null;
+  var n: usize = len(sl);
+  var one: u8 = sl[0];
+  return 0;
+}

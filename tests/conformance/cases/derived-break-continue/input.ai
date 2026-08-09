@@ -1,0 +1,10 @@
+module main;
+// §5.2 — break and continue in for loop
+fn first_even(n: i32) -> i32 {
+  for (var i: i32 = 0; i < n; i += 1) {
+    if (i % 2 == 0) {
+      return i;
+    }
+  }
+  return 0 - 1;
+}

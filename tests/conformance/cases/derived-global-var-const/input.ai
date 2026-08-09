@@ -1,0 +1,5 @@
+module main;
+// §8.3 — global var and const at module scope
+const MAX: i32 = 100;
+var counter: i32 = 0;
+var label: str = "hello";

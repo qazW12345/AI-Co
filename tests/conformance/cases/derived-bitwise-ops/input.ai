@@ -1,0 +1,8 @@
+module main;
+// §10 — bitwise operators
+var a: i32 = 0xFF & 0x0F;
+var b: i32 = 0xF0 | 0x0F;
+var c: i32 = 0xFF ^ 0x0F;
+var d: i32 = 1 << 4;
+var e: i32 = 256 >> 4;
+var f: i32 = ~0;

@@ -1,0 +1,4 @@
+module main;
+// §13.4 — void function (no return value)
+fn noop() -> void {
+}

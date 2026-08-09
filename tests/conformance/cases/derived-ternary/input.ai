@@ -1,0 +1,4 @@
+module main;
+// §10.4 — ternary conditional expression
+var x: i32 = 5;
+var result: i32 = x > 0 ? x : 0 - x;

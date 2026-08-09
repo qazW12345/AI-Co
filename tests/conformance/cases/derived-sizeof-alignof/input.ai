@@ -1,0 +1,6 @@
+module main;
+// §10.5 — sizeof and alignof on types
+var a: usize = sizeof(i32);
+var b: usize = sizeof(bool);
+var c: usize = alignof(i32);
+var d: usize = alignof(bool);

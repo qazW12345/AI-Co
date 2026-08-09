@@ -1,0 +1,5 @@
+module main;
+// §11.4 — bool equality
+var a: bool = true == true;
+var b: bool = true != false;
+var c: bool = !false;

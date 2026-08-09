@@ -1,0 +1,7 @@
+module main;
+// §12.4 — slice expressions: full, head, tail, range
+var arr: i32[4] = [10, 20, 30, 40];
+var full: i32[] = arr[..];
+var head: i32[] = arr[..2];
+var tail: i32[] = arr[2..];
+var mid: i32[] = arr[1..3];

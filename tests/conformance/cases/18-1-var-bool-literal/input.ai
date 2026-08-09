@@ -1,0 +1,3 @@
+module main;
+// §18.1 — bool literal
+var b: bool = true;

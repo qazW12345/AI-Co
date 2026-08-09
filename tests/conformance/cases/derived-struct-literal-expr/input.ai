@@ -1,0 +1,6 @@
+module main;
+// §12.7 — struct literal in expression position
+struct Point { x: i32; y: i32; }
+fn make_origin() -> Point {
+  return Point { x: 0, y: 0 };
+}

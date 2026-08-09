@@ -1,0 +1,3 @@
+module main;
+// §4.3 — octal literal
+var o: i32 = 0o17;

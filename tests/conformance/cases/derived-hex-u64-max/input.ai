@@ -1,0 +1,3 @@
+module main;
+// §4.3 — hex literal for u64 max
+var max: u64 = 0xFFFF_FFFF_FFFF_FFFF;

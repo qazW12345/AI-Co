@@ -1,0 +1,4 @@
+module main;
+// §12.6 — pointer null comparison
+var p: i32* = null;
+var is_null: bool = p == null;

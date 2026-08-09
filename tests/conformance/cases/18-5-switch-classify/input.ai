@@ -1,0 +1,9 @@
+module main;
+// §18.5 — switch statement with case/default
+fn classify(n: i32) -> str {
+  switch (n) {
+    case 0: { return "zero"; }
+    case 1: { return "one"; }
+    default: { return "other"; }
+  }
+}

@@ -1,0 +1,3 @@
+module main;
+// §7.5 — enum with gap values
+enum Flags: u32 { None = 0, Read = 1, Write = 2, Exec = 4 }

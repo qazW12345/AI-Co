@@ -1,0 +1,3 @@
+module main;
+// §18.2 — enum with implicit values (Red=0, Green=1, Blue=2)
+enum Color: u8 { Red, Green, Blue }

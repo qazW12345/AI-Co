@@ -1,0 +1,12 @@
+module main;
+// §7.1 — all integer types declared
+var a: i8 = 0;
+var b: i16 = 0;
+var c: i32 = 0;
+var d: i64 = 0;
+var e: u8 = 0;
+var f: u16 = 0;
+var g: u32 = 0;
+var h: u64 = 0;
+var i: isize = 0;
+var j: usize = 0;

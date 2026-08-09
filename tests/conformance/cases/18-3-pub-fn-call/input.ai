@@ -1,0 +1,4 @@
+module main;
+// §18.3 — calling a pub function from imported module
+import a.b;
+var x: i32 = a.b.f();

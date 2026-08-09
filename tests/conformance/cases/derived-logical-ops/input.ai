@@ -1,0 +1,5 @@
+module main;
+// §10 — logical operators (bool)
+var a: bool = true && false;
+var b: bool = true || false;
+var c: bool = !true;

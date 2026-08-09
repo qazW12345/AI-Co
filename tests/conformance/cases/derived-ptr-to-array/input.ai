@@ -1,0 +1,4 @@
+module main;
+// §7.2 — pointer to array type
+var arr: i32[3] = [1, 2, 3];
+var p: i32[3]* = &arr;

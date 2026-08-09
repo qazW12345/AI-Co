@@ -1,0 +1,7 @@
+module main;
+// §10 — arithmetic operators
+var a: i32 = 10 + 3;
+var b: i32 = 10 - 3;
+var c: i32 = 10 * 3;
+var d: i32 = 10 / 3;
+var e: i32 = 10 % 3;
