@@ -7,6 +7,7 @@ GitHub-API.txt
 
 # Native build output
 build/
+!bootstrap/build/
 out/
 bin/
 obj/
@@ -27,6 +28,7 @@ generated/
 
 # Test and analysis output
 coverage/
+tests/artifacts/
 corpus/artifacts/
 *.log
 *.tmp
