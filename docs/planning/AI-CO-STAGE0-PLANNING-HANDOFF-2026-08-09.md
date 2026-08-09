@@ -6,7 +6,7 @@
 - **Decision authority (if applicable):** Main Designer (accepted architecture: ADR-001, ADR-002, ADR-004); Marcel, Human Sponsor (ADR-004 resolutions; Stage-0 direction and working philosophy, 2026-08-08)
 - **Human approver (if a gate applies):** Not applicable — this is a planning handoff; no new approval gate is claimed. M0/M1 milestone gates remain with the Main Designer; human gates remain with Marcel per the Constitution.
 
-**Status:** Complete for handoff (planning artifact; not an implementation or acceptance claim)
+**Status:** Accepted (planning artifact; Main Designer acceptance recorded 2026-08-10 — not an implementation claim)
 **Owner:** Planner
 **Date:** 2026-08-09
 **Scope:** project AI-Co, task t_dd420fb9
@@ -72,7 +72,8 @@ Critical path: WP-M0-01 (conventions) → 06 (diag) → 07 (load) → 08 (lex) �
 ## 9. Review and approval state
 
 - Planning self-review: performed by the Planner over the two artifacts (scope, ownership disjointness, serial chain, traceability, attribution). No independent Reviewer review was requested for this planning handoff; the Coordinator may route a Reviewer conformance check of the manifest before card creation if assurance policy requires it.
-- No approval is claimed in this report. M0 gate acceptance and IR contract acceptance remain with the Main Designer; any human gate remains with Marcel.
+- **Accepted (2026-08-10, Main Designer):** The Main Designer accepted the Stage-0 milestone plan and work-package manifest as the M0 implementation basis (Main Designer decision, session 2026-08-10; routing task t_5bcee55d; recorded by the Planner). Scope: M0 milestone plan and manifest only; M1/M2 remain as recorded; the M1 refinement checkpoint is unchanged. This supersedes the earlier "no approval is claimed" statement in this section. No new architecture decisions; no new Human Sponsor claims.
+- M0 gate acceptance (WP-M0-20), IR contract acceptance (WP-M0-16), and Windows API baseline doc review (WP-M0-15) remain with the Main Designer; any human gate remains with Marcel.
 
 ## 10. Coordinator handoff and follow-up decision owners
 

@@ -6,10 +6,11 @@
 - **Decision authority (if applicable):** Main Designer (accepted architecture: ADR-001, ADR-002, ADR-004); Marcel, Human Sponsor (ADR-004 resolutions; Stage-0 direction and working philosophy, 2026-08-08)
 - **Human approver (if a gate applies):** Not applicable — this manifest routes implementation; it introduces no new approval gate.
 
-**Status:** Draft for Coordinator handoff
+**Status:** Accepted
 **Owner:** Planner
 **Date:** 2026-08-09
 **Scope:** project AI-Co, milestone M0 (Stage-0 bootstrap compiler and verification infrastructure); M1 shown as milestone-level streams with a Planner refinement checkpoint
+**Accepted:** 2026-08-10 — Main Designer (decision owner for plan acceptance; decision in session 2026-08-10, routing task t_5bcee55d). Scope: M0 work-package manifest only; M1 remains milestone-level streams; the M1 refinement checkpoint is unchanged. No new architecture decisions; no new Human Sponsor claims.
 
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 

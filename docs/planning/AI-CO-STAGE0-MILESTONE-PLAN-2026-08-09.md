@@ -6,11 +6,12 @@
 - **Decision authority (if applicable):** Main Designer (accepted architecture: ADR-001, ADR-002, ADR-004); Marcel, Human Sponsor (ADR-004 resolutions; Stage-0 direction and working philosophy, 2026-08-08)
 - **Human approver (if a gate applies):** Not applicable — this report is a planning handoff; it relies on already-recorded approvals and introduces no new gate.
 
-**Status:** Draft for Coordinator handoff
+**Status:** Accepted
 **Owner:** Planner
 **Date:** 2026-08-09
 **Scope:** project AI-Co
 **Supersedes:** none (first implementation-planning artifact for AI-Co)
+**Accepted:** 2026-08-10 — Main Designer (decision owner for plan acceptance; decision in session 2026-08-10, routing task t_5bcee55d). Scope: M0 milestone plan only; M1/M2 remain as recorded; the M1 refinement checkpoint is unchanged. No new architecture decisions; no new Human Sponsor claims.
 
 ## 1. Requested outcome and governing decisions
 
