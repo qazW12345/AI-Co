@@ -191,7 +191,7 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 - **Exclusions:** tokenization (WP-M0-08); module-to-file resolution (WP-M0-10).
 - **Dependencies / inputs:** WP-M0-06 diag API; spec §3, §4.1.
 - **Expected artifacts:** `bootstrap/src/load/**`, `bootstrap/build/load.txt`, unit tests incl. byte-level UTF-8 vectors.
-- **Capability:** `junior_specialist` (bounded, well-specified; byte-level test vectors make verification objective).
+- **Capability:** `senior_specialist` (C17 host-toolchain implementation package per milestone plan §8; byte-level UTF-8 validation and span computation are pipeline-critical).
 - **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Valid UTF-8 (incl. 4-byte code points) loads; BOM/NUL/invalid/overlong/surrogate sequences rejected with the correct codes.
