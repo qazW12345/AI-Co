@@ -1,6 +1,6 @@
-# AI-Co Language Specification v0.1.1 (Proposed)
+# AI-Co Language Specification v0.1.1 (Accepted)
 
-**Status:** Proposed
+**Status:** Accepted
 **Owner:** Planner
 **Decision owner:** Main Designer (architecture); decisions recorded in ADR-004 are Human Sponsor approvals and are applied here as governing direction.
 **Approver:** Main Designer (architectural acceptance); Reviewer (independent conformance review); Marcel (Human Sponsor) for purpose-affecting questions.
@@ -22,7 +22,7 @@ This specification is derived from, and must not contradict:
 8. Marcel's accepted base direction as durably captured in the charter.
 9. `docs/reviews/INITIAL-ARCHITECTURE-REVIEW-2026-08-08.md` (Approved with Minor findings; FIND-001/FIND-002 architecture-resolved, FIND-003/FIND-004/FIND-005 Planner gates closed in this specification).
 
-This document is a *Proposed* normative draft. It becomes normative only after the required review gates pass: Planner self-review, independent Reviewer conformance review, and Main Designer architectural acceptance. Nothing in this document authorizes implementation before those gates pass. Implementation remains blocked until the review gates in Section 21 are met; this Proposed draft is not an Accepted specification and must not be relabeled as one.
+This document is an *Accepted* normative specification (2026-08-08). It was a Proposed normative draft until the required review gates passed: Planner self-review, independent Reviewer conformance review, and Main Designer architectural acceptance. The review gates in Section 21 are now met; see Section 21 for the acceptance record.
 
 Related documents:
 
@@ -1231,7 +1231,7 @@ Self-checklist against the task acceptance criteria:
 
 ## 21. Review state and handoff
 
-- Status: **Proposed** (not Accepted). Implementation remains blocked until the gates below are met.
+- Status: **Accepted** (2026-08-08, Main Designer gate-3 acceptance). Implementation is no longer blocked by the gates below, which have all passed; see the gate-3 acceptance entry below.
 - Required before implementation may be planned:
   1. Planner self-review (this draft);
   2. independent Reviewer conformance review of this specification and `DIAGNOSTIC-CONTRACT.md`;
@@ -1249,4 +1249,5 @@ Self-checklist against the task acceptance criteria:
 - **Planner self-review (2026-08-08):** Pass with one correction. The Planner self-review of the ADR-003/ADR-004-aligned v0.1.1 draft confirmed the three decisions (temporal baseline, wrapping baseline, Windows baseline) are requirements-complete, internally coherent, and implementation-ready; it added the ADR-004 §63 obligation that runtime-facing Windows calls be enumerated and documented against the pinned baseline (§14.3), which the v0.1.1 draft had not carried explicitly. No other corrections required; no new architecture decisions made.
 - **Gate-2 correction round (2026-08-08):** corrected the six Major findings (FIND-G2-01..06) and three Minor findings (FIND-G2-07..09) of the independent gate-2 conformance review (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REVIEW-2026-08-08.md`, verdict "Changes required") and adopted the three Suggestions (SUG-G2-01, SUG-G2-02, SUG-G2-03). Resolution per finding: FIND-G2-01 — §18.4/§18.6 examples corrected to conform to the §4.3/§11.1 conversion rules (explicit `cast` and suffixed literals), with negative coverage for the rejected spellings; FIND-G2-02 — §14.4 defines the hashed artifact set and explicitly excludes the manifest from its own hash list; FIND-G2-03 — §14.4 defines stage-invariant manifest fields (AI-Co language/spec version string only), carries host compiler and linker identity exclusively in the §16.3 external evidence, and requires identical relative output paths for the byte-identity comparison; FIND-G2-04 — deterministic null-span ordering rule added to `DIAGNOSTIC-CONTRACT.md` §9; FIND-G2-05 — §15.1 defines `alloc_bytes(0)` (returns `null`, no allocation) and an exact-fit size/reuse rule (reverse order of release within a size class; no splitting or coalescing); FIND-G2-06 — §12.5 defines checked pointer-arithmetic overflow with new stable trap `AIC-R0816` (registry and trap table updated); FIND-G2-07 — §6.5 rejects bare `import rt;` with new code `AIC-N0209` and requires explicit runtime submodule imports (no auto-availability); FIND-G2-08 — §18.5 annotations repositioned and completed (missing `AIC-N0202` added); FIND-G2-09 — `DIAGNOSTIC-CONTRACT.md` §11.10 gained a draft-exemption clause. Suggestions adopted: SUG-G2-01 (compiler-controlled timestamps are zero, ADR-001 §107), SUG-G2-02 (`U` class exempt from the phase-group digit mapping), SUG-G2-03 (manifest version/identity field is the AI-Co language/spec version string). No ADR, charter, or governance document was modified; this round is specification precision repair within the accepted architecture. The amended set is subject to Reviewer re-review (gate 2) before Main Designer architectural acceptance (gate 3); push remains held pending a passing re-review verdict.
 - **RER-G2-01 correction (2026-08-08):** closed the residual Minor finding of the gate-2 re-review round 1 (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REREVIEW-2026-08-08.md`, verdict "Approved with Minor findings") by completing the §18.5 `fn bad` example's error annotation set: added `// ERROR AIC-E0416: span "fn bad"` for the reachable no-return path (a `switch` with no matching case and no optional `default` reaches the function tail per §13.2/§13.4/§13.5; span is the function name per `DIAGNOSTIC-CONTRACT.md` §11.5). The example's annotation set (AIC-N0202 + AIC-E0412 + AIC-E0416) now matches the actual error set. No registry or contract change was required; no ADR, charter, or governance document was modified.
+- **Gate-3 acceptance (2026-08-08):** accepted by the Main Designer on 2026-08-08 (task t_b157b2bd). Evidence: gate-2 re-review round 1 returned `Approved with Minor findings` (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REREVIEW-2026-08-08.md`); the residual Minor RER-G2-01 was fixed and verified closed (commit 1340a45); no open questions remain. The Status of this specification and its normative companions (`DIAGNOSTIC-CONTRACT.md`, `OPEN-QUESTIONS.md`) is now **Accepted**. Implementation may now be planned per the applicable governance.
 - Follow-up decision owners: Main Designer (specification acceptance); Coordinator (routing of the Reviewer conformance review and later implementation work packages). No open questions remain; `spec/OPEN-QUESTIONS.md` is the monitored resolution record.

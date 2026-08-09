@@ -1,10 +1,10 @@
-# AI-Co Specification Open Questions and Resolution Record (Proposed v0.1.1)
+# AI-Co Specification Open Questions and Resolution Record (Accepted v0.1.1)
 
-**Status:** No implementation-blocking open questions remain. All items escalated during v0.1.0 drafting are resolved or deferred by Human Sponsor approval recorded in ADR-004; the entries below are the monitored resolution record, not an open-question list.
+**Status:** Accepted (2026-08-08). No implementation-blocking open questions remain. All items escalated during v0.1.0 drafting are resolved or deferred by Human Sponsor approval recorded in ADR-004; the entries below are the monitored resolution record, not an open-question list.
 **Owner:** Planner
 **Decision owner per item:** Marcel, Human Sponsor (as recorded in ADR-004)
 **Date:** 2026-08-08
-**Companion to:** `spec/AI-CO-LANGUAGE-SPECIFICATION.md` v0.1.1 (Proposed) and `spec/DIAGNOSTIC-CONTRACT.md` v0.1.1 (Proposed)
+**Companion to:** `spec/AI-CO-LANGUAGE-SPECIFICATION.md` v0.1.1 (Accepted) and `spec/DIAGNOSTIC-CONTRACT.md` v0.1.1 (Accepted)
 
 **Authority note:** the substantive choices below are Human Sponsor approvals recorded in `docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md` (Accepted). ADR-003 is retained as superseded history only. No Planner artifact creates an approval; ADR-004 is the authoritative record of these resolutions (ADR-004, Context; Constitution: silence is not approval).
 
@@ -78,4 +78,4 @@
 
 - Each item closes only by an explicit decision recorded in an accepted record; silence is not approval (Constitution §3.1). For these items, the accepted record is ADR-004 (Human Sponsor approval), and the decisions are attributed only to Marcel, Human Sponsor, and ADR-004 — never to the Main Designer or to any nonexistent decision note.
 - The deleted, never-committed Main Designer decision-note artifact is not referenced anywhere in the v0.1.1 specification set and is not a source of any resolution.
-- Deferred items are monitored here until reopened or closed; they do not block the v0.1.1 Proposed specification's remaining gates (Planner self-review, independent Reviewer conformance review, Main Designer acceptance). Implementation remains blocked until those gates pass.
+- Deferred items are monitored here until reopened or closed; they did not block the v0.1.1 specification's gates (Planner self-review, independent Reviewer conformance review, Main Designer acceptance), all of which have now passed (gate-3 acceptance 2026-08-08).

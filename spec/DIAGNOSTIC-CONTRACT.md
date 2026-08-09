@@ -1,6 +1,6 @@
-# AI-Co Diagnostic Contract v0.1.1 (Proposed)
+# AI-Co Diagnostic Contract v0.1.1 (Accepted)
 
-**Status:** Proposed
+**Status:** Accepted
 **Owner:** Planner
 **Decision owner:** Main Designer (architecture); decisions recorded in ADR-004 are Human Sponsor approvals and are applied here as governing direction.
 **Approver:** Main Designer (architectural acceptance); Reviewer (independent conformance review).
@@ -8,11 +8,11 @@
 **Schema version:** 1
 **Date:** 2026-08-08
 **Scope:** project AI-Co
-**Companion to:** `spec/AI-CO-LANGUAGE-SPECIFICATION.md` (v0.1.1, Proposed)
+**Companion to:** `spec/AI-CO-LANGUAGE-SPECIFICATION.md` (v0.1.1, Accepted)
 
-This document defines the normative, versioned JSON Lines diagnostic contract for the AI-Co minimal language and compiler, and the proposed stable diagnostic-code and runtime-trap-code namespace.
+This document defines the normative, versioned JSON Lines diagnostic contract for the AI-Co minimal language and compiler, and the stable diagnostic-code and runtime-trap-code namespace.
 
-Governing sources: `docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md` (Accepted), `docs/adr/ADR-002-minimal-core-language-semantics.md` (Accepted), `docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md` (Superseded by ADR-004), `docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md` (Accepted), `spec/AI-CO-LANGUAGE-SPECIFICATION.md` (Proposed v0.1.1).
+Governing sources: `docs/adr/ADR-001-bootstrap-compiler-and-initial-target.md` (Accepted), `docs/adr/ADR-002-minimal-core-language-semantics.md` (Accepted), `docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md` (Superseded by ADR-004), `docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md` (Accepted), `spec/AI-CO-LANGUAGE-SPECIFICATION.md` (Accepted v0.1.1).
 
 ---
 
@@ -129,7 +129,7 @@ The process writes the trap record to `stderr` as one JSON line, then terminates
 
 User traps via `rt.trap.report(code: u32, message: str)` emit a record with `code = "AIC-U0000"` and `trap_code = <caller code>`; exit code `70`.
 
-## 11. Proposed diagnostic-code table
+## 11. Diagnostic-code table
 
 ### 11.1 Lexical (`AIC-L`)
 
@@ -295,8 +295,10 @@ Runtime trap record (on stderr at trap time):
 
 ## 14. Review state
 
-Status: **Proposed**. This contract is reviewed with the language specification: Planner self-review, then Reviewer conformance review and Main Designer architectural acceptance. Code additions/changes require a new schema version or documented deprecation; codes never change meaning after acceptance. This document closes review finding FIND-005 (diagnostic schema version 1, stable code-allocation policy and registry, compatibility rules, deterministic ordering, and runtime-trap code contract).
+Status: **Accepted** (2026-08-08). This contract was reviewed with the language specification (Planner self-review, then Reviewer conformance review and Main Designer architectural acceptance) and was accepted with it; see the gate-3 acceptance entry below. Code additions/changes require a new schema version or documented deprecation; codes never change meaning after acceptance. This document closes review finding FIND-005 (diagnostic schema version 1, stable code-allocation policy and registry, compatibility rules, deterministic ordering, and runtime-trap code contract).
 
 **v0.1.1 (2026-08-08):** made `recovery` mandatory on error/trap records, defined `corrections` as structured objects, and added `AIC-N0207`/`AIC-N0208` for the reserved runtime-module rules of the language specification §6.5. Schema version remains `"1"` (see §11.10 compatibility note). Status remains Proposed.
 
 **v0.1.1 gate-2 correction round (2026-08-08):** per the gate-2 conformance review (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REVIEW-2026-08-08.md`): §9 now defines deterministic ordering for null-span records (FIND-G2-04), §11.10 now states the draft-exemption clause (FIND-G2-09), the registry gained `AIC-N0209` (bare `import rt;`; language spec §6.5) and `AIC-R0816` (pointer arithmetic overflow; language spec §12.5) (FIND-G2-07, FIND-G2-06), and §5 notes the `U` class exemption from the phase-group digit mapping (SUG-G2-02). Schema version remains `"1"` (the additions follow the class allocation policy; no required-field structure changed). Status remains Proposed.
+
+**v0.1.1 accepted (2026-08-08):** Status flipped to **Accepted** with the language specification (Main Designer gate-3 acceptance, task t_b157b2bd; gate-2 re-review `docs/reviews/LANGUAGE-SPEC-v0.1.1-REREVIEW-2026-08-08.md` returned `Approved with Minor findings` and residual RER-G2-01 was closed). Schema version remains `"1"`; no code-registry or structural change.
