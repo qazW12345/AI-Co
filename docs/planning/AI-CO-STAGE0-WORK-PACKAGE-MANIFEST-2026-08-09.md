@@ -12,6 +12,8 @@
 **Scope:** project AI-Co, milestone M0 (Stage-0 bootstrap compiler and verification infrastructure); M1 shown as milestone-level streams with a Planner refinement checkpoint
 **Accepted:** 2026-08-10 — Main Designer (decision owner for plan acceptance; decision in session 2026-08-10, routing task t_5bcee55d). Scope: M0 work-package manifest only; M1 remains milestone-level streams; the M1 refinement checkpoint is unchanged. No new architecture decisions; no new Human Sponsor claims.
 
+**Amendment (2026-08-10):** explicit completion protocol added — §1 routing rule 8 (binding on every implementing worker) and a §5 Coordinator checklist item (card bodies must carry the rule). Source: Main Designer direction, Marcel-approved (2026-08-10), following the WP-M0-03/04 protocol-slip corrective round (OM §6.1 watchdog audit). Decision authority for this planning-artifact amendment: Main Designer (OM §8); no new Human Sponsor claims. Existing M0 cards 05–20 keep their current card bodies and are covered operationally by the OM §6.1 watchdog audit (premature-completion auto-route); no board edits are required. The companion milestone plan §7 carries a one-line reference; the protocol is not duplicated there.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -23,6 +25,7 @@ Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone 
 5. Corpus packages (WP-M0-02..04) may be authored before the compiler exists; they encode the specification, not the implementation. Their acceptance does not require execution. All three corpus packages and the harness (WP-M0-05) implement **the single case schema defined in §1a** below; no package invents its own format.
 6. Commit locally on `main`; do **not** push (push is handled separately per project practice). Commits must carry clear messages naming the package.
 7. No package may write to the C: drive, create secrets, modify the specification/ADRs, or publish anything (private repo).
+8. **Completion protocol (binding on every implementing worker):** on completing bounded work whose review class requires independent review, post the handoff evidence as a comment, then call `kanban_block(reason='review-required: <one-line summary>')`. Do **NOT** call `kanban_complete` on your own card — completion is applied by the authorized owner only after the review gate passes (OM §6.1, org ADR-004 §54-8).
 
 ## 1a. Corpus and harness case schema (Planner-defined interface)
 
@@ -458,4 +461,4 @@ M1 acceptance is normative in spec §16.5/§16.6 and is not restated as a new de
 
 ## 5. Coordinator checklist
 
-For each WP-M0 card, verify before dispatch: assignee profile Active and capability matches; workspace `E:\Hermes_Agent\projects\Sneedworks\projects\AI-Co`; parent dependency edges set (WP-M0-N depends on WP-M0-(N-1); WP-M0-05 also depends on WP-M0-02..04 schemas; WP-M0-14/WP-M0-15 coordinate the rt.trap interface — represent as a documented interface note, not a shared file); delivery destination = owned area in §2; acceptance criteria present; review class recorded; no human gate outstanding. If any package requires a Planner refinement (e.g., harness schema conflict), return to the Planner rather than inventing content.
+For each WP-M0 card, verify before dispatch: assignee profile Active and capability matches; workspace `E:\Hermes_Agent\projects\Sneedworks\projects\AI-Co`; parent dependency edges set (WP-M0-N depends on WP-M0-(N-1); WP-M0-05 also depends on WP-M0-02..04 schemas; WP-M0-14/WP-M0-15 coordinate the rt.trap interface — represent as a documented interface note, not a shared file); delivery destination = owned area in §2; acceptance criteria present; review class recorded; card body carries the completion protocol rule (manifest §1.8 — worker must block `review-required:` and must not `kanban_complete` own review-class work); no human gate outstanding. If any package requires a Planner refinement (e.g., harness schema conflict), return to the Planner rather than inventing content.
