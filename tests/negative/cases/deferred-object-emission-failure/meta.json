@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-O0701"
+  ],
+  "deferral_reason": "Object emission / deterministic-artifact failure; requires compiler implementation with COFF emitter to test."
+}

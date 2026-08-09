@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-O0702"
+  ],
+  "deferral_reason": "Link failure reported by external linker; requires compiler implementation with linker invocation to test."
+}

@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-I0501"
+  ],
+  "deferral_reason": "Compiler internal invariant violation; cannot be triggered by user source; requires compiler implementation to test."
+}

@@ -1,0 +1,41 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0201",
+      "severity": "error",
+      "phase": "name",
+      "message": "duplicate declaration of 'x' in same scope",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 3,
+          "offset": 52
+        },
+        "end": {
+          "line": 4,
+          "col": 17,
+          "offset": 66
+        }
+      },
+      "recovery": "authoritative",
+      "secondary_spans": [
+        {
+          "file": "input.ai",
+          "start": {
+            "line": 3,
+            "col": 7,
+            "offset": 38
+          },
+          "end": {
+            "line": 3,
+            "col": 8,
+            "offset": 39
+          }
+        }
+      ]
+    }
+  ]
+}

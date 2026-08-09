@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-BL0803"
+  ],
+  "deferral_reason": "Entry module not found; requires build system implementation to test."
+}

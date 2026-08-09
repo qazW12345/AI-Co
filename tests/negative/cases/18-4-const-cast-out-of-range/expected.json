@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0408",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "constant cast out of range: 200 does not fit in i8",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 13,
+          "offset": 52
+        },
+        "end": {
+          "line": 3,
+          "col": 26,
+          "offset": 65
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

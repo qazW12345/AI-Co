@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0303",
+      "severity": "error",
+      "phase": "type",
+      "message": "struct 'Node' has infinite size due to recursive by-value field 'next'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 8,
+          "offset": 20
+        },
+        "end": {
+          "line": 2,
+          "col": 12,
+          "offset": 24
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

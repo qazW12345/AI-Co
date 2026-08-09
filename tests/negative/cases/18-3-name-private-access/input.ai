@@ -1,0 +1,4 @@
+module main;
+import a.b;
+var x: i32 = a.b.f();
+var y: i32 = a.b.g();

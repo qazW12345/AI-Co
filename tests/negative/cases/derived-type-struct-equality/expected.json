@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0304",
+      "severity": "error",
+      "phase": "type",
+      "message": "'==' operator not applicable to struct type 'Point'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 6,
+          "col": 20,
+          "offset": 162
+        },
+        "end": {
+          "line": 6,
+          "col": 22,
+          "offset": 164
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

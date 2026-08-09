@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0009",
+      "severity": "error",
+      "phase": "lex",
+      "message": "string literal bytes not valid UTF-8 after escape expansion",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 14,
+          "offset": 26
+        },
+        "end": {
+          "line": 2,
+          "col": 20,
+          "offset": 32
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

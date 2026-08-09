@@ -1,0 +1,41 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0206",
+      "severity": "error",
+      "phase": "name",
+      "message": "import cycle detected",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 13
+        },
+        "end": {
+          "line": 2,
+          "col": 10,
+          "offset": 22
+        }
+      },
+      "recovery": "authoritative",
+      "secondary_spans": [
+        {
+          "file": "a.ai",
+          "start": {
+            "line": 1,
+            "col": 1,
+            "offset": 0
+          },
+          "end": {
+            "line": 1,
+            "col": 10,
+            "offset": 9
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0305",
+      "severity": "error",
+      "phase": "type",
+      "message": "chained comparison is not allowed",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 19,
+          "offset": 68
+        },
+        "end": {
+          "line": 4,
+          "col": 20,
+          "offset": 69
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

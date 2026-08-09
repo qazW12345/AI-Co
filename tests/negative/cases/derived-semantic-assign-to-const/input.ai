@@ -1,0 +1,6 @@
+module main;
+fn main() -> i32 {
+  const X: i32 = 5;
+  X = 10;
+  return X;
+}

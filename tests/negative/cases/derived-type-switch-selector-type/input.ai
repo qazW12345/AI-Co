@@ -1,0 +1,8 @@
+module main;
+fn main() -> i32 {
+  var s: str = "hello";
+  switch (s) {
+    case "hello": { return 1; }
+    default: { return 0; }
+  }
+}

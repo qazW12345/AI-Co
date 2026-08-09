@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0205",
+      "severity": "error",
+      "phase": "name",
+      "message": "module declaration name does not match canonical path",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 1,
+          "col": 1,
+          "offset": 0
+        },
+        "end": {
+          "line": 1,
+          "col": 19,
+          "offset": 18
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

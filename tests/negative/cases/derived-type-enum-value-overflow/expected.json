@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0301",
+      "severity": "error",
+      "phase": "type",
+      "message": "enum member value 256 is not representable in underlying type u8",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 22,
+          "offset": 34
+        },
+        "end": {
+          "line": 2,
+          "col": 25,
+          "offset": 37
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

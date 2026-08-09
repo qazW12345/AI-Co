@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-S0104",
+      "severity": "error",
+      "phase": "syntax",
+      "message": "controlled body must be enclosed in braces",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 3,
+          "offset": 34
+        },
+        "end": {
+          "line": 3,
+          "col": 12,
+          "offset": 43
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

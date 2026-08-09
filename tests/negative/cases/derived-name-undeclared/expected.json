@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0202",
+      "severity": "error",
+      "phase": "name",
+      "message": "undeclared name 'y'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 16,
+          "offset": 47
+        },
+        "end": {
+          "line": 3,
+          "col": 17,
+          "offset": 48
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-R0801",
+    "AIC-R0802",
+    "AIC-R0803",
+    "AIC-R0804",
+    "AIC-R0805",
+    "AIC-R0806",
+    "AIC-R0807",
+    "AIC-R0808",
+    "AIC-R0809",
+    "AIC-R0810",
+    "AIC-R0811",
+    "AIC-R0812",
+    "AIC-R0813",
+    "AIC-R0814",
+    "AIC-R0815",
+    "AIC-R0816"
+  ],
+  "deferral_reason": "Runtime trap codes are emitted at process runtime, not compile time. These belong in the smoke/executable test corpus (WP-M0-04)."
+}

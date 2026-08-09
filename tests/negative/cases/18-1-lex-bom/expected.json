@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0002",
+      "severity": "error",
+      "phase": "lex",
+      "message": "UTF-8 BOM present at start of file",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 1,
+          "col": 1,
+          "offset": 0
+        },
+        "end": {
+          "line": 1,
+          "col": 4,
+          "offset": 3
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

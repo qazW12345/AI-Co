@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0405",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "constant expression overflow",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 13,
+          "offset": 25
+        },
+        "end": {
+          "line": 2,
+          "col": 40,
+          "offset": 52
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

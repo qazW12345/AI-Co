@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0207",
+      "severity": "error",
+      "phase": "name",
+      "message": "module declaration uses the reserved 'rt' prefix",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 1,
+          "col": 1,
+          "offset": 0
+        },
+        "end": {
+          "line": 1,
+          "col": 15,
+          "offset": 14
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

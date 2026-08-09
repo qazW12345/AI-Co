@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-S0101",
+      "severity": "error",
+      "phase": "syntax",
+      "message": "expected token",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 16,
+          "offset": 61
+        },
+        "end": {
+          "line": 3,
+          "col": 30,
+          "offset": 75
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

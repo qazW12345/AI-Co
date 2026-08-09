@@ -1,0 +1,8 @@
+module main;
+import rt.mem;
+fn main() -> i32 {
+  var p1: i32* = alloc_bytes(4);
+  var p2: i32* = alloc_bytes(6);
+  const diff: usize = p2 - p1;
+  return 0;
+}

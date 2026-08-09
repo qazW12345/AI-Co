@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0306",
+      "severity": "error",
+      "phase": "type",
+      "message": "'+' operator not applicable to operand type 'bool'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 5,
+          "col": 19,
+          "offset": 95
+        },
+        "end": {
+          "line": 5,
+          "col": 20,
+          "offset": 96
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

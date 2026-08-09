@@ -1,0 +1,7 @@
+module main;
+fn main() -> i32 {
+  var a: bool = true;
+  var b: bool = false;
+  var r: bool = a + b;
+  return 0;
+}

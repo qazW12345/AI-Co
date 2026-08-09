@@ -1,0 +1,2 @@
+module wrong.path;
+fn main() -> i32 { return 0; }

@@ -1,0 +1,2 @@
+module main;
+var f: i8 = cast<i8>(127) + cast<i8>(1);

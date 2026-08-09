@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0415",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "return value in void function",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 3,
+          "offset": 27
+        },
+        "end": {
+          "line": 3,
+          "col": 12,
+          "offset": 36
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

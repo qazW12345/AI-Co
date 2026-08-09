@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0003",
+      "severity": "error",
+      "phase": "lex",
+      "message": "NUL byte in source",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 13
+        },
+        "end": {
+          "line": 2,
+          "col": 2,
+          "offset": 14
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

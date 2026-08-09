@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-BL0801"
+  ],
+  "deferral_reason": "Build manifest schema error; requires build system / manifest loader implementation to test."
+}

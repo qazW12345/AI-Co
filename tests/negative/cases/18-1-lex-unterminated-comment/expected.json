@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0004",
+      "severity": "error",
+      "phase": "lex",
+      "message": "unterminated block comment",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 13
+        },
+        "end": {
+          "line": 2,
+          "col": 24,
+          "offset": 36
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

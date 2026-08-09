@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0412",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "switch case 0 body lacks a terminating statement; fall-through is prohibited",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 5,
+          "offset": 56
+        },
+        "end": {
+          "line": 4,
+          "col": 11,
+          "offset": 62
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

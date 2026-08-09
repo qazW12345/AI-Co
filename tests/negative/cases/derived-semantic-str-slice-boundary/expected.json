@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0410",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "constant str slice not on code point boundary",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 18,
+          "offset": 75
+        },
+        "end": {
+          "line": 4,
+          "col": 25,
+          "offset": 82
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

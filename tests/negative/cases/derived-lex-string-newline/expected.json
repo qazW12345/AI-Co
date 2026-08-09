@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0007",
+      "severity": "error",
+      "phase": "lex",
+      "message": "line terminator inside string literal",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 20,
+          "offset": 32
+        },
+        "end": {
+          "line": 3,
+          "col": 1,
+          "offset": 33
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

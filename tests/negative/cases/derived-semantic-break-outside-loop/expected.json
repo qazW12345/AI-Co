@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0414",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "break outside loop or switch",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 3,
+          "offset": 34
+        },
+        "end": {
+          "line": 3,
+          "col": 9,
+          "offset": 40
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+module main;
+var g: i32 = 5 / 0;

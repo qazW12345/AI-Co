@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0307",
+      "severity": "error",
+      "phase": "type",
+      "message": "no common type: i32 literal 200 cannot be implicitly narrowed to i8",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 13,
+          "offset": 52
+        },
+        "end": {
+          "line": 3,
+          "col": 16,
+          "offset": 55
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

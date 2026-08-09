@@ -1,0 +1,2 @@
+module main;
+var x: i32 = ÿ 42;

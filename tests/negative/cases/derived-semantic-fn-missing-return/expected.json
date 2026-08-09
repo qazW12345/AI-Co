@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0416",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "non-void function 'missing' has a path without return",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 13
+        },
+        "end": {
+          "line": 2,
+          "col": 11,
+          "offset": 23
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

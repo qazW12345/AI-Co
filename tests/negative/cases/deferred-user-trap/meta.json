@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-U0000"
+  ],
+  "deferral_reason": "User trap via rt.trap.report is a runtime-phase event; belongs in smoke/executable corpus (WP-M0-04)."
+}

@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-S0103",
+      "severity": "error",
+      "phase": "syntax",
+      "message": "module declaration must be the first element",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 17
+        },
+        "end": {
+          "line": 2,
+          "col": 13,
+          "offset": 29
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

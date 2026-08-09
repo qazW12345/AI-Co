@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0309",
+      "severity": "error",
+      "phase": "type",
+      "message": "array literal element count mismatch: expected 3, found 2",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 21,
+          "offset": 52
+        },
+        "end": {
+          "line": 3,
+          "col": 27,
+          "offset": 58
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

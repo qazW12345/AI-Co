@@ -1,0 +1,3 @@
+module main;
+var s: str = "hello
+world";

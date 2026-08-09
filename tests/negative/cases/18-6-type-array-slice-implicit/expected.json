@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0307",
+      "severity": "error",
+      "phase": "type",
+      "message": "implicit array-to-slice conversion is absent",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 5,
+          "col": 7,
+          "offset": 71
+        },
+        "end": {
+          "line": 5,
+          "col": 10,
+          "offset": 74
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

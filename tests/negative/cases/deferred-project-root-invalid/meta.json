@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-BL0802"
+  ],
+  "deferral_reason": "Project root missing/invalid; requires build system implementation to test."
+}

@@ -1,0 +1,2 @@
+module main;
+var s: str = "bad \q escape";

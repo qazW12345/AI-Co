@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0006",
+      "severity": "error",
+      "phase": "lex",
+      "message": "integer literal 300 is not representable in type u8",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 15,
+          "offset": 27
+        },
+        "end": {
+          "line": 2,
+          "col": 20,
+          "offset": 32
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

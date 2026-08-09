@@ -1,0 +1,6 @@
+module main;
+struct Node { val: i32; next: Node; }
+fn main() -> i32 {
+  var n: Node = Node { val: 1, next: Node { val: 2, next: Node {} } };
+  return 0;
+}

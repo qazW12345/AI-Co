@@ -1,0 +1,41 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0203",
+      "severity": "error",
+      "phase": "name",
+      "message": "access to private item 'g' in module 'a.b'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 14,
+          "offset": 60
+        },
+        "end": {
+          "line": 4,
+          "col": 19,
+          "offset": 65
+        }
+      },
+      "recovery": "authoritative",
+      "secondary_spans": [
+        {
+          "file": "a/b.ai",
+          "start": {
+            "line": 3,
+            "col": 1,
+            "offset": 44
+          },
+          "end": {
+            "line": 3,
+            "col": 5,
+            "offset": 48
+          }
+        }
+      ]
+    }
+  ]
+}

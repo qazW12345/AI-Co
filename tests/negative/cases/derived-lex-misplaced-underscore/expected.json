@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-L0005",
+      "severity": "error",
+      "phase": "lex",
+      "message": "misplaced '_' in integer literal",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 14,
+          "offset": 26
+        },
+        "end": {
+          "line": 2,
+          "col": 33,
+          "offset": 45
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

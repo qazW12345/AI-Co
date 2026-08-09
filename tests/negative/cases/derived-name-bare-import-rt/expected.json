@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-N0209",
+      "severity": "error",
+      "phase": "name",
+      "message": "bare 'import rt;' is not allowed; import a specific runtime submodule instead",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 1,
+          "offset": 13
+        },
+        "end": {
+          "line": 2,
+          "col": 11,
+          "offset": 23
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0404",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "assignment to const 'X'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 3,
+          "col": 9,
+          "offset": 40
+        },
+        "end": {
+          "line": 3,
+          "col": 10,
+          "offset": 41
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

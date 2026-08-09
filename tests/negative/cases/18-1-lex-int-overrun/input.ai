@@ -1,0 +1,2 @@
+module main;
+var bad: u8 = 300u8;

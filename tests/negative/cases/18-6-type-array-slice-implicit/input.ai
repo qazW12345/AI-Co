@@ -1,0 +1,8 @@
+module main;
+import rt.mem;
+import rt.io;
+pub fn main() -> i32 {
+  var buf: u8[16] = [0u8; 16];
+  var s: u8[] = buf;
+  return 0;
+}

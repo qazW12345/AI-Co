@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0313",
+      "severity": "error",
+      "phase": "type",
+      "message": "unknown field 'z' in struct literal of type 'Point'",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 32,
+          "offset": 96
+        },
+        "end": {
+          "line": 4,
+          "col": 33,
+          "offset": 97
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

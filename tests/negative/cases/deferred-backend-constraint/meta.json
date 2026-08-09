@@ -1,0 +1,7 @@
+{
+  "spec_ref": "N/A",
+  "codes": [
+    "AIC-B0601"
+  ],
+  "deferral_reason": "Backend constraint violation; requires compiler implementation and target-specific input to test."
+}

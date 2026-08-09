@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0413",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "duplicate switch case value: 0",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 5,
+          "col": 5,
+          "offset": 69
+        },
+        "end": {
+          "line": 5,
+          "col": 11,
+          "offset": 75
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

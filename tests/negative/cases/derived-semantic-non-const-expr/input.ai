@@ -1,0 +1,4 @@
+module main;
+const X: i32 = 5;
+var y: i32 = X;
+fn main() -> i32 { return 0; }

@@ -1,0 +1,7 @@
+module main;
+import rt.mem;
+import rt.io;
+pub fn main() -> i32 {
+  var badbuf: u8[16] = [0; 16];
+  return 0;
+}

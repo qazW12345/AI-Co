@@ -1,0 +1,6 @@
+module main;
+fn main() -> i32 {
+  var b: bool = true;
+  var x: i32 = cast<i32>(b);
+  return x;
+}

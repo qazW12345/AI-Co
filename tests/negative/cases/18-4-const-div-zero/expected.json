@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-E0406",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "constant division by zero",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 14,
+          "offset": 26
+        },
+        "end": {
+          "line": 2,
+          "col": 19,
+          "offset": 31
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}

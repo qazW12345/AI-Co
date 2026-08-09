@@ -1,0 +1,26 @@
+{
+  "kind": "diagnostics",
+  "records": [
+    {
+      "schema_version": "1",
+      "code": "AIC-T0312",
+      "severity": "error",
+      "phase": "type",
+      "message": "call argument count mismatch: expected 2, found 1",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 16,
+          "offset": 95
+        },
+        "end": {
+          "line": 4,
+          "col": 22,
+          "offset": 101
+        }
+      },
+      "recovery": "authoritative"
+    }
+  ]
+}
