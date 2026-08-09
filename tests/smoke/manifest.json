@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "corpus": "smoke",
+  "description": "Executable smoke suite: deterministic runtime behavior programs with expected stdout/exit/trap records, derived from spec §15 (runtime), §15.5 (trap table), §18.6 (example), and DIAGNOSTIC-CONTRACT §10 (trap-record contract).",
+  "cases": [
+    "smoke-void-main",
+    "smoke-exit-0",
+    "smoke-exit-42",
+    "smoke-proc-exit",
+    "smoke-stdout-write",
+    "smoke-mem-alloc-dealloc",
+    "smoke-mem-alloc-zero",
+    "smoke-mem-null-noop",
+    "smoke-trap-cast-range",
+    "smoke-trap-overflow",
+    "smoke-trap-div-zero",
+    "smoke-trap-shift-range",
+    "smoke-trap-utf8-str",
+    "smoke-trap-index-oob",
+    "smoke-trap-str-slice-boundary",
+    "smoke-trap-null-deref",
+    "smoke-trap-double-release",
+    "smoke-trap-invalid-release",
+    "smoke-trap-invalid-handle",
+    "smoke-user-trap",
+    "deferred-trap-bool-byte",
+    "deferred-trap-ptr-diff-div",
+    "deferred-trap-ptr-align",
+    "deferred-trap-stack-exhaust",
+    "deferred-trap-ptr-arith-overflow"
+  ]
+}

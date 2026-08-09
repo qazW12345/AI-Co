@@ -1,0 +1,6 @@
+module main;
+import rt.trap;
+
+pub fn main() -> void {
+  rt.trap.report(42u32, "user trap test");
+}

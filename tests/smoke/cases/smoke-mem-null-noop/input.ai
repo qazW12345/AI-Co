@@ -1,0 +1,7 @@
+module main;
+import rt.mem;
+
+pub fn main() -> i32 {
+  rt.mem.dealloc_bytes(null);
+  return 0;
+}

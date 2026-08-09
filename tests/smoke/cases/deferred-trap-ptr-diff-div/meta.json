@@ -1,0 +1,1 @@
+{"spec_ref":"§15.5","codes":["AIC-R0810"],"deferral_reason":"requires two pointers with byte difference not divisible by element size; not constructible without raw address manipulation"}

@@ -1,0 +1,1 @@
+{"spec_ref":"§15.5","codes":["AIC-R0805"],"deferral_reason":"requires raw byte reinterpretation as bool which is not expressible in the minimal language without compiler intrinsics"}

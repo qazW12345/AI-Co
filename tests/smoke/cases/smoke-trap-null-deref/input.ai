@@ -1,0 +1,6 @@
+module main;
+
+pub fn main() -> void {
+  var p: i32* = null;
+  var x: i32 = *p;
+}

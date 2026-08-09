@@ -1,0 +1,8 @@
+module main;
+import rt.mem;
+
+pub fn main() -> void {
+  var p: u8* = rt.mem.alloc_bytes(16);
+  rt.mem.dealloc_bytes(p);
+  rt.mem.dealloc_bytes(p);
+}

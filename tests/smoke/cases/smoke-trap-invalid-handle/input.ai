@@ -1,0 +1,6 @@
+module main;
+import rt.io;
+
+pub fn main() -> void {
+  rt.io.close(999);
+}

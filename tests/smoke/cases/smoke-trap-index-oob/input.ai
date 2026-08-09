@@ -1,0 +1,6 @@
+module main;
+
+pub fn main() -> void {
+  var a: i32[3] = [1i32, 2i32, 3i32];
+  var x: i32 = a[3];
+}

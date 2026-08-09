@@ -1,0 +1,6 @@
+module main;
+import rt.proc;
+
+pub fn main() -> void {
+  rt.proc.exit(42);
+}

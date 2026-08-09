@@ -1,0 +1,8 @@
+module main;
+import rt.io;
+
+pub fn main() -> void {
+  var h: usize = rt.io.stdout();
+  var buf: u8[5] = [72u8, 101u8, 108u8, 108u8, 111u8];
+  rt.io.write(h, buf[..], 5);
+}

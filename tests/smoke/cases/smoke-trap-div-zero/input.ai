@@ -1,0 +1,5 @@
+module main;
+
+pub fn main() -> void {
+  var x: i32 = 1i32 / 0i32;
+}

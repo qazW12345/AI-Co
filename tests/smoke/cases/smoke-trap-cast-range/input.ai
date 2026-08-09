@@ -1,0 +1,5 @@
+module main;
+
+pub fn main() -> void {
+  var x: i8 = cast<i8>(200i32);
+}

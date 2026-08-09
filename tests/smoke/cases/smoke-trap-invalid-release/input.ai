@@ -1,0 +1,8 @@
+module main;
+import rt.mem;
+
+pub fn main() -> void {
+  var x: i32 = 42;
+  var p: u8* = cast<u8*>(&x);
+  rt.mem.dealloc_bytes(p);
+}

@@ -1,0 +1,9 @@
+module main;
+import rt.mem;
+
+pub fn main() -> i32 {
+  var p: u8* = rt.mem.alloc_bytes(16);
+  if (p == null) { return 1; }
+  rt.mem.dealloc_bytes(p);
+  return 0;
+}

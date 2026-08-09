@@ -1,0 +1,6 @@
+module main;
+
+pub fn main() -> void {
+  var bad: u8[1] = [0xFFu8];
+  var s: str = cast<str>(bad[..]);
+}
