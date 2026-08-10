@@ -1,0 +1,1 @@
+{"schema_version":"1","code":"AIC-L0006","severity":"error","phase":"lex","message":"integer literal 300 is not representable in type u8","primary_span":{"file":"main.ai","start":{"line":4,"col":12,"offset":88},"end":{"line":4,"col":16,"offset":92}},"recovery":"authoritative","related":{"module":"main"}}

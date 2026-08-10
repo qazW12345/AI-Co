@@ -1,0 +1,1 @@
+{"schema_version":"1","code":"AIC-E0412","severity":"error","phase":"semantic","message":"switch case 0 body lacks a terminating statement; fall-through is prohibited","primary_span":{"file":"main.ai","start":{"line":12,"col":7,"offset":300},"end":{"line":12,"col":12,"offset":305}},"recovery":"authoritative"}

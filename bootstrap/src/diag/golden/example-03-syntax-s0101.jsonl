@@ -1,0 +1,1 @@
+{"schema_version":"1","code":"AIC-S0101","severity":"error","phase":"syntax","message":"expected ';' after expression","primary_span":{"file":"main.ai","start":{"line":7,"col":19,"offset":120},"end":{"line":7,"col":20,"offset":121}},"recovery":"authoritative","corrections":[{"replacement":";"}]}

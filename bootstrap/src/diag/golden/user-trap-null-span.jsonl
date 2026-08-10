@@ -1,0 +1,1 @@
+{"schema_version":"1","code":"AIC-U0000","severity":"error","phase":"trap","message":"user trap","primary_span":null,"recovery":"authoritative","related":{"module":"main"},"trap_code":7,"exit_code":70}

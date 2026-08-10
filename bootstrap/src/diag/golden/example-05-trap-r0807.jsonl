@@ -1,0 +1,1 @@
+{"schema_version":"1","code":"AIC-R0807","severity":"error","phase":"trap","message":"slice index 16 out of bounds (len 16)","primary_span":{"file":"main.ai","start":{"line":30,"col":14,"offset":740},"end":{"line":30,"col":19,"offset":745}},"recovery":"authoritative","related":{"operation":"index","type":"u8[]","index":16,"len":16},"exit_code":70}
