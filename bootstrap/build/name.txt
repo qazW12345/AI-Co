@@ -1,0 +1,10 @@
+# bootstrap/build/name.txt
+# WP-M0-10 name resolution area source list (owned by WP-M0-10).
+# Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd fragment
+# aggregation (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root.
+#
+# name_test.c is intentionally NOT listed here: it is a unit-test program
+# with its own main() and is built explicitly together with these library
+# sources (see bootstrap/src/name/README.md).
+bootstrap/src/name/name.c
