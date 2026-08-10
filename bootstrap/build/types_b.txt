@@ -1,0 +1,10 @@
+# bootstrap/build/types_b.txt
+# WP-M0-11b struct/enum layout and padding area source list (owned by
+# WP-M0-11b). Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd
+# fragment aggregation (CONVENTIONS.md §3). One source path per line,
+# relative to the repository root.
+#
+# layout_test.c is intentionally NOT listed here: it is a unit-test
+# program with its own main() and is built explicitly together with these
+# library sources (see the build comment at the top of layout_test.c).
+bootstrap/src/types/layout.c
