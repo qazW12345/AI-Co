@@ -4,15 +4,15 @@
  *
  * Consumes the parsed AST (WP-M0-09) of the entry module plus the project
  * root and entry module name supplied by the driver (WP-M0-19 reads them
- * from the build manifest per spec §14.4) and produces:
+ * from the build manifest per spec sec. 14.4) and produces:
  *   - the module graph (entry + imports) with canonical module-to-file
- *     mapping (spec §6.5: a.b.c -> <root>/a/b/c.ai), cycle detection, and
+ *     mapping (spec sec. 6.5: a.b.c -> <root>/a/b/c.ai), cycle detection, and
  *     reserved rt.* handling;
- *   - per-module name tables: module scope (single name space, §6.2),
- *     function/block scopes with shadowing (§6.1), struct field and enum
+ *   - per-module name tables: module scope (single name space, sec. 6.2),
+ *     function/block scopes with shadowing (sec. 6.1), struct field and enum
  *     member namespaces;
- *   - name-phase diagnostics AIC-N0201..N0209 per spec §6 and the
- *     diagnostic contract §11.3 / §7.
+ *   - name-phase diagnostics AIC-N0201..N0209 per spec sec. 6 and the
+ *     diagnostic contract sec. 11.3 / sec. 7.
  *
  * This header is the resolution API contract the build driver (WP-M0-19)
  * consumes: it supplies the project root (canonical import-resolution root)
@@ -20,13 +20,13 @@
  * resolves imports itself by loading/lexing/parsing imported files at their
  * canonical paths (consuming the WP-M0-07/08/09 read-only APIs).
  *
- * Determinism obligations (spec §14.2):
+ * Determinism obligations (spec sec. 14.2):
  *   - resolution depends only on the project root and the entry file
  *     (never the current working directory, environment, registry, or
  *     network);
  *   - module iteration order is deterministic (entry first, then imports in
  *     source order, depth-first);
- *   - records are returned sorted with the contract §9 comparator
+ *   - records are returned sorted with the contract sec. 9 comparator
  *     (diag_sort_records) and carry phase "name", severity "error",
  *     recovery "authoritative";
  *   - no absolute host paths or timestamps appear in any span or record;
@@ -56,7 +56,7 @@ typedef enum NameStatus {
     NAME_OOM                 /* allocation failure; nothing produced */
 } NameStatus;
 
-/* Symbol kinds (spec §6.1-6.3). */
+/* Symbol kinds (spec sec. 6.1-6.3). */
 typedef enum NameSymbolKind {
     NAME_SYM_FN = 0,
     NAME_SYM_STRUCT,
@@ -147,7 +147,7 @@ typedef struct NameResult {
  *                      manifest; used only to build canonical file paths
  *                      for imports - never embedded in spans/records).
  *   entry_module_name  the entry module name from the build manifest
- *                      (spec §14.4); the entry file's module declaration
+ *                      (spec sec. 14.4); the entry file's module declaration
  *                      must match it, else AIC-N0205.
  *   entry_file         repository-relative path of the entry source.
  *   entry_src          the loaded entry source (must be LOAD_OK; spans use

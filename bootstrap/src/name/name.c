@@ -4,7 +4,7 @@
  *
  * Consumes the entry module's parsed AST (WP-M0-09) plus the project root
  * and entry module name supplied by the driver (WP-M0-19 reads them from
- * the build manifest per spec §14.4). Resolves the full module graph
+ * the build manifest per spec sec. 14.4). Resolves the full module graph
  * (loading, lexing, and parsing imported files at their canonical paths
  * via the WP-M0-07/08/09 read-only APIs), builds per-module name tables,
  * and emits the name-phase diagnostics AIC-N0201..N0209.
@@ -15,7 +15,7 @@
  *      repository-relative name (a/b/c.ai), never an absolute path.
  *   2. Module graph resolution is a depth-first walk in import source
  *      order (deterministic). The entry module is resolved first; each
- *      imported module is loaded once and reused by FQN (spec §6.5: same
+ *      imported module is loaded once and reused by FQN (spec sec. 6.5: same
  *      fully qualified name always denotes the same declaration).
  *   3. Cycle detection: an import of a module already in the current
  *      depth-first path closes a cycle. Primary span: the import statement
@@ -25,8 +25,8 @@
  *   4. Module scope is the entire module (order-independent): all
  *      top-level declarations are registered before any body/type is
  *      resolved, so mutual recursion works without forward declarations
- *      (spec §6.1).
- *   5. Single name space per scope (spec §6.2): struct/enum names share
+ *      (spec sec. 6.1).
+ *   5. Single name space per scope (spec sec. 6.2): struct/enum names share
  *      the scope with values. Duplicate declarations in the same scope
  *      (module, function-parameter, block, struct-field namespace, enum
  *      member namespace) are AIC-N0201.
@@ -39,12 +39,12 @@
  *      statement; N0205/N0207 primary = the whole module declaration;
  *      N0206 primary = the closing import statement, secondary = module
  *      declarations of the remaining cycle members.
- *   7. rt.* rules (spec §6.5): module declarations with the reserved "rt"
+ *   7. rt.* rules (spec sec. 6.5): module declarations with the reserved "rt"
  *      prefix are N0207; imports of rt submodules outside the runtime
  *      surface are N0208; bare `import rt;` is N0209; runtime members are
  *      not auto-available (a reference to a reserved runtime name without
  *      the matching import is an ordinary undeclared name, N0202).
- *   8. Records are collected and sorted with the contract §9 comparator
+ *   8. Records are collected and sorted with the contract sec. 9 comparator
  *      (diag_sort_records) before being returned; every name record is
  *      phase "name", severity "error", recovery "authoritative".
  */
@@ -156,7 +156,7 @@ static bool rec_push(NameCtx *c, DiagRecord *r)
 
 /* Skip whitespace and comments starting at offset `pos` in `src`; return the
  * offset of the next significant byte (or src->len at EOF). Comments are
- * whitespace per spec §4.1. */
+ * whitespace per spec sec. 4.1. */
 static int64_t skip_trivia(const LoadSource *src, int64_t pos)
 {
     const char *t = src->text;
@@ -204,7 +204,7 @@ static int64_t ident_end_at(const LoadSource *src, int64_t pos)
 /* Find the identifier span of a declaration's name. `decl_start` is the
  * declaration's start offset; `keyword` is the leading keyword text (may be
  * NULL when the declaration starts directly with the identifier, e.g. field
- * and param declarations). Returns true and fills *out_start/*out_end on
+ * and param declarations). Returns true and fills *out_start / *out_end on
  * success (identifier token span). */
 static bool decl_ident_span(const LoadSource *src, int64_t decl_start,
                             const char *keyword,
@@ -230,7 +230,7 @@ static bool decl_ident_span(const LoadSource *src, int64_t decl_start,
 /* Qualified-name span inside an import/module statement. `stmt_start` is
  * the statement start (at the "import"/"module" keyword), `stmt_end` is the
  * statement end (after the ';'). Scans: keyword, trivia, then the dotted
- * name; fills *out_start/*out_end with the qname token span. */
+ * name; fills *out_start / *out_end with the qname token span. */
 static bool qname_span_in_stmt(const LoadSource *src,
                                int64_t stmt_start,
                                int64_t *out_start, int64_t *out_end)
@@ -500,7 +500,7 @@ static NameSymbol *scope_stack_find(NameCtx *c, const char *name)
         NameSymbol *s = scope_find(&c->scopes[i], name);
         if (s) return s;
     }
-    /* module scope: the whole module is visible (spec §6.1) */
+    /* module scope: the whole module is visible (spec sec. 6.1) */
     if (c->cur_module) {
         NameSymbol *s = name_module_lookup(c->cur_module, name);
         if (s) return s;
@@ -741,7 +741,7 @@ static NameSymbol *member_find(const NameSymbol *owner, const char *name)
 }
 
 /* Register struct fields / enum members into the type's namespace
- * (spec §6.1: struct fields and enum members are members of the type and
+ * (spec sec. 6.1: struct fields and enum members are members of the type and
  * do not leak into enclosing scopes). Duplicate names within the type are
  * AIC-N0201. Returns false on OOM. */
 static bool register_type_members(NameCtx *c, NameModule *module,
@@ -805,7 +805,7 @@ static bool resolve_type(NameCtx *c, NameModule *module, AstNode *type)
             }
             return ref_add(c, module, type, s);
         }
-        /* module-qualified named type (spec §6.6): longest prefix that is
+        /* module-qualified named type (spec sec. 6.6): longest prefix that is
          * the current module or an import selects the module; the remaining
          * segments resolve in that module's scope. */
         for (size_t k = nm->count; k >= 1; k--) {
@@ -814,6 +814,7 @@ static bool resolve_type(NameCtx *c, NameModule *module, AstNode *type)
                                                      nm->count, k);
             if (!target) continue;
             NameSymbol *s = NULL;
+            NameSymbol *final_s = NULL;
             bool failed = false;
             size_t remaining = nm->count - k;
             for (size_t i = 0; i < remaining && !failed; i++) {
@@ -824,6 +825,7 @@ static bool resolve_type(NameCtx *c, NameModule *module, AstNode *type)
                     failed = true;
                     break;
                 }
+                final_s = s;
                 if (i + 1 < remaining) {
                     if (s->kind == NAME_SYM_ENUM) {
                         NameSymbol *m = member_find(s, nm->parts[k + i + 1]);
@@ -833,18 +835,21 @@ static bool resolve_type(NameCtx *c, NameModule *module, AstNode *type)
                             failed = true;
                             break;
                         }
-                        i++;
+                        /* the member is the resolution target; remaining
+                         * segments are value paths owned by types */
+                        final_s = m;
+                        i = remaining;
                     } else {
                         i = remaining;   /* field path: types package owns */
                     }
                 }
             }
             if (failed) return true;
-            if (!s) continue;
+            if (!final_s) continue;
             if (!s->is_pub && target != module && s->decl) {
                 emit_private_access(c, target, type, s->decl);
             }
-            return ref_add(c, module, type, s);
+            return ref_add(c, module, type, final_s);
         }
         /* no module prefix matched: treat the first segment as a scope name */
         {
@@ -991,7 +996,7 @@ static NameModule *match_module_prefix(NameCtx *c, NameModule *module,
 }
 
 /* Resolve a member/arrow chain (e.g. a.b.g, Color.Red, p.x, rt.mem.fn).
- * Rules (spec §6.1, §6.4-6.6):
+ * Rules (spec sec. 6.1, sec. 6.4-6.6):
  *  - module-qualified reference: the longest prefix of the chain that is
  *    the current module or an imported module selects the module; the rest
  *    of the chain resolves in that module's scope (visibility checked,
@@ -1063,6 +1068,7 @@ static bool resolve_member_chain(NameCtx *c, NameModule *module, AstNode *node)
             matched = true;
 
             NameSymbol *s = NULL;
+            NameSymbol *final_s = NULL;
             size_t remaining = nsegs - k;
             for (size_t i = 0; i < remaining && !failed; i++) {
                 const char *nm = segs[k + i];
@@ -1072,6 +1078,7 @@ static bool resolve_member_chain(NameCtx *c, NameModule *module, AstNode *node)
                     failed = true;
                     break;
                 }
+                final_s = s;
                 if (i + 1 < remaining) {
                     if (s->kind == NAME_SYM_ENUM) {
                         NameSymbol *m = member_find(s, segs[k + i + 1]);
@@ -1081,7 +1088,10 @@ static bool resolve_member_chain(NameCtx *c, NameModule *module, AstNode *node)
                             failed = true;
                             break;
                         }
-                        i++;   /* consume the member segment */
+                        /* the member is the resolution target; remaining
+                         * segments are value paths owned by types */
+                        final_s = m;
+                        i = remaining;
                     } else {
                         /* struct field / value member: type-checking owns
                          * the field name; stop resolving here */
@@ -1089,11 +1099,11 @@ static bool resolve_member_chain(NameCtx *c, NameModule *module, AstNode *node)
                     }
                 }
             }
-            if (!failed && s) {
+            if (!failed && final_s) {
                 if (!s->is_pub && target != module && s->decl) {
                     emit_private_access(c, target, node, s->decl);
                 }
-                if (!ref_add(c, module, node, s)) failed = true;
+                if (!ref_add(c, module, node, final_s)) failed = true;
             }
         }
         if (oom) { free((void *)segs); return false; }
@@ -1210,7 +1220,7 @@ static bool resolve_stmt(NameCtx *c, NameModule *module, AstNode *stmt)
         if (!resolve_expr(c, module, stmt->u.while_loop.cond)) return false;
         return resolve_stmt(c, module, stmt->u.while_loop.body);
     case AST_FOR: {
-        /* the for-init declares in the loop's own scope (spec §13.3) */
+        /* the for-init declares in the loop's own scope (spec sec. 13.3) */
         if (!scope_push(c, scope_top(c) ? scope_top(c)->depth + 1 : 0)) {
             return false;
         }
@@ -1417,7 +1427,7 @@ static char *join_dotted(NameCtx *c, char *const *parts, size_t n)
     return s;
 }
 
-/* Canonical module-to-file mapping (spec §6.5): a.b.c -> <root>/a/b/c.ai.
+/* Canonical module-to-file mapping (spec sec. 6.5): a.b.c -> <root>/a/b/c.ai.
  * Returns a heap-owned repository-relative path ("a/b/c.ai"). */
 static char *canonical_module_path(NameCtx *c, char *const *parts, size_t n)
 {
@@ -1503,7 +1513,7 @@ static bool load_and_resolve_import(NameCtx *c, NameModule *from,
     char *fqn = join_dotted(c, qn->parts, n);
     if (!fqn) return false;
 
-    /* --- rt.* reserved rules (spec §6.5) --- */
+    /* --- rt.* reserved rules (spec sec. 6.5) --- */
     if (strcmp(qn->parts[0], "rt") == 0) {
         if (n == 1) {
             /* bare `import rt;` -> AIC-N0209, primary = whole import stmt */
@@ -1916,7 +1926,7 @@ NameStatus name_resolve(const char *project_root,
         return NAME_OOM;
     }
 
-    /* entry module declaration checks (spec §6.5 / §6.4) */
+    /* entry module declaration checks (spec sec. 6.5 / sec. 6.4) */
     const AstNode *mdecl = entry_program->u.program.module_decl;
     if (mdecl && mdecl->u.qname.name && mdecl->u.qname.name->count > 0 &&
         strcmp(mdecl->u.qname.name->parts[0], "rt") == 0) {
@@ -1982,7 +1992,7 @@ NameStatus name_resolve(const char *project_root,
     free(c.stack);
     free(c.stack_imports);
 
-    /* sort records with the contract §9 comparator before returning */
+    /* sort records with the contract sec. 9 comparator before returning */
     diag_sort_records(c.records, c.nrecords);
 
     if (!ok || c.oom) {

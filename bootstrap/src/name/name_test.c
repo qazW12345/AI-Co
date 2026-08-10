@@ -1,10 +1,10 @@
 /* bootstrap/src/name/name_test.c
  *
- * WP-M0-10 unit and integration tests: scopes and shadowing (spec §6.1),
- * single name space and duplicate/undeclared rules (§6.2) with exact
- * AIC-N0201/N0202 spans, visibility (§6.3) with AIC-N0203, module
- * declaration checks (§6.4/§6.5) with AIC-N0205/N0207, canonical
- * module-to-file mapping and import resolution (§6.5) with AIC-N0204,
+ * WP-M0-10 unit and integration tests: scopes and shadowing (spec sec. 6.1),
+ * single name space and duplicate/undeclared rules (sec. 6.2) with exact
+ * AIC-N0201/N0202 spans, visibility (sec. 6.3) with AIC-N0203, module
+ * declaration checks (sec. 6.4/sec. 6.5) with AIC-N0205/N0207, canonical
+ * module-to-file mapping and import resolution (sec. 6.5) with AIC-N0204,
  * cycle detection (AIC-N0206), rt.* reserved rules (AIC-N0207/N0208/
  * N0209), explicit-import requirement, deterministic module ordering and
  * record sorting, same-FQN-same-declaration identity, and re-execution of
@@ -173,7 +173,7 @@ static bool rec_matches(const DiagRecord *r, const char *code,
 static void test_shadowing_and_scopes(void)
 {
     /* Inner declarations may shadow outer ones; same-scope duplicates are
-     * AIC-N0201 (spec §6.1/§6.2). A block-local may shadow a module-level
+     * AIC-N0201 (spec sec. 6.1/sec. 6.2). A block-local may shadow a module-level
      * name and a fn param may shadow a module-level name. */
     const char *src =
         "module main;\n"
@@ -196,7 +196,7 @@ static void test_shadowing_and_scopes(void)
 
 static void test_single_name_space_duplicate(void)
 {
-    /* Type names and value names share one name space per scope (§6.2). */
+    /* Type names and value names share one name space per scope (sec. 6.2). */
     const char *src =
         "module main;\n"
         "struct Point { x: i32; }\n"
@@ -277,7 +277,7 @@ static void test_module_order_independent(void)
 static void test_struct_field_namespace(void)
 {
     /* Struct fields live in the type namespace, not the enclosing scope
-     * (§6.1): a field name must not collide with a module-level name and
+     * (sec. 6.1): a field name must not collide with a module-level name and
      * must not be visible as a bare identifier. */
     const char *src =
         "module main;\n"
@@ -297,7 +297,7 @@ static void test_struct_field_namespace(void)
 
 static void test_enum_member_namespace(void)
 {
-    /* Enum members are accessed only through the enum type name (§6.1). */
+    /* Enum members are accessed only through the enum type name (sec. 6.1). */
     const char *src =
         "module main;\n"
         "enum Color: u8 { Red, Green, Blue }\n"
@@ -455,7 +455,7 @@ static void test_import_valid_rt_submodule(void)
 static void test_runtime_not_auto_available(void)
 {
     /* Without the matching import, rt.mem is an ordinary undeclared name
-     * (spec §6.5): AIC-N0202 on the reference. */
+     * (spec sec. 6.5): AIC-N0202 on the reference. */
     const char *src =
         "module main;\n"
         "fn main() -> i32 {\n"
@@ -556,7 +556,7 @@ static void test_import_cycle(void)
 static void test_diamond_import(void)
 {
     /* Importing the same module twice (directly or transitively) is not an
-     * error and the same module object is reused (spec §6.5). */
+     * error and the same module object is reused (spec sec. 6.5). */
     FILE *f = fopen("bootstrap/stage0/name-fixture/a.ai", "wb");
     CHECK(f != NULL);
     if (f) {
@@ -604,7 +604,7 @@ static void test_diamond_import(void)
 static void test_qualified_type(void)
 {
     /* A module-qualified named type resolves through the imported module
-     * (spec §6.6). Uses the canonical multi-module fixture a/b.ai. */
+     * (spec sec. 6.6). Uses the canonical multi-module fixture a/b.ai. */
     FILE *f = fopen("bootstrap/stage0/name-fixture2/a/b.ai", "wb");
     CHECK(f != NULL);
     if (f) {
@@ -655,6 +655,83 @@ static void test_qualified_type(void)
     remove("bootstrap/stage0/name-fixture2/a/b.ai");
 }
 
+static void test_qualified_enum_member(void)
+{
+    /* A module-qualified enum member (a.b.Color.Red) must resolve to the
+     * same member symbol as the same-module spelling (Color.Red) would
+     * (spec sec. 6.6 / criterion 4: same FQN -> same declaration). The
+     * enum's visibility governs the member (spec sec. 6.3). */
+    FILE *f = fopen("bootstrap/stage0/name-fixture2/a/b.ai", "wb");
+    CHECK(f != NULL);
+    if (f) {
+        fputs("module a.b;\n", f);
+        fputs("pub enum Color: u8 { Red, Green, Blue }\n", f);
+        fclose(f);
+    }
+    const char *entry =
+        "module main;\n"
+        "import a.b;\n"
+        "fn main() -> i32 {\n"
+        "  var c: a.b.Color = a.b.Color.Red;\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    memset(&p, 0, sizeof(p));
+    {
+        LoadStatus ld;
+        LexStatus lx;
+        ParseStatus ps;
+        ld = load_source_from_bytes("input.ai", (const uint8_t *)entry,
+                                    strlen(entry), &p.src, &p.recs, &p.rn);
+        CHECK(ld == LOAD_OK);
+        lx = lex_tokenize(p.src, &p.toks, &p.tn, &p.recs, &p.rn);
+        CHECK(lx == LEX_OK);
+        ps = parse_program(p.toks, p.tn, &p.program, &p.recs, &p.rn);
+        CHECK(ps == PARSE_OK);
+        p.st = name_resolve("bootstrap/stage0/name-fixture2", "main",
+                            "input.ai", p.src, p.program,
+                            &p.result, &p.recs, &p.rn);
+    }
+    CHECK(p.st == NAME_OK);
+    CHECK(p.rn == 0);
+    if (p.result) {
+        CHECK(p.result->nmodules == 2);
+        NameModule *ab = name_module_by_fqn(p.result, "a.b");
+        CHECK(ab != NULL);
+        if (ab) {
+            NameSymbol *color = name_module_lookup(ab, "Color");
+            CHECK(color != NULL);
+            if (color) {
+                CHECK(color->is_pub);
+                CHECK(strcmp(color->fqn, "a.b.Color") == 0);
+                CHECK(color->nmembers == 3);
+                NameSymbol *red = NULL;
+                for (size_t i = 0; i < color->nmembers; i++) {
+                    if (strcmp(color->members[i]->name, "Red") == 0) {
+                        red = color->members[i];
+                    }
+                }
+                CHECK(red != NULL);
+                if (red) {
+                    CHECK(red->owner == color);
+                    CHECK(strcmp(red->fqn, "a.b.Color.Red") == 0);
+                    /* the module-qualified reference resolves to the member */
+                    NameModule *main_m = p.result->modules[0];
+                    if (main_m) {
+                        size_t found = 0;
+                        for (size_t i = 0; i < main_m->nrefs; i++) {
+                            if (main_m->refs[i].sym == red) found++;
+                        }
+                        CHECK(found >= 1);
+                    }
+                }
+            }
+        }
+    }
+    pipeline_free(&p);
+    remove("bootstrap/stage0/name-fixture2/a/b.ai");
+}
+
 /* ---------------------------------------------------------------------------
  * Same-FQN identity and determinism
  * ------------------------------------------------------------------------- */
@@ -662,7 +739,7 @@ static void test_qualified_type(void)
 static void test_same_fqn_same_declaration(void)
 {
     /* Two references to the same fully qualified name must resolve to the
-     * same declaration within a build (§6.6 / criterion 4). */
+     * same declaration within a build (sec. 6.6 / criterion 4). */
     const char *src =
         "module main;\n"
         "fn f() -> i32 { return 1; }\n"
@@ -838,6 +915,7 @@ int main(void)
     test_import_cycle();
     test_diamond_import();
     test_qualified_type();
+    test_qualified_enum_member();
     test_same_fqn_same_declaration();
     test_determinism();
     test_corpus_anchors();
