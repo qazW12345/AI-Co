@@ -40,7 +40,7 @@ What is the current state of this Windows PC's hardware and software environment
 | Virtualization | No hypervisor running (HypervisorPresent=False); Hyper-V and Virtual Machine Platform features Disabled; WSL optional feature Enabled; WSL2 cannot start (VMP disabled); no WSL distros installed; QEMU 11.0.50 present. |
 | Shells | Git Bash (MSYS2/MINGW64, bash 5.2.26), PowerShell 5.1.19041.6456, cmd (Windows 10.0.19045.6466). |
 | Auth | GitHub CLI: not logged in to any host. Git: credential manager configured; no user identity configured at system or global level (no values disclosed). |
-| Compilers | MSVC cl 19.50.35717 (VS Build Tools 2026, on PATH); MSVC 14.44.35207 also present in VS Community 2022 (off PATH); LLVM/Clang 22.1.8 installed (off PATH); ml64 (MASM) on PATH; no GCC/MinGW/MSYS2. |
+| Compilers | MSVC cl 19.50.35728 (binary self-report; VS Build Tools 2026, toolset dir 14.50.35717; on PATH); MSVC 14.44.35207 also present in VS Community 2022 (off PATH); LLVM/Clang 22.1.8 installed (off PATH); ml64 (MASM) on PATH; no GCC/MinGW/MSYS2. |
 | Build systems | No CMake/make/ninja/autotools on PATH; CMake + ninja bundled inside VS Build Tools 2026 (off PATH); MSBuild present in both VS instances. |
 | Runtimes | Python 3.11.15 (Hermes venv, on PATH as `python`), pip 26.1.2, uv 0.12.2; Node.js v22.23.0 (Hermes bundle, on PATH) + v18.20.2 (Program Files); .NET runtimes 6.0.36/7.0.20/8.0.8 (**no SDK**); Java 21 JRE only (no javac); no Rust, Go, Zig, TCC. |
 | Smoke test | MSVC cl, clang-cl, clang driver + LLD, and ml64 assembler+link all compiled/linked/ran successfully (x64). |
@@ -148,11 +148,11 @@ No tokens, identities, or credential values were read, stored, or reported. The 
 
 | Tool | Version | On PATH | Evidence |
 |---|---|---|---|
-| MSVC `cl` | 19.50.35717 (VS Build Tools 2026, toolset 14.50.35717; Hostx64/x64) | Yes | PROBE_05, `where cl`, vswhere, smoke test 1 |
+| MSVC `cl` | 19.50.35728 (compiler binary self-report; VS Build Tools 2026, toolset dir 14.50.35717; Hostx64/x64) | Yes | PROBE_05, `where cl`, vswhere, smoke test 1; cl.exe self-report (2026-08-11, FIND-M0-01-01) |
 | MSVC `link` (PE linker) | 14.50.35728 | Yes (shadowed — see 5.11) | PROBE_05, `where link` |
 | MSVC `lib` | 14.50.35728 | Yes | PROBE_05 |
 | MSVC `dumpbin` | 14.50.35728 | Yes | PROBE_05 |
-| MSVC `ml64` (MASM x64) | 14.50.35717 | Yes | PROBE_05, smoke test 4 |
+| MSVC `ml64` (MASM x64) | 14.50.35728 (binary self-report; toolset dir 14.50.35717) | Yes | PROBE_05, smoke test 4; ml64.exe self-report (2026-08-11, FIND-M0-01-01) |
 | MSVC `ml` (MASM x86) | absent from PATH | No | PROBE_05 |
 | MSVC 14.44.35207 | VS Community 2022 (off PATH) | No | `ls` MSVC toolsets |
 | LLVM/Clang | 22.1.8 (clang, clang-cl, clang++, clangd, flang, lld-link, ld.lld, llvm-ar/lib/objdump/rc/ml64/strip, etc.; 90 bin entries) | **No** | PROBE_05, `ls` + clang --version |
@@ -165,6 +165,8 @@ No tokens, identities, or credential values were read, stored, or reported. The 
 | Windows SDK | 10.0.26100.0 (Include/Lib); installer display version "10.1.26100.7705" (see 5.10/11) | — | `ls` Windows Kits, registry |
 | vcvarsall.bat | present in both VS instances | — | `ls` |
 | VS Installer | Visual Studio Build Tools 2026 18.4.2; Visual Studio Community 2022 17.14.29 | — | vswhere, registry |
+
+Note on version notation (corrected 2026-08-11, FIND-M0-01-01): the toolset **directory** under `VC\Tools\MSVC\` is `14.50.35717`; that is the toolset/directory identity, **not** the compiler binary version. The binaries in that directory self-report the compiler/tool versions listed above: `cl.exe` reports **19.50.35728**, and `link`/`lib`/`dumpbin`/`ml64` report **14.50.35728** (verified 2026-08-11 by direct pinned-path invocation of each binary). Any future environment-deviation check comparing versions must compare the binary self-report, and must treat the directory name as a separate (toolset identity) field.
 
 ### 5.10 Language runtimes and package tools
 
@@ -209,9 +211,9 @@ Findings (resolution evidence from `where.exe` and `command -v`, PATH values the
 
 Candidates ranked by direct machine evidence (verified by smoke tests where marked):
 
-1. **C (primary candidate)** — matches AI-Co's stated C-based intent (ADR-003 context). Verified working on this machine: MSVC `cl` 19.50.35717 and LLVM Clang 22.1.8 (clang-cl and clang driver + LLD) both compile/link/run x64 PE executables against Windows SDK 10.0.26100. Both support C17/C23-class features. Two independent verified compilers reduce single-toolchain risk.
+1. **C (primary candidate)** — matches AI-Co's stated C-based intent (ADR-003 context). Verified working on this machine: MSVC `cl` 19.50.35728 (binary; VS Build Tools 2026, toolset dir 14.50.35717) and LLVM Clang 22.1.8 (clang-cl and clang driver + LLD) both compile/link/run x64 PE executables against Windows SDK 10.0.26100. Both support C17/C23-class features. Two independent verified compilers reduce single-toolchain risk.
 2. **C++ (alternative)** — same two verified toolchains; viable if the implementation wants RAII/templates; adds language complexity not evidenced as needed.
-3. **x64 assembly (support role)** — `ml64` 14.50.35717 verified (assemble + link + run); LLVM's `llvm-ml64` also present off PATH. Suitable for low-level runtime/startup code, not the compiler core.
+3. **x64 assembly (support role)** — `ml64` 14.50.35728 verified (assemble + link + run); LLVM's `llvm-ml64` also present off PATH. Suitable for low-level runtime/startup code, not the compiler core.
 4. **Scripting/tooling languages (support role, not compiler core)** — Python 3.11.15 (with pip/uv) and Node 22.23.0 are present and suitable for build glue, test harnesses, and code generation scripts; performance rules them out for the compiler core.
 5. **Not viable without installs:** Rust, Go, Zig, TCC, GCC/MinGW, .NET/C# (no SDK), Java (JRE only, no javac).
 
@@ -257,6 +259,7 @@ Setup: sources under `%TEMP%\sneedworks_smoke\`; each test initialized the MSVC 
 | Node v22.23.0 on PATH vs registered Node 18.20.2 | Two installs; PATH wins with v22.23.0 (Hermes bundle). |
 | `clang` installed (22.1.8) but `command -v clang` empty | LLVM not on PATH. |
 | `python3` "found" but prints no version | WindowsApps Store alias stub, not a real interpreter. |
+| Recorded `cl` 19.50.35717 vs actual binary self-report 19.50.35728 (FIND-M0-01-01) | The recorded value conflated the toolset **directory** name (14.50.35717) with the compiler **binary** version. Direct pinned-path invocation on 2026-08-11: `cl.exe` reports 19.50.35728; `link`/`lib`/`dumpbin`/`ml64` report 14.50.35728. Notation corrected 2026-08-11 (§5.9); directory identity retained separately. |
 
 ## 12. Command provenance (reproducibility)
 
