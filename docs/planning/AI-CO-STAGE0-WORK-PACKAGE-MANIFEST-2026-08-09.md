@@ -28,6 +28,12 @@
 - Board-state scope: no board edits here. Existing already-created/dispatched cards keep their bodies per §1 rule 9; the Coordinator supersedes the original over-threshold cards for unrun packages per §5 when the amended manifest reaches it.
 - Evidence: Main Designer evidence note (2026-08-11); Kanban run histories for t_518e9bbe (11a), t_3656a3a8 (11b), t_2e52b09e (11c), t_5988c42e (11d), t_9a70ee96 (12a); repo `wc -l` counts of the delivered owned areas at HEAD 8ba332b; milestone-plan §7 one-line reference updated in the companion document.
 
+**Amendment (2026-08-12):** file-ownership carve-out recorded — WP-M0-12b2 (t_159df8e5, commit e688c6e) converted four `derived-semantic-*` negative-corpus cases to const-context sites per its expected artifacts ("failure-record tests + negative-corpus anchors"). §2 now carves those four case directories out of WP-M0-03's `tests/negative/**` ownership into co-ownership with WP-M0-12b2 so future WP-M0-03 work does not conflict over them.
+- Source: Reviewer2 verdict t_ca8bf4d5 (comment 712), Suggestion (non-blocking), routed via Coordinator as t_38568fc1; commit e688c6e (WP-M0-12b2) converted the four anchors; Coordinator gate record t_7b943196.
+- Decision authority: Planner-owned bookkeeping amendment per task t_38568fc1 — records ownership consistent with the already-accepted WP-M0-12b2 scope; no new architecture decision; no governance change. Escalation on file-ownership ambiguity → Main Designer.
+- Board-state scope: no board edits here. Future WP-M0-03 cards must respect the §2 carve-out; the WP-M0-03 owned area is `tests/negative/**` minus the four carved-out case directories.
+- Evidence: `git show --stat e688c6e` (four case dirs `input.ai`/`expected.json`/`meta.json` modified); parent task t_159df8e5 completion metadata; §2 matrix below.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -101,7 +107,7 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 |---|---|
 | WP-M0-01 | `bootstrap/build/` top-level entry points + toolchain init scripts + `CONVENTIONS.md` + the empty `bootstrap/build/` directory convention; `bootstrap/README.md`; `.gitignore` (tests/artifacts only). Per-area fragment files (`bootstrap/build/<area>.txt`) belong to their area packages, not to WP-M0-01. |
 | WP-M0-02 | `tests/conformance/**` |
-| WP-M0-03 | `tests/negative/**` |
+| WP-M0-03 | `tests/negative/**` (except the four const-context anchor cases carved out to WP-M0-12b2 per the 2026-08-12 amendment: `tests/negative/cases/derived-semantic-{shift-out-of-range,index-out-of-range,str-slice-boundary,ptr-diff-divisible}/**`) |
 | WP-M0-04 | `tests/smoke/**` |
 | WP-M0-05 | `tests/harness/**`, `tests/README.md` |
 | WP-M0-06 | `bootstrap/src/diag/**`, `bootstrap/build/diag.txt` |
@@ -115,7 +121,7 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 | WP-M0-11d | `bootstrap/src/types/optype.*` (explicit cast/wrap matrix, operator typing), `bootstrap/build/types_d.txt` |
 | WP-M0-12a | `bootstrap/src/const/eval_core.*`, `bootstrap/build/const_a.txt` |
 | WP-M0-12b1 | `bootstrap/src/const/eval_fail_arith.*` (checked arithmetic/div-zero/shift failure evaluation), `bootstrap/build/const_b1.txt` |
-| WP-M0-12b2 | `bootstrap/src/const/eval_fail_rec.*` (cast/index/slice/ptr-diff failure sites + record emission), `bootstrap/build/const_b2.txt` |
+| WP-M0-12b2 | `bootstrap/src/const/eval_fail_rec.*` (cast/index/slice/ptr-diff failure sites + record emission), `bootstrap/build/const_b2.txt`, plus const-context negative-corpus anchors `tests/negative/cases/derived-semantic-{shift-out-of-range,index-out-of-range,str-slice-boundary,ptr-diff-divisible}/**` (co-owned with WP-M0-03 per the 2026-08-12 amendment) |
 | WP-M0-13a1 | `bootstrap/src/sema/decl_core.*` (declaration model, storage/mutability/assignability), `bootstrap/build/sema_a1.txt` |
 | WP-M0-13a2 | `bootstrap/src/sema/decl_init.*` (initializers, missing-initializer rules), `bootstrap/build/sema_a2.txt` |
 | WP-M0-13b1 | `bootstrap/src/sema/expr_core.*` (precedence, evaluation-order, const-context), `bootstrap/build/sema_b1.txt` |
