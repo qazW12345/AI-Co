@@ -912,8 +912,8 @@ static void test_classify_api(void)
      * composition is out of the classify contract (it classifies
      * already-routed EVAL_FAILURE sites from 12a); it must not claim
      * an allocation failure. The no-record behavior for non-const
-     * sites is covered by test_ptr_diff_not_const and
-     * test_no_e0401_from_rec. */
+     * sites is covered by test_ptr_diff_not_const and by the
+     * classify-API non-const probe below. */
     {
         static const char nc_src[] =
             "module main;\n"
