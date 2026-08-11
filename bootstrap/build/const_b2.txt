@@ -1,0 +1,13 @@
+# bootstrap/build/const_b2.txt
+# WP-M0-12b2 const-failure record emission + remaining failure sites
+# area source list (owned by WP-M0-12b2). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level const_b.txt entry per
+# manifest §5 (12b1 owns const_b1.txt; this fragment is disjoint).
+#
+# eval_fail_rec_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with these library sources (see the build comment at the
+# top of eval_fail_rec_test.c).
+bootstrap/src/const/eval_fail_rec.c

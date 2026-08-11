@@ -1,6 +1,3 @@
 module main;
-fn main() -> i32 {
-  const s: str = "hello";
-  var sub: str = s[1..3];
-  return 0;
-}
+const s: str = "héllo";
+var sub: str = s[2..3];

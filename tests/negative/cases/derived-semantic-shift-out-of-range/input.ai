@@ -1,6 +1,2 @@
 module main;
-fn main() -> i32 {
-  const SHIFT: i32 = 33;
-  var x: i32 = 1 << SHIFT;
-  return x;
-}
+var x: i32 = 1 << 33;

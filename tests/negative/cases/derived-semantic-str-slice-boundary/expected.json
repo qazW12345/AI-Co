@@ -10,14 +10,14 @@
       "primary_span": {
         "file": "input.ai",
         "start": {
-          "line": 4,
-          "col": 18,
-          "offset": 75
+          "line": 3,
+          "col": 16,
+          "offset": 53
         },
         "end": {
-          "line": 4,
-          "col": 25,
-          "offset": 82
+          "line": 3,
+          "col": 23,
+          "offset": 60
         }
       },
       "recovery": "authoritative"
