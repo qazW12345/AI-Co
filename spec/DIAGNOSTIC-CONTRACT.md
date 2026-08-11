@@ -176,7 +176,7 @@ User traps via `rt.trap.report(code: u32, message: str)` emit a record with `cod
 | `AIC-T0302` | use of incomplete struct type as a value | error | the struct's declaration-name span |
 | `AIC-T0303` | struct recursion by value (infinite size) | error | the struct's declaration-name span |
 | `AIC-T0304` | `==`/`!=` on array or struct type | error | the operator |
-| `AIC-T0305` | chained comparison | error | the second comparison operator |
+| `AIC-T0305` | chained comparison | error | the leftmost comparison operator of the chain |
 | `AIC-T0306` | operator not applicable to operand type | error | the operator |
 | `AIC-T0307` | no common type / type mismatch (implicit conversion absent) | error | the mismatched operand/expression |
 | `AIC-T0308` | invalid explicit cast pair | error | the cast expression |
@@ -304,3 +304,5 @@ Status: **Accepted** (2026-08-08). This contract was reviewed with the language 
 **v0.1.1 accepted (2026-08-08):** Status flipped to **Accepted** with the language specification (Main Designer gate-3 acceptance, task t_b157b2bd; gate-2 re-review `docs/reviews/LANGUAGE-SPEC-v0.1.1-REREVIEW-2026-08-08.md` returned `Approved with Minor findings` and residual RER-G2-01 was closed). Schema version remains `"1"`; no code-registry or structural change.
 
 **v0.1.1 S-1 alignment (2026-08-11):** Section 11.4 primary-span prose for `AIC-T0302` and `AIC-T0303` was aligned to the accepted negative-corpus declaration-name-span pin, closing Planner ruling R-1 (task t_420f9f8a) and Reviewer Suggestion S-1 (task t_ee0942a1). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
+
+**v0.1.1 S-1 alignment (2026-08-11):** Section 11.4 primary-span prose for `AIC-T0305` was aligned to the accepted negative-corpus leftmost-operator pin (`tests/negative/cases/derived-type-chained-comparison`; documented in `bootstrap/src/types/optype.h`), closing Reviewer Suggestion S-1 (task t_0db758e5). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
