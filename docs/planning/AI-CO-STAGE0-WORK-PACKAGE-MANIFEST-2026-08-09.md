@@ -20,6 +20,8 @@
 - Evidence: Kanban task t_a38a2060 (2026-08-10) — Human Sponsor direction and Main Designer metric recommendation recorded in the task body; run/turn actuals from the Kanban run history (runs 89–144) and repository evidence (commit log, LOC counts, test counts).
 - Board-state scope: no board edits here. The Coordinator handoff note (§5) states that split cards replace the original oversized cards for unrun packages; existing already-created M0 cards keep their bodies (no board edits for cards already dispatched or in-flight).
 
+**Amendment (2026-08-11):** Minor-1 citation correction in WP-M0-11c — the three common-type-promotion citations previously citing §11.4 (Objective, Dependencies, AC 2) now cite §11.1 bullet 2 (the normative common-type-promotion rule; §11.4 is "Comparison semantics"). Source: reviewer2 watchdog re-verification finding Minor-1 (review card t_879bda8d, 2026-08-11), routed via Coordinator gate t_ddc8f6e3 as correction task t_2dd05335. Comment/prose only; no behavioral, source, or spec change. Decision authority: Main Designer (OM §8); authorized deferral with no re-review required (reviewer2). Card t_2e52b09e body keeps its existing text per §1 rule 9 (no board edits for already-created/dispatched cards); this amendment is the durable correction record.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -359,16 +361,16 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 
 #### WP-M0-11c — Implicit conversions and common type
 
-- **Objective:** implement the implicit-conversion whitelist (§11.1) and common-type promotion (§11.4).
+- **Objective:** implement the implicit-conversion whitelist (§11.1) and common-type promotion (§11.1 bullet 2).
 - **Scope:** conversion whitelist; narrowing/sign-change/pointer-integer/implicit-decay rejections (`AIC-T0307` etc.); common-type promotion.
 - **Exclusions:** explicit cast/wrap matrix (11d); layout (11b).
-- **Dependencies / inputs:** WP-M0-11a/b; spec §11.1, §11.4.
+- **Dependencies / inputs:** WP-M0-11a/b; spec §11.1 (incl. bullet 2: common-type promotion).
 - **Expected artifacts:** `bootstrap/src/types/convert.*`, `bootstrap/build/types_c.txt`, conversion-matrix tests.
 - **Sizing estimate:** 45–55 senior turns. Basis: ~500–700 LOC incl. tests, ~10 test functions, ~6 normative rules.
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Implicit conversions exactly the §11.1 whitelist; anything else rejected `AIC-T0307` with correct spans.
-  2. Common-type promotion per §11.4.
+  2. Common-type promotion per §11.1 bullet 2.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** conversion-matrix subtlety. **Escalation:** conversion ambiguity → Planner.
 
