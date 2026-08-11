@@ -16,7 +16,12 @@ This package is the single place that guarantees offset→(line,col) consistency
   CRT text-mode layer).
 - UTF-8 validation state machine (spec §3.1): no overlong encodings, no
   surrogate code points, no out-of-range code points, no invalid lead or
-  stray continuation bytes, no truncated sequences at EOF.
+  stray continuation bytes, no truncated sequences at EOF. **The validity
+  check applies to every byte of the file in every lexical context** — code,
+  line comment, block comment, and string literal (including bytes consumed
+  by an escape). Spec §3.1 bullet 1 requires the whole file to be valid
+  UTF-8, unqualified; the only context-qualified rule is the NUL bullet
+  below.
 - BOM (EF BB BF) at the start of a file → `AIC-L0002` (primary span: the BOM
   bytes).
 - NUL byte (U+0000) outside a string literal or comment → `AIC-L0003`
@@ -33,22 +38,35 @@ driver behavior (all later work packages).
 
 ## Design decisions
 
-1. **NUL context (spec §3.1 qualifier).** The spec rejects a NUL "outside a
+1. **UTF-8 validity in all contexts.** The single validation pass runs the
+   UTF-8 state machine on every byte of the normalized text regardless of
+   lexical context. Line comments, block comments, unterminated block
+   comments, string literals, and escaped bytes inside strings all feed the
+   same `scan_utf8_sequence` logic as code, so invalid/stray/truncated/
+   overlong/surrogate/out-of-range sequences are diagnosed with `AIC-L0001`
+   (maximal-malformed-run span, decision 2) wherever they appear. A valid
+   multi-byte character inside a string escape is consumed as one sequence so
+   it is never split into a spurious stray-continuation error.
+2. **NUL context (spec §3.1 qualifier).** The spec rejects a NUL "outside a
    string literal or comment"; spec §4.4 makes a raw NUL a legal string
    character. Honoring both requires lexical context, which the loader does
    not have (tokenization is WP-M0-08). The validation pass therefore tracks
    line-comment / block-comment / string-literal boundaries **only** to
-   classify NUL bytes. It produces no tokens, validates no escapes, and
+   classify NUL bytes (a NUL inside a comment or string is consumed as a
+   plain ASCII byte and never produces `AIC-L0003`; the qualifier is not
+   broadened). It produces no tokens, validates no escapes, and
    computes no literal values. Recovery for malformed constructs is
    deterministic:
    - a line comment ends at LF (a lone CR is whitespace and does not end it);
    - a block comment runs to `*/` or EOF (an unterminated block comment is
      the lexer's AIC-L0004; the loader stays in comment context, so NULs
      inside it are not misclassified);
-   - a string ends at an unescaped `"`; `\` skips the next byte; a raw LF
-     inside a string ends the string context (the lexer reports AIC-L0007
-     later), so NULs on later lines are classified as code.
-2. **AIC-L0001 span policy.** The primary span is the malformed run as
+   - a string ends at an unescaped `"`; `\` skips the next byte (if that byte
+     begins a multi-byte sequence, the whole valid sequence is consumed so
+     UTF-8 validation stays correct); a raw LF inside a string ends the
+     string context (the lexer reports AIC-L0007 later), so NULs on later
+     lines are classified as code.
+3. **AIC-L0001 span policy.** The primary span is the malformed run as
    consumed, following the Unicode standard's maximal-subpart behavior
    (Unicode D92):
    - invalid lead byte / stray continuation: the single byte;
@@ -60,16 +78,16 @@ driver behavior (all later work packages).
      sequence.
    This matches the negative corpus (`derived-lex-invalid-utf8`: a single
    0xFF at offset 26 spans exactly one byte).
-3. **Offset space.** All spans/offsets are in the line-terminator-normalized
+4. **Offset space.** All spans/offsets are in the line-terminator-normalized
    text (CRLF counted as one LF; the CR byte is not part of any offset). This
    is the canonical text every downstream stage consumes.
-4. **All load-level errors are reported.** A file with several load failures
+5. **All load-level errors are reported.** A file with several load failures
    yields several records, sorted with the contract §9 comparator.
-5. **I/O failures carry no diag record.** The registry has no file-read code
+6. **I/O failures carry no diag record.** The registry has no file-read code
    (AIC-BL0802/0803 are build-phase module-resolution codes owned by
    WP-M0-10/driver). `load_source_from_file` returns `LOAD_IO_ERROR` and the
    driver decides how to report it.
-6. **Embedded NULs.** The normalized text may contain NUL bytes (inside
+7. **Embedded NULs.** The normalized text may contain NUL bytes (inside
    strings/comments); `len` is authoritative. The buffer is not a C string.
 
 ## API
@@ -120,7 +138,11 @@ BOM at start / mid-file / with a second error; NUL in code, line comment,
 block comment, unterminated block comment, string, string with escapes, and
 recovery after a raw LF in a string; a table of invalid sequences with exact
 expected spans (overlong, surrogate, out-of-range, stray continuation,
-truncated, invalid lead, lead-then-non-continuation); CRLF / LF / lone-CR /
+truncated, invalid lead, lead-then-non-continuation); the same invalid-byte
+families inside line comments, block comments, unterminated block comments,
+string literals, and string escapes (spec §3.1 validity is enforced in every
+context), plus valid multi-byte characters in those contexts staying
+`LOAD_OK`; CRLF / LF / lone-CR /
 empty / trailing-LF positions; byte columns for multi-byte characters;
 record validation + single-line JSONL emission; file reading including a
 missing file.

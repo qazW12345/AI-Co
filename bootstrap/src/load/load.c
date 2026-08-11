@@ -12,6 +12,10 @@
  *        - invalid UTF-8 sequence (incl. overlong,
  *          surrogate, out-of-range, stray continuation,
  *          truncated at EOF, invalid lead)                -> AIC-L0001
+ *          (applies to EVERY byte of the file, regardless of
+ *          lexical context: code, line comment, block comment,
+ *          or string literal - spec sec. 3.1 requires the whole
+ *          file to be valid UTF-8, unqualified)
  *        - NUL byte (U+0000) outside a string literal or
  *          comment (spec sec. 3.1 qualifier; sec. 4.4 allows a raw
  *          NUL as a string character)                     -> AIC-L0003
@@ -19,6 +23,11 @@
  *      severity error, recovery authoritative) and sorted deterministically.
  *
  * Design decisions (also recorded in README.md):
+ *   - UTF-8 validity everywhere: the single pass validates every byte of the
+ *     normalized text as UTF-8 in every context (code, line comment, block
+ *     comment, string literal, including bytes consumed by an escape), so
+ *     invalid bytes inside comments and strings are diagnosed with AIC-L0001
+ *     just like invalid bytes in code.
  *   - NUL context: the spec's "outside a string literal or comment" qualifier
  *     cannot be honored without knowing lexical context, so the loader's
  *     validation pass tracks line-comment / block-comment / string-literal
@@ -254,6 +263,80 @@ static size_t consume_continuations(const char *text, size_t len, size_t i,
     return i + need + 1;
 }
 
+/* Validate the UTF-8 sequence starting at byte i (s->text[i] >= 0x80).
+ * Emits AIC-L0001 with the maximal-malformed-run span (Unicode D92 policy;
+ * see README.md) when the sequence is invalid, and returns the number of
+ * bytes to advance past the consumed part:
+ *   - valid 2/3/4-byte sequence: its full length (the sequence is valid);
+ *   - overlong / surrogate / out-of-range completed sequence: full length
+ *     (all bytes of the completed sequence belong to the malformed run);
+ *   - truncated at EOF / bad continuation: bytes consumed so far, i.e. the
+ *     lead byte plus valid continuations, ending just before the byte that
+ *     broke the sequence (the breaking byte is re-examined by the caller,
+ *     except at EOF);
+ *   - invalid lead / stray continuation: 1 (the single byte).
+ * The caller must advance by the return value. */
+static size_t scan_utf8_sequence(Scan *s, size_t i)
+{
+    uint8_t b = (uint8_t)s->text[i];
+
+    if (b >= 0xC2 && b <= 0xDF) {
+        size_t k;
+        bool ok;
+        k = consume_continuations(s->text, s->len, i, 1, &ok);
+        if (!ok) {
+            scan_add_invalid(s, i, k);
+            return k - i;
+        }
+        /* 2-byte sequences never encode overlong/surrogate values
+         * (leads C2..DF => U+0080..U+07FF). */
+        return 2;
+    }
+    if (b >= 0xE0 && b <= 0xEF) {
+        size_t k;
+        bool ok;
+        int64_t cp;
+        k = consume_continuations(s->text, s->len, i, 2, &ok);
+        if (!ok) {
+            scan_add_invalid(s, i, k);
+            return k - i;
+        }
+        cp = ((int64_t)(b & 0x0F) << 12) |
+             ((int64_t)((uint8_t)s->text[i + 1] & 0x3F) << 6) |
+             (int64_t)((uint8_t)s->text[i + 2] & 0x3F);
+        if (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF)) {
+            /* overlong (U+0000..U+07FF in 3 bytes) or surrogate */
+            scan_add_invalid(s, i, i + 3);
+            return 3;
+        }
+        return 3;
+    }
+    if (b >= 0xF0 && b <= 0xF4) {
+        size_t k;
+        bool ok;
+        int64_t cp;
+        k = consume_continuations(s->text, s->len, i, 3, &ok);
+        if (!ok) {
+            scan_add_invalid(s, i, k);
+            return k - i;
+        }
+        cp = ((int64_t)(b & 0x07) << 18) |
+             ((int64_t)((uint8_t)s->text[i + 1] & 0x3F) << 12) |
+             ((int64_t)((uint8_t)s->text[i + 2] & 0x3F) << 6) |
+             (int64_t)((uint8_t)s->text[i + 3] & 0x3F);
+        if (cp < 0x10000 || cp > 0x10FFFF) {
+            /* overlong (U+0000..U+FFFF in 4 bytes) or out of range */
+            scan_add_invalid(s, i, i + 4);
+            return 4;
+        }
+        return 4;
+    }
+    /* Invalid lead: 0x80-0xC1 (stray continuation / C0 C1) and 0xF5-0xFF.
+     * Single-byte malformed run. */
+    scan_add_invalid(s, i, i + 1);
+    return 1;
+}
+
 static void scan_text(Scan *s)
 {
     size_t i = 0;
@@ -295,75 +378,22 @@ static void scan_text(Scan *s)
                 i += 1;
                 continue;
             }
-            if (b >= 0xC2 && b <= 0xDF) {
-                size_t k;
-                bool ok;
-                k = consume_continuations(s->text, s->len, i, 1, &ok);
-                if (!ok) {
-                    scan_add_invalid(s, i, k);
-                    i = k;
-                    continue;
-                }
-                /* 2-byte sequences never encode overlong/surrogate values
-                 * (leads C2..DF => U+0080..U+07FF). */
-                i += 2;
-                continue;
-            }
-            if (b >= 0xE0 && b <= 0xEF) {
-                size_t k;
-                bool ok;
-                int64_t cp;
-                k = consume_continuations(s->text, s->len, i, 2, &ok);
-                if (!ok) {
-                    scan_add_invalid(s, i, k);
-                    i = k;
-                    continue;
-                }
-                cp = ((int64_t)(b & 0x0F) << 12) |
-                     ((int64_t)((uint8_t)s->text[i + 1] & 0x3F) << 6) |
-                     (int64_t)((uint8_t)s->text[i + 2] & 0x3F);
-                if (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF)) {
-                    /* overlong (U+0000..U+07FF in 3 bytes) or surrogate */
-                    scan_add_invalid(s, i, i + 3);
-                    i += 3;
-                    continue;
-                }
-                i += 3;
-                continue;
-            }
-            if (b >= 0xF0 && b <= 0xF4) {
-                size_t k;
-                bool ok;
-                int64_t cp;
-                k = consume_continuations(s->text, s->len, i, 3, &ok);
-                if (!ok) {
-                    scan_add_invalid(s, i, k);
-                    i = k;
-                    continue;
-                }
-                cp = ((int64_t)(b & 0x07) << 18) |
-                     ((int64_t)((uint8_t)s->text[i + 1] & 0x3F) << 12) |
-                     ((int64_t)((uint8_t)s->text[i + 2] & 0x3F) << 6) |
-                     (int64_t)((uint8_t)s->text[i + 3] & 0x3F);
-                if (cp < 0x10000 || cp > 0x10FFFF) {
-                    /* overlong (U+0000..U+FFFF in 4 bytes) or out of range */
-                    scan_add_invalid(s, i, i + 4);
-                    i += 4;
-                    continue;
-                }
-                i += 4;
-                continue;
-            }
-            /* Invalid lead: 0x80-0xC1 (stray continuation / C0 C1) and
-             * 0xF5-0xFF. Single-byte malformed run. */
-            scan_add_invalid(s, i, i + 1);
-            i += 1;
+            i += scan_utf8_sequence(s, i);
             continue;
 
         case SCAN_LINE_COMMENT:
             if (b == '\n') {
                 ctx = SCAN_CODE;
+                i += 1;
+                continue;
             }
+            if (b >= 0x80) {
+                i += scan_utf8_sequence(s, i);
+                continue;
+            }
+            /* ASCII comment byte: NUL is allowed inside a comment (spec
+             * sec. 3.1 qualifier), so it is consumed here like any other
+             * ASCII byte. */
             i += 1;
             continue;
 
@@ -371,6 +401,10 @@ static void scan_text(Scan *s)
             if (b == '*' && i + 1 < s->len && s->text[i + 1] == '/') {
                 ctx = SCAN_CODE;
                 i += 2;
+                continue;
+            }
+            if (b >= 0x80) {
+                i += scan_utf8_sequence(s, i);
                 continue;
             }
             i += 1;
@@ -383,8 +417,19 @@ static void scan_text(Scan *s)
                         /* backslash before a line terminator: the string is
                          * malformed (lexer reports later); recover at LF */
                         ctx = SCAN_CODE;
+                        i += 2;
+                        continue;
                     }
-                    i += 2;
+                    if ((uint8_t)s->text[i + 1] >= 0x80) {
+                        /* The escaped byte begins a UTF-8 sequence; validate
+                         * it and consume the full valid sequence so a valid
+                         * multi-byte character inside an escape is not split
+                         * into a stray-continuation error. Invalid sequences
+                         * emit AIC-L0001 here. */
+                        i += 1 + scan_utf8_sequence(s, i + 1);
+                    } else {
+                        i += 2;
+                    }
                 } else {
                     /* trailing backslash at EOF */
                     i += 1;
@@ -401,6 +446,12 @@ static void scan_text(Scan *s)
                  * later); end the string context so NULs on later lines are
                  * classified as code */
                 ctx = SCAN_CODE;
+                i += 1;
+                continue;
+            }
+            if (b >= 0x80) {
+                i += scan_utf8_sequence(s, i);
+                continue;
             }
             i += 1;
             continue;

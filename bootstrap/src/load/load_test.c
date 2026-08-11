@@ -20,6 +20,11 @@
  * stray continuation). This matches the maximal-subpart behavior of the
  * Unicode standard (D92) and the negative corpus (derived-lex-invalid-utf8:
  * a single 0xFF at offset 26 spans exactly one byte).
+ *
+ * UTF-8 validity is enforced in EVERY lexical context (spec sec. 3.1): the
+ * invalid-sequence vectors below cover line comments, block comments,
+ * unterminated block comments, string literals, and string escapes; valid
+ * multi-byte characters remain accepted in those same contexts.
  */
 #define _CRT_SECURE_NO_WARNINGS 1
 #include "load.h"
@@ -507,6 +512,131 @@ static void test_invalid_utf8(void)
 }
 
 /* ---------------------------------------------------------------------------
+ * Invalid UTF-8 inside comments and strings (spec sec. 3.1 requires the whole
+ * file to be valid UTF-8; the loader validates every byte in every context)
+ * ------------------------------------------------------------------------- */
+
+typedef struct CtxInvalidVec {
+    const uint8_t *bytes;
+    size_t len;
+    size_t nrecords;
+    size_t first_start;   /* span of the first record (by offset) */
+    size_t first_end;
+    size_t second_start;  /* span of the second record, or (size_t)-1 */
+    size_t second_end;
+    const char *label;
+} CtxInvalidVec;
+
+static void test_invalid_utf8_in_contexts(void)
+{
+    static const uint8_t lc_ff[] = { '/', '/', ' ', 0xFF };
+    static const uint8_t lc_80[] = { '/', '/', ' ', 0x80 };
+    static const uint8_t lc_c2[] = { '/', '/', ' ', 0xC2 };
+    static const uint8_t lc_e282[] = { '/', '/', ' ', 0xE2, 0x82 };
+    static const uint8_t bc_ff[] = { '/', '*', ' ', 0xFF, ' ', '*', '/' };
+    static const uint8_t bc_c3[] = { '/', '*', ' ', 0xC3, ' ', '*', '/' };
+    static const uint8_t bc_80[] = { '/', '*', ' ', 0x80, '*', '/' };
+    static const uint8_t ub_ff[] = { '/', '*', ' ', 0xFF };
+    static const uint8_t ub_c2[] = { '/', '*', ' ', 0xC2 };
+    static const uint8_t ub_f09f92[] = { '/', '*', ' ', 0xF0, 0x9F, 0x92 };
+    static const uint8_t str_ff[] = { '"', 'a', 0xFF, '"' };
+    static const uint8_t str_c3[] = { '"', 'a', 0xC3, '"' };
+    static const uint8_t str_80[] = { '"', 'a', 0x80, '"' };
+    static const uint8_t esc_ff[] = { '"', 'a', '\\', 0xFF, '"' };
+    static const uint8_t esc_c3[] = { '"', 'a', '\\', 0xC3, '"' };
+    static const uint8_t lc_nul_ff[] = { '/', '/', 0x00, 0xFF };
+    static const uint8_t str_nul_ff[] = { '"', 'a', 0x00, 0xFF, '"' };
+
+    static const CtxInvalidVec vecs[] = {
+        { lc_ff,    4, 1, 3, 4, (size_t)-1, 0, "line comment 0xFF" },
+        { lc_80,    4, 1, 3, 4, (size_t)-1, 0, "line comment stray 0x80" },
+        { lc_c2,    4, 1, 3, 4, (size_t)-1, 0, "line comment truncated 0xC2" },
+        { lc_e282,  5, 1, 3, 5, (size_t)-1, 0, "line comment truncated 3-byte" },
+        { bc_ff,    7, 1, 3, 4, (size_t)-1, 0, "block comment 0xFF" },
+        { bc_c3,    7, 1, 3, 4, (size_t)-1, 0, "block comment 0xC3 then space" },
+        { bc_80,    6, 1, 3, 4, (size_t)-1, 0, "block comment stray 0x80" },
+        { ub_ff,    4, 1, 3, 4, (size_t)-1, 0, "unterminated block comment 0xFF" },
+        { ub_c2,    4, 1, 3, 4, (size_t)-1, 0, "unterminated block comment truncated 0xC2" },
+        { ub_f09f92, 6, 1, 3, 6, (size_t)-1, 0, "unterminated block comment truncated 4-byte" },
+        { str_ff,   4, 1, 2, 3, (size_t)-1, 0, "string 0xFF" },
+        { str_c3,   4, 1, 2, 3, (size_t)-1, 0, "string 0xC3 then quote" },
+        { str_80,   4, 1, 2, 3, (size_t)-1, 0, "string stray 0x80" },
+        { esc_ff,   5, 1, 3, 4, (size_t)-1, 0, "string escape 0xFF" },
+        { esc_c3,   5, 1, 3, 4, (size_t)-1, 0, "string escape truncated 0xC3" },
+        /* NUL inside comment/string stays allowed; the invalid byte still
+         * reports (L0003 must not broaden, L0001 must still fire). */
+        { lc_nul_ff, 4, 1, 3, 4, (size_t)-1, 0, "line comment NUL then 0xFF" },
+        { str_nul_ff, 5, 1, 3, 4, (size_t)-1, 0, "string NUL then 0xFF" },
+    };
+
+    size_t i;
+    for (i = 0; i < sizeof(vecs) / sizeof(vecs[0]); ++i) {
+        const CtxInvalidVec *v = &vecs[i];
+        LoadSource *src = NULL;
+        DiagRecord **recs = NULL;
+        size_t n = 0;
+        LoadStatus st = load_source_from_bytes("input.ai", v->bytes,
+                                               v->len, &src, &recs, &n);
+        CHECK(st == LOAD_VALIDATION_ERROR);
+        CHECK(src == NULL);
+        CHECK(recs != NULL && n == v->nrecords);
+        if (recs != NULL && n >= 1) {
+            check_record(recs[0], "AIC-L0001", "input.ai",
+                         1, (int64_t)v->first_start + 1, (int64_t)v->first_start,
+                         1, (int64_t)v->first_end + 1, (int64_t)v->first_end);
+        }
+        if (recs != NULL && n >= 2 && v->second_start != (size_t)-1) {
+            check_record(recs[1], "AIC-L0001", "input.ai",
+                         1, (int64_t)v->second_start + 1, (int64_t)v->second_start,
+                         1, (int64_t)v->second_end + 1, (int64_t)v->second_end);
+        }
+        load_records_free(recs, n);
+    }
+
+    /* Valid multi-byte characters in comments, strings, and string escapes
+     * remain LOAD_OK (the escape path must consume the full sequence). */
+    {
+        static const uint8_t ok_lc[] = { '/', '/', 0xC3, 0xA9, '\n' };
+        static const uint8_t ok_bc[] = { '/', '*', 0xC3, 0xA9, '*', '/' };
+        static const uint8_t ok_str[] = { '"', 0xC3, 0xA9, '"' };
+        static const uint8_t ok_esc[] = { '"', 'a', '\\', 0xC3, 0xA9, '"' };
+        static const uint8_t ok_esc4[] = { '"', 'a', '\\', 0xF0, 0x9F, 0x92, 0xA9, '"' };
+        static const uint8_t *oks[] = { ok_lc, ok_bc, ok_str, ok_esc, ok_esc4 };
+        static const size_t ok_lens[] = { 5, 6, 4, 6, 8 };
+        for (i = 0; i < sizeof(oks) / sizeof(oks[0]); ++i) {
+            LoadSource *src = NULL;
+            DiagRecord **recs = NULL;
+            size_t n = 0;
+            LoadStatus st = load_source_from_bytes("input.ai", oks[i],
+                                                   ok_lens[i], &src, &recs, &n);
+            CHECK(st == LOAD_OK);
+            CHECK(src != NULL);
+            CHECK(recs == NULL && n == 0);
+            load_source_free(src);
+        }
+    }
+
+    /* A multi-byte lead inside a comment followed by a non-continuation is
+     * still a malformed run (lead alone, D92 policy). */
+    {
+        const uint8_t bytes[] = { '/', '*', 0xC3, '\n', 'x', '*', '/' };
+        LoadSource *src = NULL;
+        DiagRecord **recs = NULL;
+        size_t n = 0;
+        LoadStatus st = load_source_from_bytes("input.ai", bytes,
+                                               sizeof(bytes),
+                                               &src, &recs, &n);
+        CHECK(st == LOAD_VALIDATION_ERROR);
+        CHECK(recs != NULL && n == 1);
+        if (recs != NULL && n >= 1) {
+            check_record(recs[0], "AIC-L0001", "input.ai",
+                         1, 3, 2, 1, 4, 3);
+        }
+        load_records_free(recs, n);
+    }
+}
+
+/* ---------------------------------------------------------------------------
  * Line terminators, spans, byte columns
  * ------------------------------------------------------------------------- */
 
@@ -814,6 +944,7 @@ int main(void)
     test_bom();
     test_nul();
     test_invalid_utf8();
+    test_invalid_utf8_in_contexts();
     test_line_terminators();
     test_byte_columns();
     test_records_valid_and_emit();
