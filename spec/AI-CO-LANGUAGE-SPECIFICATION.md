@@ -1,11 +1,11 @@
-# AI-Co Language Specification v0.1.1 (Accepted)
+# AI-Co Language Specification v0.1.2 (Accepted)
 
 **Status:** Accepted
 **Owner:** Planner
 **Decision owner:** Main Designer (architecture); decisions recorded in ADR-004 are Human Sponsor approvals and are applied here as governing direction.
 **Approver:** Main Designer (architectural acceptance); Reviewer (independent conformance review); Marcel (Human Sponsor) for purpose-affecting questions.
-**Version:** 0.1.1
-**Date:** 2026-08-08
+**Version:** 0.1.2
+**Date:** 2026-08-11
 **Scope:** project AI-Co
 
 ## Authority
@@ -591,6 +591,7 @@ A constant expression is an expression composed only of:
 - `true`, `false`, `null`;
 - `const` names declared at module scope or enclosing scopes;
 - enum members (`Color.Red`);
+- composite literals: struct literals whose field initializer expressions are constant expressions, array literals whose element expressions are constant expressions, and repetition-form array literals `[e; N]` whose element expression `e` and count `N` are constant expressions;
 - `sizeof`/`alignof`;
 - `&` of a static-storage lvalue (a global `var`), `&arr[0]` of a static array, and slice expressions of static arrays with constant bounds;
 - unary and binary operators on constant expressions, provided every operation is valid and checked at compile time (Section 11.3);
@@ -1056,7 +1057,7 @@ Evaluation basis (recorded here per review FIND-003 and ADR-002 §71):
 
 ## 18. Normative examples and counterexamples
 
-Conventions: `// valid` marks conforming examples; `// ERROR AIC-xxxx: span` marks invalid examples with the expected primary span described in prose (the span is the smallest token/expression responsible). Runtime traps are labeled TRAP.
+Conventions: `// valid` marks conforming examples; `// ERROR AIC-xxxx: span` marks invalid examples with the expected primary span described in prose (the span is the smallest token/expression responsible). Runtime traps are labeled TRAP. Examples in this section illustrate individual constructs and are not necessarily complete programs. A complete runnable program additionally requires an entry module declaring `fn main() -> i32` or `fn main() -> void`, per Section 15.3.
 
 ### 18.1 Lexical examples
 
@@ -1066,7 +1067,7 @@ module main;              // valid
 var x: i32 = 42;          // valid
 var b: bool = true;       // valid
 var c: i32 = 0b1010;      // valid
-var h: u64 = 0xFF_FF;     // valid
+var h: u64 = 0xFF_FFu64;  // valid
 // ERROR AIC-L0006: span "300u8"
 var bad: u8 = 300u8;
 // ERROR AIC-L0008: span "\q"
@@ -1245,6 +1246,7 @@ Self-checklist against the task acceptance criteria:
   - FIND-005 (diagnostic schema v1, code registry, compatibility): closed in `DIAGNOSTIC-CONTRACT.md` (schema version 1; Sections 5, 11.9, and 11.10 of that document).
   - FIND-G2-01..09 (gate-2 conformance review, 2026-08-08): corrected in the correction round below; closure confirmed by the gate-2 re-review round 1 (2026-08-08), with FIND-G2-08's residual RER-G2-01 closed in the entry below.
 - Changes from review will be recorded as new versions of this document; supersession is handled per organization governance.
+- **v0.1.2 (2026-08-11):** applied the Main Designer-approved precision amendments recorded in t_5f69de3e comment 216 (2026-08-11): (1) §18.1 lexical example `var h: u64 = 0xFF_FF;` corrected to `0xFF_FFu64` (u64-suffixed literal) so the example conforms to the §4.3 literal-typing rule and the §11.1 Table 11.1 conversion whitelist (no i32→u64 implicit conversion exists); (2) §10.5 constant-expression enumeration now explicitly includes recursively constant composite literals (struct literals, array literals, and repetition-form array literals) whose element/field/count expressions are constant expressions; (3) §18 conventions paragraph now states that examples illustrate individual constructs and are not necessarily complete programs, and that a complete runnable program requires an entry module declaring `fn main() -> i32` or `fn main() -> void` per §15.3. The amendment text was applied exactly as accepted by the Main Designer; no semantic expansion, no §18.4 change, no diagnostic-contract or ADR change. Authority: Main Designer decision t_5f69de3e comment 216; Planner authored and applied this revision; independent Reviewer verification of this artifact is pending per the Planner follow-up task t_9410ebc6.
 - **v0.1.1 (2026-08-08):** applied the ADR-004 Human Sponsor resolutions (temporal baseline, wrapping baseline, Windows baseline), removed every reference to the deleted, never-committed Main Designer decision-note artifact, and corrected the grammar and contract defects identified by Main Designer inspection. This revision supersedes the v0.1.0 Proposed draft for review purposes.
 - **Planner self-review (2026-08-08):** Pass with one correction. The Planner self-review of the ADR-003/ADR-004-aligned v0.1.1 draft confirmed the three decisions (temporal baseline, wrapping baseline, Windows baseline) are requirements-complete, internally coherent, and implementation-ready; it added the ADR-004 §63 obligation that runtime-facing Windows calls be enumerated and documented against the pinned baseline (§14.3), which the v0.1.1 draft had not carried explicitly. No other corrections required; no new architecture decisions made.
 - **Gate-2 correction round (2026-08-08):** corrected the six Major findings (FIND-G2-01..06) and three Minor findings (FIND-G2-07..09) of the independent gate-2 conformance review (`docs/reviews/LANGUAGE-SPEC-v0.1.1-REVIEW-2026-08-08.md`, verdict "Changes required") and adopted the three Suggestions (SUG-G2-01, SUG-G2-02, SUG-G2-03). Resolution per finding: FIND-G2-01 — §18.4/§18.6 examples corrected to conform to the §4.3/§11.1 conversion rules (explicit `cast` and suffixed literals), with negative coverage for the rejected spellings; FIND-G2-02 — §14.4 defines the hashed artifact set and explicitly excludes the manifest from its own hash list; FIND-G2-03 — §14.4 defines stage-invariant manifest fields (AI-Co language/spec version string only), carries host compiler and linker identity exclusively in the §16.3 external evidence, and requires identical relative output paths for the byte-identity comparison; FIND-G2-04 — deterministic null-span ordering rule added to `DIAGNOSTIC-CONTRACT.md` §9; FIND-G2-05 — §15.1 defines `alloc_bytes(0)` (returns `null`, no allocation) and an exact-fit size/reuse rule (reverse order of release within a size class; no splitting or coalescing); FIND-G2-06 — §12.5 defines checked pointer-arithmetic overflow with new stable trap `AIC-R0816` (registry and trap table updated); FIND-G2-07 — §6.5 rejects bare `import rt;` with new code `AIC-N0209` and requires explicit runtime submodule imports (no auto-availability); FIND-G2-08 — §18.5 annotations repositioned and completed (missing `AIC-N0202` added); FIND-G2-09 — `DIAGNOSTIC-CONTRACT.md` §11.10 gained a draft-exemption clause. Suggestions adopted: SUG-G2-01 (compiler-controlled timestamps are zero, ADR-001 §107), SUG-G2-02 (`U` class exempt from the phase-group digit mapping), SUG-G2-03 (manifest version/identity field is the AI-Co language/spec version string). No ADR, charter, or governance document was modified; this round is specification precision repair within the accepted architecture. The amended set is subject to Reviewer re-review (gate 2) before Main Designer architectural acceptance (gate 3); push remains held pending a passing re-review verdict.
