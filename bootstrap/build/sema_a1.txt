@@ -1,0 +1,13 @@
+# bootstrap/build/sema_a1.txt
+# WP-M0-13a1 declaration model and assignability
+# area source list (owned by WP-M0-13a1). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level sema_a.txt entry per
+# manifest §5 (13a2 owns sema_a2.txt; this fragment is disjoint).
+#
+# decl_core_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with these library sources (see the build comment at the
+# top of decl_core_test.c).
+bootstrap/src/sema/decl_core.c
