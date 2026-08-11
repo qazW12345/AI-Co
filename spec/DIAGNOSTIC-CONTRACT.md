@@ -191,9 +191,9 @@ User traps via `rt.trap.report(code: u32, message: str)` emit a record with `cod
 | Code | Meaning | Severity | Primary span |
 |---|---|---|---|
 | `AIC-E0401` | expression is not a constant expression | error | the expression |
-| `AIC-E0402` | address of const / address of non-lvalue | error | the operand |
+| `AIC-E0402` | address of const / address of non-lvalue | error | the whole address-of expression |
 | `AIC-E0403` | missing initializer on variable declaration | error | the declaration |
-| `AIC-E0404` | assignment to const | error | the assignment |
+| `AIC-E0404` | assignment to const | error | the const declaration identifier |
 | `AIC-E0405` | constant expression overflow (checked arithmetic) | error | the constant expression |
 | `AIC-E0406` | constant division by zero | error | the constant expression |
 | `AIC-E0407` | constant shift count out of range | error | the shift |
@@ -306,3 +306,5 @@ Status: **Accepted** (2026-08-08). This contract was reviewed with the language 
 **v0.1.1 S-1 alignment (2026-08-11):** Section 11.4 primary-span prose for `AIC-T0302` and `AIC-T0303` was aligned to the accepted negative-corpus declaration-name-span pin, closing Planner ruling R-1 (task t_420f9f8a) and Reviewer Suggestion S-1 (task t_ee0942a1). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
 
 **v0.1.1 S-1 alignment (2026-08-11):** Section 11.4 primary-span prose for `AIC-T0305` was aligned to the accepted negative-corpus leftmost-operator pin (`tests/negative/cases/derived-type-chained-comparison`; documented in `bootstrap/src/types/optype.h`), closing Reviewer Suggestion S-1 (task t_0db758e5). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
+
+**v0.1.1 SUG-1 alignment (2026-08-12):** Section 11.5 primary-span prose for `AIC-E0402` and `AIC-E0404` was aligned to the accepted negative-corpus pins (`tests/negative/cases/derived-semantic-addr-of-const`: whole address-of expression node, span 5:17-19/83-85 for `&X`; `tests/negative/cases/derived-semantic-assign-to-const`: const declaration identifier, span 3:9-10/40-41 for `X` in `const X: i32 = 5;`), closing Reviewer Suggestion SUG-1 (review t_4ea1365e comment 730; gate t_e82dee76). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
