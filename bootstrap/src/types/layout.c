@@ -328,6 +328,69 @@ static bool build_push_enum(LayoutBuild *b, const NameSymbol *sym,
     return true;
 }
 
+/* Record a declaration whose layout was skipped as unevaluable (a
+ * member-value/array-extent expression outside the 11b subset; WP-M0-12
+ * owns full composition). The declaration's layout is not published;
+ * the marker lets a later by-value reference route to
+ * LAYOUT_UNEVALUABLE instead of the defensive LAYOUT_UNSUPPORTED, so
+ * the driver can send the program to the const stage. */
+static bool build_mark_struct_unevaluable(LayoutBuild *b,
+                                          const NameSymbol *sym)
+{
+    if (b->nstruct_unevaluable == b->struct_unevaluable_cap) {
+        size_t ncap = b->struct_unevaluable_cap
+                          ? b->struct_unevaluable_cap * 2
+                          : 16;
+        const NameSymbol **ns = (const NameSymbol **)realloc(
+            (void *)b->struct_unevaluable,
+            ncap * sizeof(const NameSymbol *));
+        if (!ns) return false;
+        b->struct_unevaluable = ns;
+        b->struct_unevaluable_cap = ncap;
+    }
+    b->struct_unevaluable[b->nstruct_unevaluable++] = sym;
+    return true;
+}
+
+static bool build_mark_enum_unevaluable(LayoutBuild *b,
+                                        const NameSymbol *sym)
+{
+    if (b->nenum_unevaluable == b->enum_unevaluable_cap) {
+        size_t ncap = b->enum_unevaluable_cap ? b->enum_unevaluable_cap * 2
+                                              : 16;
+        const NameSymbol **ns = (const NameSymbol **)realloc(
+            (void *)b->enum_unevaluable,
+            ncap * sizeof(const NameSymbol *));
+        if (!ns) return false;
+        b->enum_unevaluable = ns;
+        b->enum_unevaluable_cap = ncap;
+    }
+    b->enum_unevaluable[b->nenum_unevaluable++] = sym;
+    return true;
+}
+
+static bool build_struct_unevaluable(const LayoutBuild *b,
+                                     const NameSymbol *sym)
+{
+    size_t i;
+    if (!b || !sym) return false;
+    for (i = 0; i < b->nstruct_unevaluable; i++) {
+        if (b->struct_unevaluable[i] == sym) return true;
+    }
+    return false;
+}
+
+static bool build_enum_unevaluable(const LayoutBuild *b,
+                                   const NameSymbol *sym)
+{
+    size_t i;
+    if (!b || !sym) return false;
+    for (i = 0; i < b->nenum_unevaluable; i++) {
+        if (b->enum_unevaluable[i] == sym) return true;
+    }
+    return false;
+}
+
 const LayoutStruct *layout_build_struct(const LayoutBuild *build,
                                         const NameSymbol *sym)
 {
@@ -364,6 +427,8 @@ void layout_build_free(LayoutBuild *build)
     free(build->struct_layouts);
     free(build->enum_syms);
     free(build->enum_layouts);
+    free(build->struct_unevaluable);
+    free(build->enum_unevaluable);
     free(build);
 }
 
@@ -420,14 +485,31 @@ static LayoutStatus type_info(LayoutCtx *c, const NameModule *module,
         if (!sym) return LAYOUT_UNSUPPORTED;
         if (sym->kind == NAME_SYM_STRUCT) {
             const LayoutStruct *ls = lookup_struct_sym(c, sym);
-            if (!ls) return LAYOUT_UNSUPPORTED;
+            if (!ls) {
+                /* A declaration whose layout was skipped as unevaluable
+                 * (11b subset boundary, WP-M0-12 territory) routes to
+                 * LAYOUT_UNEVALUABLE so a future driver can send the
+                 * program to the const stage; an unknown symbol stays
+                 * defensive LAYOUT_UNSUPPORTED. */
+                if (build_struct_unevaluable(c->build, sym)) {
+                    c->unevaluable = true;
+                    return LAYOUT_UNEVALUABLE;
+                }
+                return LAYOUT_UNSUPPORTED;
+            }
             out->size = ls->size;
             out->align = ls->align;
             return LAYOUT_OK;
         }
         if (sym->kind == NAME_SYM_ENUM) {
             const LayoutEnum *le = lookup_enum_sym(c, sym);
-            if (!le) return LAYOUT_UNSUPPORTED;
+            if (!le) {
+                if (build_enum_unevaluable(c->build, sym)) {
+                    c->unevaluable = true;
+                    return LAYOUT_UNEVALUABLE;
+                }
+                return LAYOUT_UNSUPPORTED;
+            }
             out->size = le->size;
             out->align = le->align;
             return LAYOUT_OK;
@@ -825,6 +907,10 @@ LayoutStatus types_layout_build(const NameResult *result,
                 if (layout_build_enum(b, sym)) continue;  /* defensive */
                 st = compute_enum(&c, module, decl, &le);
                 if (st == LAYOUT_UNEVALUABLE) {
+                    /* Skip the layout (not published), but record the
+                     * skip so a by-value reference from a struct routes
+                     * LAYOUT_UNEVALUABLE instead of UNSUPPORTED. */
+                    if (!build_mark_enum_unevaluable(b, sym)) goto oom;
                     worst = LAYOUT_UNEVALUABLE;
                     continue;
                 }
@@ -862,6 +948,11 @@ LayoutStatus types_layout_build(const NameResult *result,
                 if (layout_build_struct(b, sym)) continue;  /* defensive */
                 st = compute_struct(&c, module, decl, &ls);
                 if (st == LAYOUT_UNEVALUABLE) {
+                    /* Same routing bookkeeping as the enum phase: the
+                     * struct's own layout is skipped and recorded, so a
+                     * later struct referencing it by value routes
+                     * LAYOUT_UNEVALUABLE (MIN-11B-01). */
+                    if (!build_mark_struct_unevaluable(b, sym)) goto oom;
                     worst = LAYOUT_UNEVALUABLE;
                     continue;
                 }

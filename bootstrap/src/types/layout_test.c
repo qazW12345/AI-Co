@@ -854,6 +854,151 @@ static void test_unevaluable_member_and_extent(void)
     pipeline_free(&p);
 }
 
+static void test_unevaluable_cross_reference_enum(void)
+{
+    /* MIN-11B-01 probe: a struct referencing by value an enum whose
+     * member expression is unevaluable (11b subset boundary, WP-M0-12
+     * territory) must surface LAYOUT_UNEVALUABLE with the build (and any
+     * records) preserved, so a future driver can route the program to
+     * the const stage instead of misclassifying it as malformed. */
+    const char *src =
+        "module main;\n"
+        "const X: i32 = 5;\n"
+        "enum E: i32 { A = X }\n"
+        "struct S { e: E; }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.lst == LAYOUT_UNEVALUABLE);
+    CHECK(p.lrn == 0);
+    CHECK(p.build != NULL);
+    if (p.build) {
+        CHECK(layout_build_enum(p.build, find_sym(&p, "E")) == NULL);
+        CHECK(layout_build_struct(p.build, find_sym(&p, "S")) == NULL);
+    }
+    pipeline_free(&p);
+}
+
+static void test_unevaluable_cross_reference_struct(void)
+{
+    /* MIN-11B-01 struct corner: struct A's array extent is unevaluable
+     * (A is skipped and not published), and struct B referencing A by
+     * value must route to LAYOUT_UNEVALUABLE with the build preserved. */
+    const char *src =
+        "module main;\n"
+        "const X: i32 = 5;\n"
+        "struct A { arr: u8[X]; }\n"
+        "struct B { a: A; }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.lst == LAYOUT_UNEVALUABLE);
+    CHECK(p.lrn == 0);
+    CHECK(p.build != NULL);
+    if (p.build) {
+        CHECK(layout_build_struct(p.build, find_sym(&p, "A")) == NULL);
+        CHECK(layout_build_struct(p.build, find_sym(&p, "B")) == NULL);
+    }
+    pipeline_free(&p);
+}
+
+static void test_unevaluable_cross_reference_chain(void)
+{
+    /* Propagation: T references S (skipped because it references E,
+     * which is skipped). Every declaration in the chain is absent from
+     * the build tables, and the routing signal survives to the top. */
+    const char *src =
+        "module main;\n"
+        "const X: i32 = 5;\n"
+        "enum E: i32 { A = X }\n"
+        "struct S { e: E; }\n"
+        "struct T { s: S; }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.lst == LAYOUT_UNEVALUABLE);
+    CHECK(p.lrn == 0);
+    CHECK(p.build != NULL);
+    if (p.build) {
+        CHECK(layout_build_enum(p.build, find_sym(&p, "E")) == NULL);
+        CHECK(layout_build_struct(p.build, find_sym(&p, "S")) == NULL);
+        CHECK(layout_build_struct(p.build, find_sym(&p, "T")) == NULL);
+    }
+    pipeline_free(&p);
+}
+
+static void test_unevaluable_cross_reference_ptr_ok(void)
+{
+    /* A pointer to a skipped-as-unevaluable declaration needs no value
+     * layout: the referencing struct still publishes (8/8), while the
+     * build routes LAYOUT_UNEVALUABLE for the skipped enum. */
+    const char *src =
+        "module main;\n"
+        "const X: i32 = 5;\n"
+        "enum E: i32 { A = X }\n"
+        "struct P { e: E*; }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.lst == LAYOUT_UNEVALUABLE);
+    CHECK(p.lrn == 0);
+    CHECK(p.build != NULL);
+    if (p.build) {
+        CHECK(layout_build_enum(p.build, find_sym(&p, "E")) == NULL);
+        const LayoutStruct *pl = layout_for(&p, "P");
+        CHECK(pl != NULL);
+        if (pl) CHECK(pl->size == 8 && pl->align == 8 && pl->nfields == 1);
+    }
+    pipeline_free(&p);
+}
+
+static void test_unevaluable_cross_reference_type_info(void)
+{
+    /* The public query helper must route a named reference to a
+     * skipped-as-unevaluable declaration the same way the entry point
+     * does (LAYOUT_UNEVALUABLE), never LAYOUT_UNSUPPORTED. */
+    const char *src =
+        "module main;\n"
+        "const X: i32 = 5;\n"
+        "enum E: i32 { A = X }\n"
+        "struct A { arr: u8[X]; }\n"
+        "struct S { e: E; }\n"
+        "struct B { a: A; }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.lst == LAYOUT_UNEVALUABLE);
+    if (p.build && p.result && p.program) {
+        const NameModule *mod = p.result->modules[0];
+        const AstNode *s = find_type_decl(p.program, "S", AST_STRUCT_DECL);
+        const AstNode *b = find_type_decl(p.program, "B", AST_STRUCT_DECL);
+        LayoutSizeAlign info;
+        CHECK(s != NULL);
+        CHECK(b != NULL);
+        if (s) {
+            CHECK(layout_build_type_info(p.build, mod,
+                      s->u.struct_decl.fields[0]->u.named.type,
+                      &info) == LAYOUT_UNEVALUABLE);
+        }
+        if (b) {
+            CHECK(layout_build_type_info(p.build, mod,
+                      b->u.struct_decl.fields[0]->u.named.type,
+                      &info) == LAYOUT_UNEVALUABLE);
+        }
+    }
+    pipeline_free(&p);
+}
+
 /* ---------------------------------------------------------------------------
  * Determinism
  * ------------------------------------------------------------------------- */
@@ -944,6 +1089,11 @@ int main(void)
     test_enum_forward_in_struct();
     test_eval_subset();
     test_unevaluable_member_and_extent();
+    test_unevaluable_cross_reference_enum();
+    test_unevaluable_cross_reference_struct();
+    test_unevaluable_cross_reference_chain();
+    test_unevaluable_cross_reference_ptr_ok();
+    test_unevaluable_cross_reference_type_info();
     test_determinism();
     test_corpus_anchor();
 

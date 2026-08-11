@@ -34,6 +34,11 @@
  * const failure codes (AIC-E0401, AIC-E0405..E0411) belong to later
  * packages. LAYOUT_UNEVALUABLE is surfaced so the driver can route those
  * programs to the const stage; it is not a rejection by this package.
+ * A by-value named reference from a struct to a declaration whose layout
+ * was skipped as unevaluable also routes LAYOUT_UNEVALUABLE: the
+ * referenced declaration is absent from the build (its layout is
+ * unknown), so the referencing layout is unknown too, and the skip is
+ * recorded in LayoutBuild so the routing signal survives (MIN-11B-01).
  *
  * Diagnostics: AIC-T0301 records carry phase "type", severity "error",
  * recovery "authoritative" and are returned sorted with the contract
@@ -66,8 +71,11 @@ typedef enum LayoutStatus {
     LAYOUT_OK = 0,          /* all layouts computed; no records */
     LAYOUT_DIAG_ERROR,      /* layouts computed; AIC-T0301 records exist */
     LAYOUT_UNEVALUABLE,     /* a member-value/array-extent expression is
-                             * outside the 11b subset (WP-M0-12 owns it);
-                             * no record was emitted for that site */
+                             * outside the 11b subset, or a by-value named
+                             * reference resolves to a declaration whose
+                             * layout was skipped as unevaluable (WP-M0-12
+                             * owns it); no record was emitted for that
+                             * site */
     LAYOUT_UNSUPPORTED,     /* defensive: malformed input / layout cycle /
                              * unknown symbol; nothing owned */
     LAYOUT_OOM              /* allocation failure; nothing owned */
@@ -157,6 +165,17 @@ typedef struct LayoutBuild {
     const NameSymbol **enum_syms;
     LayoutEnum *enum_layouts;
     size_t nenums, enums_cap;
+    /* Declarations whose layout was skipped as unevaluable (a
+     * member-value/array-extent expression outside the 11b subset;
+     * WP-M0-12 owns full composition). Their layouts are NOT present in
+     * the tables above; the markers make a by-value named reference to
+     * one of them route to LAYOUT_UNEVALUABLE instead of the defensive
+     * LAYOUT_UNSUPPORTED, so a future driver can send the program to
+     * the const stage rather than misclassify it as malformed. */
+    const NameSymbol **struct_unevaluable;
+    const NameSymbol **enum_unevaluable;
+    size_t nstruct_unevaluable, struct_unevaluable_cap;
+    size_t nenum_unevaluable, enum_unevaluable_cap;
 } LayoutBuild;
 
 /* ---------------------------------------------------------------------------
@@ -173,10 +192,13 @@ typedef struct LayoutBuild {
  *   LAYOUT_OK              no records; *out_build set.
  *   LAYOUT_DIAG_ERROR      *out_build set, *out_records set (AIC-T0301).
  *   LAYOUT_UNEVALUABLE     *out_build set; some member-value/array-extent
- *                          expression was outside the 11b subset; no
- *                          record was emitted for those sites (WP-M0-12
- *                          owns full const evaluation). Records from
- *                          representability failures may also be present.
+ *                          expression was outside the 11b subset, or a
+ *                          by-value named reference resolved to a
+ *                          declaration whose layout was skipped as
+ *                          unevaluable; no record was emitted for those
+ *                          sites (WP-M0-12 owns full const evaluation).
+ *                          Records from representability failures may
+ *                          also be present.
  *   LAYOUT_UNSUPPORTED     defensive; nothing owned.
  *   LAYOUT_OOM             nothing owned.
  */
@@ -192,7 +214,8 @@ void layout_build_free(LayoutBuild *build);
  * ------------------------------------------------------------------------- */
 
 /* The layout of a struct/enum declaration symbol, or NULL when the symbol
- * is not a struct/enum declaration or not present in the build. */
+ * is not a struct/enum declaration, was skipped as unevaluable (its
+ * layout is not present in the build), or is not present in the build. */
 const LayoutStruct *layout_build_struct(const LayoutBuild *build,
                                         const NameSymbol *sym);
 const LayoutEnum *layout_build_enum(const LayoutBuild *build,
@@ -200,10 +223,11 @@ const LayoutEnum *layout_build_enum(const LayoutBuild *build,
 
 /* Size/alignment of an AST type node in `module` (recursive; struct/enum
  * references resolved through `build`). Returns LAYOUT_OK, LAYOUT_OOM, or
- * LAYOUT_UNSUPPORTED (defensive: unknown symbol/cycle). Never returns
- * LAYOUT_DIAG_ERROR / LAYOUT_UNEVALUABLE: size/alignment of an array type
- * whose extent expression is outside the 11b subset returns
- * LAYOUT_UNEVALUABLE. `out` is untouched unless LAYOUT_OK. */
+ * LAYOUT_UNSUPPORTED (defensive: unknown symbol/cycle). Returns
+ * LAYOUT_UNEVALUABLE (no record, `out` untouched) when an array extent
+ * expression is outside the 11b subset or when a named reference resolves
+ * to a declaration whose layout was skipped as unevaluable. Never returns
+ * LAYOUT_DIAG_ERROR. `out` is untouched unless LAYOUT_OK. */
 LayoutStatus layout_build_type_info(const LayoutBuild *build,
                                     const NameModule *module,
                                     const AstNode *type_node,
