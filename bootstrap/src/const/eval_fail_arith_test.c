@@ -356,6 +356,53 @@ static void test_overflow_kinds(void)
     pipeline_free(&p);
 }
 
+/* Pointer-arithmetic overflow (header convention lines 62-64; spec
+ * sec. 12.5): 12a routes p + i and i + p whose byte-offset math
+ * overflows int64 as EVAL_FAIL_OVERFLOW, typed here as AIC-E0405 with
+ * width 64 / signed and a = the integer operand, b = 0 (the documented
+ * convention). A valid pointer-arithmetic control produces no failure. */
+static void test_pointer_arith_overflow(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "var arr: i32[4] = [1, 2, 3, 4];\n"
+        "var a: i32* = &arr[0] + 9223372036854775807i64;\n"
+        "var b: i32* = 9223372036854775807i64 + &arr[0];\n"
+        "var c: i32* = &arr[0] + 2;\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.lst == LAYOUT_OK);
+    CHECK(p.esc == CONST_EVAL_FAILURE);
+    CHECK(p.ast2 == ARITH_FAIL_FAILURE);
+    /* a and b overflow; c is valid pointer arithmetic (no failure). */
+    CHECK(p.afailn == 2);
+    if (p.afailn != 2) {
+        pipeline_free(&p);
+        return;
+    }
+    /* a: p + i -- INT64_MAX elements * 4 bytes overflows int64. */
+    {
+        const AstNode *site = global_init(find_global_decl(p.program, "a"));
+        check_fail_kind(&p.afails[0], EVAL_FAIL_OVERFLOW, "AIC-E0405");
+        check_fail_site(&p.afails[0], site);
+        check_fail_op_at_site(&p.afails[0], site, AST_BIN_ADD);
+        check_fail_int(&p.afails[0], INT64_MAX, 0, 64, true);
+    }
+    /* b: i + p -- the same convention with the integer operand first. */
+    {
+        const AstNode *site = global_init(find_global_decl(p.program, "b"));
+        check_fail_kind(&p.afails[1], EVAL_FAIL_OVERFLOW, "AIC-E0405");
+        check_fail_site(&p.afails[1], site);
+        check_fail_op_at_site(&p.afails[1], site, AST_BIN_ADD);
+        check_fail_int(&p.afails[1], INT64_MAX, 0, 64, true);
+    }
+
+    pipeline_free(&p);
+}
+
 /* Division/remainder by zero, signed and unsigned (AIC-E0406). */
 static void test_div_zero_kinds(void)
 {
@@ -737,6 +784,8 @@ int main(void)
 {
     test_overflow_kinds();
     fprintf(stderr, "after test_overflow_kinds\n");
+    test_pointer_arith_overflow();
+    fprintf(stderr, "after test_pointer_arith_overflow\n");
     test_div_zero_kinds();
     fprintf(stderr, "after test_div_zero_kinds\n");
     test_shift_range_kinds();
