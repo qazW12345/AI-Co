@@ -31,12 +31,12 @@
  *      (module, function-parameter, block, struct-field namespace, enum
  *      member namespace) are AIC-N0201.
  *   6. Span choices follow the accepted negative corpus exactly:
- *      N0201 primary = later declaration's span minus a trailing ';',
- *      secondary = earlier declaration's identifier; N0203 primary = the
+ *      N0201 primary = the later declaration's identifier, secondary =
+ *      the earlier declaration's identifier; N0203 primary = the
  *      reference (member chain), secondary = the private declaration's
- *      head (keyword through identifier); N0204/N0208 primary = the
- *      import's qualified name; N0209 primary = the whole import
- *      statement; N0205/N0207 primary = the whole module declaration;
+ *      head (keyword through identifier); N0204/N0208/N0209 primary =
+ *      the import's qualified name; N0205/N0207 primary = the whole
+ *      module declaration;
  *      N0206 primary = the closing import statement, secondary = module
  *      declarations of the remaining cycle members.
  *   7. rt.* rules (spec sec. 6.5): module declarations with the reserved "rt"
@@ -597,19 +597,28 @@ static NameModule *match_module_prefix(NameCtx *c, NameModule *module,
 
 /* Emit AIC-N0201 for a duplicate declaration. `later` is the new
  * declaration node, `earlier` the previously-registered symbol. Primary
- * span: later declaration minus a trailing ';' (corpus convention);
- * secondary: earlier declaration's identifier. */
+ * span: the later declaration's identifier (spec sec. 6.2, contract
+ * sec. 11.3); secondary: the earlier declaration's identifier. */
 static void emit_duplicate(NameCtx *c, NameModule *module,
                            AstNode *later, NameSymbol *earlier)
 {
     const LoadSource *src = module->src;
-    int64_t start = later->span->start.offset;
-    int64_t end = later->span->end.offset;
-    if (src && end > start && (size_t)(end - 1) < src->len &&
-        src->text[end - 1] == ';') {
-        end--;
+    int64_t is, ie;
+    DiagSpan *primary = NULL;
+    if (src && decl_ident_span(src, later->span->start.offset,
+                               decl_keyword(later->kind), &is, &ie)) {
+        primary = span_range(src, is, ie);
     }
-    DiagSpan *primary = span_range(src, start, end);
+    if (!primary) {
+        /* fallback: the whole declaration minus a trailing ';' */
+        int64_t start = later->span->start.offset;
+        int64_t end = later->span->end.offset;
+        if (src && end > start && (size_t)(end - 1) < src->len &&
+            src->text[end - 1] == ';') {
+            end--;
+        }
+        primary = span_range(src, start, end);
+    }
     char msg[256];
     const char *nm = decl_name(later);
     snprintf(msg, sizeof(msg), "duplicate declaration of '%s' in same scope",
@@ -1600,12 +1609,21 @@ static bool load_and_resolve_import(NameCtx *c, NameModule *from,
     /* --- rt.* reserved rules (spec sec. 6.5) --- */
     if (strcmp(qn->parts[0], "rt") == 0) {
         if (n == 1) {
-            /* bare `import rt;` -> AIC-N0209, primary = whole import stmt */
+            /* bare `import rt;` -> AIC-N0209, primary = the import's
+             * qualified name (spec sec. 6.5, contract sec. 11.3) */
+            int64_t qs, qe;
+            DiagSpan *qspan = NULL;
+            if (qname_span_in_stmt(from->src,
+                                   import_decl->span->start.offset,
+                                   &qs, &qe)) {
+                qspan = span_range(from->src, qs, qe);
+            }
             DiagRecord *r = new_name_record(
                 c, "AIC-N0209",
                 "bare 'import rt;' is not allowed; "
                 "import a specific runtime submodule instead",
-                import_decl->span);
+                qspan ? qspan : import_decl->span);
+            if (qspan) diag_span_free(qspan);
             if (r) rec_push(c, r);
             free(fqn);
             return true;

@@ -207,10 +207,10 @@ static void test_single_name_space_duplicate(void)
     CHECK(p.st == NAME_DIAG_ERROR);
     CHECK(p.rn == 1);
     if (p.rn >= 1) {
-        /* primary = later declaration (no trailing ';' on a fn decl) */
+        /* primary = the later declaration's identifier (spec sec. 6.2) */
         CHECK(rec_matches(p.recs[0], "AIC-N0201",
                           "duplicate declaration of 'Point' in same scope",
-                          3, 1, 38, 3, 32, 69, 1));
+                          3, 4, 41, 3, 9, 46, 1));
         CHECK(strcmp(p.recs[0]->primary_span->file, "input.ai") == 0);
         if (p.recs[0]->secondary_count >= 1) {
             CHECK(strcmp(p.recs[0]->secondary_spans[0]->file,
@@ -236,7 +236,7 @@ static void test_duplicate_local(void)
     if (p.rn >= 1) {
         CHECK(rec_matches(p.recs[0], "AIC-N0201",
                           "duplicate declaration of 'x' in same scope",
-                          4, 3, 52, 4, 17, 66, 1));
+                          4, 7, 56, 4, 8, 57, 1));
     }
     pipeline_free(&p);
 }
@@ -405,7 +405,7 @@ static void test_bare_import_rt(void)
         CHECK(rec_matches(p.recs[0], "AIC-N0209",
                           "bare 'import rt;' is not allowed; import a "
                           "specific runtime submodule instead",
-                          2, 1, 13, 2, 11, 23, 0));
+                          2, 8, 20, 2, 10, 22, 0));
     }
     pipeline_free(&p);
 }
@@ -1000,7 +1000,7 @@ static void test_corpus_anchors(void)
     check_corpus_anchor("derived-name-duplicate-decl", "main",
                         "AIC-N0201",
                         "duplicate declaration of 'x' in same scope",
-                        4, 3, 52, 4, 17, 66, 1);
+                        4, 7, 56, 4, 8, 57, 1);
     check_corpus_anchor("derived-name-import-not-found", "main",
                         "AIC-N0204",
                         "imported module 'nonexistent' not found at "
@@ -1027,7 +1027,7 @@ static void test_corpus_anchors(void)
                         "AIC-N0209",
                         "bare 'import rt;' is not allowed; import a "
                         "specific runtime submodule instead",
-                        2, 1, 13, 2, 11, 23, 0);
+                        2, 8, 20, 2, 10, 22, 0);
 }
 
 /* ---------------------------------------------------------------------------

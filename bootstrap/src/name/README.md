@@ -108,15 +108,14 @@ areas.
    (enum members), and bare use of an enum member name is an undeclared
    name (`AIC-N0202`).
 6. **Span choices follow the accepted negative corpus exactly.** N0201
-   primary = the later declaration's span minus a trailing `;`,
-   secondary = the earlier declaration's identifier; N0203 primary = the
-   reference (member chain), secondary = the private declaration's head
-   (keyword through identifier); N0204/N0208 primary = the import's
-   qualified name; N0209 primary = the whole import statement;
-   N0205/N0207 primary = the whole module declaration; N0206 primary =
-   the closing import statement, secondary = module declarations of the
-   remaining cycle members. (Verified against the committed
-   `expected.json` fixtures.)
+   primary = the later declaration's identifier, secondary = the earlier
+   declaration's identifier; N0203 primary = the reference (member
+   chain), secondary = the private declaration's head (keyword through
+   identifier); N0204/N0208/N0209 primary = the import's qualified
+   name; N0205/N0207 primary = the whole module declaration; N0206
+   primary = the closing import statement, secondary = module
+   declarations of the remaining cycle members. (Verified against the
+   committed `expected.json` fixtures.)
 7. **rt.\* rules match spec §6.5 exactly.** A user `module` declaration
    with the reserved `rt` prefix is `AIC-N0207`. An import of a reserved
    `rt` submodule outside the runtime surface (the four Section 15
@@ -157,7 +156,7 @@ areas.
 
 | Code | Condition | Primary span |
 |---|---|---|
-| AIC-N0201 | duplicate declaration of the same name in the same scope | the later declaration (minus a trailing `;`) |
+| AIC-N0201 | duplicate declaration of the same name in the same scope | the later declaration's identifier (secondary: the earlier identifier) |
 | AIC-N0202 | use of an undeclared name (incl. reserved runtime names without the matching import, and bare enum members) | the reference identifier |
 | AIC-N0203 | access to a private item from another module | the reference (member chain) |
 | AIC-N0204 | imported module not found at its canonical path | the import's qualified name |
@@ -165,7 +164,7 @@ areas.
 | AIC-N0206 | import cycle | the import that closes the cycle |
 | AIC-N0207 | module declaration uses the reserved `rt` prefix | the module declaration |
 | AIC-N0208 | import of a reserved rt submodule outside the runtime surface | the import's qualified name |
-| AIC-N0209 | bare `import rt;` | the whole import statement |
+| AIC-N0209 | bare `import rt;` | the import's qualified name |
 
 ## Build and test
 
@@ -192,8 +191,8 @@ Clang build. Expected: `name_test: N checks, 0 failures`, exit 0.
 - Scopes and shadowing: inner declarations may shadow outer ones;
   module scope is order-independent (mutual recursion); block/param
   shadowing is permitted; same-scope duplicates are `AIC-N0201` with the
-  later declaration's exact span and the earlier declaration's
-  identifier as secondary span.
+  later declaration's identifier as primary span and the earlier
+  declaration's identifier as secondary span.
 - Single name space: a struct and a fn of the same name in the same
   scope are a duplicate; duplicate locals in the same block are
   `AIC-N0201`.
