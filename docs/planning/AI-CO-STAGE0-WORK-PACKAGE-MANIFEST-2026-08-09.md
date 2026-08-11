@@ -22,6 +22,12 @@
 
 **Amendment (2026-08-11):** Minor-1 citation correction in WP-M0-11c — the three common-type-promotion citations previously citing §11.4 (Objective, Dependencies, AC 2) now cite §11.1 bullet 2 (the normative common-type-promotion rule; §11.4 is "Comparison semantics"). Source: reviewer2 watchdog re-verification finding Minor-1 (review card t_879bda8d, 2026-08-11), routed via Coordinator gate t_ddc8f6e3 as correction task t_2dd05335. Comment/prose only; no behavioral, source, or spec change. Decision authority: Main Designer (OM §8); authorized deferral with no re-review required (reviewer2). Card t_2e52b09e body keeps its existing text per §1 rule 9 (no board edits for already-created/dispatched cards); this amendment is the durable correction record.
 
+**Amendment (2026-08-11):** sizing-estimate recalibration against actuals + senior lane-budget recommendation — §1b gains the 2026-08-11 calibration anchors (WP-M0-11a..11d, WP-M0-12a), a calibrated per-area LOC/turn multiplier rule, and a recommended senior-lane budget change; every remaining package (WP-M0-12b..19c) is re-estimated under the multiplier and pre-split where the realistic estimate exceeds the recomputed threshold. WP-M0-12b, 13a..13d, 14a..14b, 15a, 15c, 16b..16c, 17a..17c, 18a..18b, 19a..19c are sub-split into two second-level cards each (12b1/12b2 … 19c1/19c2) in §2/§3; WP-M0-15b, 16a, and 20 are retained single with revised Sizing. The original first-level split rows for those packages are superseded per the existing split convention (no board edits here; dispatch remains the Coordinator's job after this amendment is accepted, per §5).
+- Source: Main Designer evidence (task t_d54d7e23, 2026-08-11) — WP-M0-11c (~2,625 LOC vs 500–700 estimate), WP-M0-11d (~3,597 vs 600–800), WP-M0-12a (~4,058 vs 600–800) each exhausted the 90-iteration senior budget and needed 2–4 runs plus watchdog continuations; residual risk documented on t_2e52b09e / t_5988c42e / t_9a70ee96 (comment 510). Actuals: Kanban run records (runs 154–367) + repository LOC counts (git HEAD 8ba332b).
+- Decision authority for this planning-artifact amendment: Main Designer (OM §8). No new Human Sponsor claims. The lane-budget change itself is a **recommendation** routed to the Coordinator for execution and recording (owner named in §1b); this document changes no runtime configuration.
+- Board-state scope: no board edits here. Existing already-created/dispatched cards keep their bodies per §1 rule 9; the Coordinator supersedes the original over-threshold cards for unrun packages per §5 when the amended manifest reaches it.
+- Evidence: Main Designer evidence note (2026-08-11); Kanban run histories for t_518e9bbe (11a), t_3656a3a8 (11b), t_2e52b09e (11c), t_5988c42e (11d), t_9a70ee96 (12a); repo `wc -l` counts of the delivered owned areas at HEAD 8ba332b; milestone-plan §7 one-line reference updated in the companion document.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -70,7 +76,24 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 - WP-M0-09 (parser): 4 runs + 2 continuations (2 crashes, 1 hit 90/90), ~4,850 LOC total (AST ~1,350 + parser ~3,500), 16 test functions + golden cases — oversized.
 - WP-M0-10 (name resolution): in-flight at recording time; 2 runs crashed after 30–90 min each, resumed after flag review; ~1,440 LOC source, tests pending — oversized.
 
-**Lesson for remaining packages.** Compiler-core packages are the risk class: conceptually small, but large raw effort (many tests, subtle spec rules). Remaining packages WP-M0-11..20 are re-estimated against these anchors below; every package estimated above ~63 senior turns is split.
+**Calibration anchors (recorded 2026-08-11, from Kanban run records runs 154–367 + repo LOC counts at HEAD 8ba332b).**
+- WP-M0-11a (type identity/tables): 1 implementation run, no budget hit; ~1,950 LOC total (source ~914 + tests ~650 + headers ~245 + README ~129 + fragment ~11), 14 test functions / 132 checks. Estimate was 600–800 LOC / 50–60 turns → delivered 2.4–3.3× the LOC estimate.
+- WP-M0-11b (layout): 1 implementation run, no budget hit; ~2,374 LOC total (layout.c ~994 + layout_test.c ~1,110 + layout.h ~270), 17 test functions / 202 checks. Estimate was 500–700 / 45–55 → 3.4–4.7×.
+- WP-M0-11c (conversions): 2–3 runs (one run killed at the 90/90 budget), ~2,625 LOC total (convert.c ~1,371 + convert_test.c ~1,046 + convert.h ~199), 19 test functions / 440 checks. Estimate was 500–700 / 45–55 → 3.8–5.3×.
+- WP-M0-11d (optype): 6+ runs (two explicit 90/90 budget hits plus budget-killed crashes; reached the AIC-WATCHDOG-CONTINUE-FLAG human-decision cap and finished only after a Marcel-authorized RESUME), ~3,597 LOC total (optype.c ~1,814 + optype_test.c ~1,712 + optype.h ~167), 13 test functions / 657 checks. Estimate was 600–800 / 50–60 → 4.5–6.0×.
+- WP-M0-12a (const eval core): 4 runs (three consecutive 90/90 budget hits; completed on the 4th; review pending at recording time), ~4,058 LOC total (eval_core.c ~2,673 + eval_core_test.c ~1,092 + eval_core.h ~282), 13 test functions / 516 checks. Estimate was 600–800 / 50–60 → 5.1–6.8×.
+
+**Multiplier rule (calibrated 2026-08-11).** For compiler-core C packages (source + tests + headers + fragment + README):
+- **Delivered LOC ≈ 3–5× the naive component-scope estimate (point 4×; observed range 2.4–6.8×, mean ≈ 4.4×).** A "~600–800 LOC incl. tests" estimate has historically delivered ~1,950–4,100 LOC. Corpus/junior packages are NOT covered by this multiplier (they fit the junior lane); the multiplier applies to senior compiler/runtime implementation packages.
+- **Agent turns ≈ delivered total LOC ÷ rate**, where rate by spec-rule complexity: low ≈ 25 LOC/turn (tables/layout — 11a/11b each fit one run), moderate ≈ 17 (conversions/optype — 11c needed 2 runs), high ≈ 13 (const evaluator — 12a needed 4 runs). For planning, use 17 LOC/turn (moderate) and 13 (high); do not assume better than the complexity-adjusted rate.
+- **One-run envelope at the current 90-turn budget:** ≈ ≤2,300 LOC (low complexity), ≈ ≤1,500 (moderate), ≈ ≤1,200 (high). At the recommended 150-turn budget: ≈ ≤3,800 / ≤2,500 / ≤2,000.
+
+**Lane-budget recommendation (2026-08-11).** Raise the senior lane budget from **90 → 150** agent turns (`agent.max_turns` on the `senior_specialist` profile).
+- Basis: the proven one-run envelope at 90 turns is ≈2,300–2,600 LOC (11a/11b fit; 11c at 2,625 hit the wall once). Packages at 3,600–4,100 LOC (11d/12a) needed 2–4 runs and watchdog continuations, and 11d reached the human-decision cap (AIC-WATCHDOG-CONTINUE-FLAG). At 150 turns the observed 2,625–4,058 LOC packages complete in 1–2 runs instead of 2–4, roughly halving per-package run fragmentation and watchdog overhead, while staying within the observed 19–87 min run-duration range (scaled ≈30–145 min) and the 200K context window.
+- Threshold: the §1b formula (estimate ≤ ~70% of lane budget) is unchanged; at the recommended budget the senior threshold becomes **≈105 turns** (was ≈63). Junior lane unchanged (60 turns; no junior packages remain in M0).
+- Owner of the config change: **Coordinator** — executes `hermes -p senior_specialist config set agent.max_turns 150` via the Deployment Guide §15 supported configuration surface, records the change on the board, and verifies it takes effect before dispatch of WP-M0-12b onward. Decision authority for raising the turn budget after the continuation cap is Coordinator/human per OM §6.1; the Planner makes no config change itself. If the budget raise is declined, the Coordinator returns over-threshold cards to the Planner for re-splitting per §1b rather than dispatching them over-threshold.
+
+**Lesson for remaining packages.** Compiler-core packages are the risk class: conceptually small, but large raw effort (many tests, subtle spec rules). Remaining packages WP-M0-12b..19c below are re-estimated under the 2026-08-11 multiplier (3–5× LOC, 13–17 LOC/turn); every package whose realistic estimate exceeds the recomputed threshold (≈105 turns at the recommended budget) is pre-split into second-level cards (12b1/12b2 … 19c1/19c2). Estimates are stated as turn ranges with their LOC basis so the next calibration can compare.
 
 ## 2. File-ownership matrix (disjoint areas)
 
@@ -91,31 +114,50 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 | WP-M0-11c | `bootstrap/src/types/convert.*` (implicit conversions, common-type promotion), `bootstrap/build/types_c.txt` |
 | WP-M0-11d | `bootstrap/src/types/optype.*` (explicit cast/wrap matrix, operator typing), `bootstrap/build/types_d.txt` |
 | WP-M0-12a | `bootstrap/src/const/eval_core.*`, `bootstrap/build/const_a.txt` |
-| WP-M0-12b | `bootstrap/src/const/eval_fail.*`, `bootstrap/build/const_b.txt` |
-| WP-M0-13a | `bootstrap/src/sema/decl.*`, `bootstrap/build/sema_a.txt` |
-| WP-M0-13b | `bootstrap/src/sema/expr.*`, `bootstrap/build/sema_b.txt` |
-| WP-M0-13c | `bootstrap/src/sema/stmt.*`, `bootstrap/build/sema_c.txt` |
-| WP-M0-13d | `bootstrap/src/sema/fn.*`, `bootstrap/build/sema_d.txt` |
-| WP-M0-14a | `bootstrap/runtime/rt_mem/rt_mem_core.*`, `bootstrap/build/rt_mem_a.txt` |
-| WP-M0-14b | `bootstrap/runtime/rt_mem/rt_mem_reuse.*`, `bootstrap/build/rt_mem_b.txt` |
-| WP-M0-15a | `bootstrap/runtime/rt_io/**`, `bootstrap/build/rt_io.txt` |
+| WP-M0-12b1 | `bootstrap/src/const/eval_fail_arith.*` (checked arithmetic/div-zero/shift failure evaluation), `bootstrap/build/const_b1.txt` |
+| WP-M0-12b2 | `bootstrap/src/const/eval_fail_rec.*` (cast/index/slice/ptr-diff failure sites + record emission), `bootstrap/build/const_b2.txt` |
+| WP-M0-13a1 | `bootstrap/src/sema/decl_core.*` (declaration model, storage/mutability/assignability), `bootstrap/build/sema_a1.txt` |
+| WP-M0-13a2 | `bootstrap/src/sema/decl_init.*` (initializers, missing-initializer rules), `bootstrap/build/sema_a2.txt` |
+| WP-M0-13b1 | `bootstrap/src/sema/expr_core.*` (precedence, evaluation-order, const-context), `bootstrap/build/sema_b1.txt` |
+| WP-M0-13b2 | `bootstrap/src/sema/expr_ops.*` (checked-arithmetic decisions, comparison semantics, operator sites), `bootstrap/build/sema_b2.txt` |
+| WP-M0-13c1 | `bootstrap/src/sema/stmt_core.*` (statement rules, switch/break/continue), `bootstrap/build/sema_c1.txt` |
+| WP-M0-13c2 | `bootstrap/src/sema/stmt_reach.*` (reachability), `bootstrap/build/sema_c2.txt` |
+| WP-M0-13d1 | `bootstrap/src/sema/fn_core.*` (return rules, return-value mismatch), `bootstrap/build/sema_d1.txt` |
+| WP-M0-13d2 | `bootstrap/src/sema/fn_main.*` (main validation, reserved names), `bootstrap/build/sema_d2.txt` |
+| WP-M0-14a1 | `bootstrap/runtime/rt_mem/rt_mem_alloc.*` (allocation registry + semantics), `bootstrap/build/rt_mem_a1.txt` |
+| WP-M0-14a2 | `bootstrap/runtime/rt_mem/rt_mem_api.*` (public alloc/dealloc/copy/fill API + integration tests), `bootstrap/build/rt_mem_a2.txt` |
+| WP-M0-14b1 | `bootstrap/runtime/rt_mem/rt_mem_reuse.*` (exact-fit reuse, 0xDD, reverse-order), `bootstrap/build/rt_mem_b1.txt` |
+| WP-M0-14b2 | `bootstrap/runtime/rt_mem/rt_mem_trap.*` (duplicate/invalid release traps), `bootstrap/build/rt_mem_b2.txt` |
+| WP-M0-15a1 | `bootstrap/runtime/rt_io/rt_io_core.*` (handle model, open/read/write/close), `bootstrap/build/rt_io1.txt` |
+| WP-M0-15a2 | `bootstrap/runtime/rt_io/rt_io_stdio.*` (stdio behavior, failure paths), `bootstrap/build/rt_io2.txt` |
 | WP-M0-15b | `bootstrap/runtime/rt_proc/**`, `bootstrap/build/rt_proc.txt` |
-| WP-M0-15c | `bootstrap/runtime/rt_trap/**`, `bootstrap/runtime/README.md`, `bootstrap/build/rt_trap.txt` |
+| WP-M0-15c1 | `bootstrap/runtime/rt_trap/rt_trap.*`, `bootstrap/build/rt_trap1.txt` |
+| WP-M0-15c2 | `bootstrap/runtime/README.md` (Windows API baseline doc), `bootstrap/build/rt_trap2.txt` |
 | WP-M0-16a | `docs/contracts/IR-CONTRACT-*.md` (draft + acceptance record) |
-| WP-M0-16b | `bootstrap/src/ir/ir_core.*`, `bootstrap/src/ir/ir_dump.*`, `bootstrap/build/ir.txt` |
-| WP-M0-16c | `bootstrap/src/ir/ir_builder.*`, `bootstrap/build/ir_builder.txt` |
-| WP-M0-17a | `bootstrap/src/backend/isel.*`, `bootstrap/build/backend_a.txt` |
-| WP-M0-17b | `bootstrap/src/backend/frame.*`, `bootstrap/build/backend_b.txt` |
-| WP-M0-17c | `bootstrap/src/backend/trap.*`, `bootstrap/build/backend_c.txt` |
-| WP-M0-18a | `bootstrap/src/coff/coff_emit.*`, `bootstrap/build/coff_a.txt` |
-| WP-M0-18b | `bootstrap/src/coff/determinism.*`, `bootstrap/build/coff_b.txt` |
-| WP-M0-19a | `bootstrap/src/driver/main.*`, `bootstrap/src/driver/cli.*`, `bootstrap/build/driver_a.txt` |
-| WP-M0-19b | `bootstrap/src/driver/manifest.*`, `bootstrap/build/driver_b.txt` |
-| WP-M0-19c | `bootstrap/src/driver/link.*`, `bootstrap/build/driver_c.txt` |
+| WP-M0-16b1 | `bootstrap/src/ir/ir_core.*` (node model, invariants), `bootstrap/build/ir1.txt` |
+| WP-M0-16b2 | `bootstrap/src/ir/ir_dump.*` (deterministic dump/verification), `bootstrap/build/ir2.txt` |
+| WP-M0-16c1 | `bootstrap/src/ir/ir_builder_core.*` (typed AST → IR mapping), `bootstrap/build/ir_builder1.txt` |
+| WP-M0-16c2 | `bootstrap/src/ir/ir_builder_cause.*` (span/cause preservation + determinism tests), `bootstrap/build/ir_builder2.txt` |
+| WP-M0-17a1 | `bootstrap/src/backend/isel_core.*` (instruction selection, deterministic output), `bootstrap/build/backend_a1.txt` |
+| WP-M0-17a2 | `bootstrap/src/backend/isel_x64.*` (x86-64+SSE2 coverage, AIC-B0601), `bootstrap/build/backend_a2.txt` |
+| WP-M0-17b1 | `bootstrap/src/backend/frame.*` (stack layout, prologue/epilogue), `bootstrap/build/backend_b1.txt` |
+| WP-M0-17b2 | `bootstrap/src/backend/call.*` (register allocation, call emission), `bootstrap/build/backend_b2.txt` |
+| WP-M0-17c1 | `bootstrap/src/backend/trap_branch.*` (trap branch emission), `bootstrap/build/backend_c1.txt` |
+| WP-M0-17c2 | `bootstrap/src/backend/trap_checked.*` (checked-op emission, span/cause), `bootstrap/build/backend_c2.txt` |
+| WP-M0-18a1 | `bootstrap/src/coff/coff_sections.*` (section/symbol/relocation tables, canonical order), `bootstrap/build/coff_a1.txt` |
+| WP-M0-18a2 | `bootstrap/src/coff/coff_determinism.*` (byte-determinism, timestamps, paths), `bootstrap/build/coff_a2.txt` |
+| WP-M0-18b1 | `bootstrap/src/coff/coff_verify.*` (link smoke, object inspection), `bootstrap/build/coff_b1.txt` |
+| WP-M0-18b2 | `bootstrap/src/coff/coff_detmach.*` (determinism machinery, tool-order canonicalization), `bootstrap/build/coff_b2.txt` |
+| WP-M0-19a1 | `bootstrap/src/driver/main.*` (pipeline orchestration), `bootstrap/build/driver_a1.txt` |
+| WP-M0-19a2 | `bootstrap/src/driver/cli.*` (deterministic CLI/options, exit codes), `bootstrap/build/driver_a2.txt` |
+| WP-M0-19b1 | `bootstrap/src/driver/manifest_writer.*` (manifest emission §14.4), `bootstrap/build/driver_b1.txt` |
+| WP-M0-19b2 | `bootstrap/src/driver/manifest_hash.*` (hashed artifact set, self-hash exclusion), `bootstrap/build/driver_b2.txt` |
+| WP-M0-19c1 | `bootstrap/src/driver/link_invoke.*` (linker invocation §16.3), `bootstrap/build/driver_c1.txt` |
+| WP-M0-19c2 | `bootstrap/src/driver/link_e2e.*` (end-to-end compile tests), `bootstrap/build/driver_c2.txt` |
 | WP-M0-20 | `docs/verification/STAGE0-INTEGRATION-*.md` (writes evidence; modifies no source) |
 | WP-M1-01..04 | `bootstrap/selfhost/**`, `docs/verification/STAGE1-2-IDENTITY-*.md` (refined at M1 planning) |
 
-Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`) per the WP-M0-01 per-area fragment convention; the original single-fragment entry (e.g. `types.txt`) is superseded by the split entries above.
+Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`) per the WP-M0-01 per-area fragment convention; the original single-fragment entry (e.g. `types.txt`) is superseded by the split entries above. Second-level sub-splits (2026-08-11 recalibration) follow the same convention with a digit suffix (e.g. `const_b1.txt`/`const_b2.txt` supersede `const_b.txt`); the first-level split entries for WP-M0-12b, 13a..13d, 14a..14b, 15a, 15c, 16b..16c, 17a..17c, 18a..18b, and 19a..19c are superseded by the second-level entries above. WP-M0-15b, 16a, and 20 keep their single-fragment entries.
 
 ## 3. Work packages — M0 (Stage-0 bootstrap compiler and verification infrastructure)
 
@@ -339,6 +381,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
   2. Completeness rules §7.6 enforced; incomplete/recursive struct usage rejected `AIC-T0302/T0303`.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** identity edge cases. **Escalation:** type ambiguity → Planner.
+- **Actuals (2026-08-11):** 1 implementation run (no budget hit); ~1,950 LOC total; 14 test functions / 132 checks; Reviewer PASS (t_5ca13527) + watchdog re-verifications PASS.
 
 ---
 
@@ -356,6 +399,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
   2. Enum continuation/aliasing per §7.5; unrepresentable member value rejected `AIC-T0301`.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** padding determinism. **Escalation:** layout ambiguity → Planner.
+- **Actuals (2026-08-11):** 1 implementation run (no budget hit); ~2,374 LOC total; 17 test functions / 202 checks; Reviewer PASS (t_33e5e9df); MIN-11B-01 remediation closed (6b248f5).
 
 ---
 
@@ -373,6 +417,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
   2. Common-type promotion per §11.1 bullet 2.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** conversion-matrix subtlety. **Escalation:** conversion ambiguity → Planner.
+- **Actuals (2026-08-11):** 2–3 runs (one run killed at the 90/90 budget); ~2,625 LOC total; 19 test functions / 440 checks; Reviewer PASS (t_f79f4280) + watchdog re-verifications PASS; Minor-1/Minor-2 citation fixes closed (914a8e4/c0d5f2e).
 
 ---
 
@@ -390,12 +435,13 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
   2. Operator typing per §10.2 with the listed rejections; no silent acceptance.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** operator edge cases. **Escalation:** operator ambiguity → Planner.
+- **Actuals (2026-08-11):** 6+ runs incl. two 90/90 budget hits and AIC-WATCHDOG-CONTINUE-FLAG (Marcel-authorized RESUME); ~3,597 LOC total; 13 test functions / 657 checks; reviewer2 PASS with Minor findings (t_0db758e5); Minor-1 (pointer-arithmetic §12.5) + Suggestion-1 (T0305 prose) remediated (b575102/a03db88).
 
 ---
 
-### WP-M0-12 — Constant-expression evaluator (split: WP-M0-12a..12b)
+### WP-M0-12 — Constant-expression evaluator (split: WP-M0-12a..12b; 12b sub-split 12b1..12b2)
 
-- **Sizing estimate (whole):** ~130–180 senior turns. Above threshold → split below per §1b. Basis: 8 const codes (`AIC-E0401`, `AIC-E0405..E0411`), §10.5/§11.3 rule surface.
+- **Sizing estimate (whole):** ~275–370 senior turns (12a actual ~270–360 at the 90-turn budget; 12b re-estimated ~135–190). Above threshold → split below per §1b. Basis: 8 const codes (`AIC-E0401`, `AIC-E0405..E0411`), §10.5/§11.3 rule surface; recalibrated 2026-08-11.
 
 #### WP-M0-12a — Evaluator core
 
@@ -411,110 +457,206 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
   2. `sizeof`/`alignof` and static-address forms evaluate per §10.5; results deterministic typed values.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** const-context edge cases. **Escalation:** const semantics ambiguity → Planner.
+- **Actuals (2026-08-11):** 4 runs (three consecutive 90/90 budget hits; completed on the 4th); ~4,058 LOC total; 13 test functions / 516 checks; review pending at recording time (t_d6414279).
 
 ---
 
-#### WP-M0-12b — Constant arithmetic failure semantics
+#### WP-M0-12b — Constant arithmetic failure semantics (sub-split: WP-M0-12b1..12b2)
 
-- **Objective:** implement compile-time checked arithmetic and const failure records per spec §10.5/§11.3.
-- **Scope:** overflow/div-zero/shift/cast/index/slice-boundary/pointer-difference failures (`AIC-E0405..E0411`); never-trap guarantee for constant failures.
-- **Exclusions:** evaluator composition (12a); runtime traps.
+- **Sizing estimate (whole):** ~135–190 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold (≈105 at the recommended budget) → sub-split below per §1b. Basis: sibling 12a actual 4,058 LOC after 3×90-turn budget hits; 12b adds failure evaluation + record emission, estimated ~2,200–3,200 LOC delivered at ~13–17 LOC/turn.
+
+##### WP-M0-12b1 — Checked-arithmetic failure evaluation
+
+- **Objective:** implement compile-time checked-arithmetic failure evaluation (overflow, division-by-zero, shift-range) per spec §10.5/§11.3, producing typed failure kinds consumed by 12b2.
+- **Scope:** overflow/div-zero/shift failure evaluation (`AIC-E0405..E0407` kinds); typed EvalFailure values; API for 12b2 record emission.
+- **Exclusions:** cast/index/slice/ptr-diff failures and record emission (12b2); evaluator composition (12a).
 - **Dependencies / inputs:** WP-M0-12a; spec §10.5, §11.3.
-- **Expected artifacts:** `bootstrap/src/const/eval_fail.*`, `bootstrap/build/const_b.txt`, overflow/div-zero/shift/cast failure tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~500–700 LOC incl. tests, ~10 test functions, ~7 normative rules.
+- **Expected artifacts:** `bootstrap/src/const/eval_fail_arith.*`, `bootstrap/build/const_b1.txt`, checked-arithmetic failure tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~4 normative rules, high complexity (~13–17 LOC/turn). Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Constant arithmetic/division/shift/cast failures emit `AIC-E0405..E0411` per spec (never traps).
-  2. Failure records carry correct spans and deterministic order.
+  1. Constant overflow/div-zero/shift failures produce the correct typed failure kinds (never traps) per §11.3.
+  2. Failure kinds are deterministic and consumable by 12b2 for record emission.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
-- **Risks:** failure-path gaps. **Escalation:** const semantics ambiguity → Planner.
+- **Risks:** failure-kind gaps. **Escalation:** const semantics ambiguity → Planner.
+
+##### WP-M0-12b2 — Failure record emission and remaining sites
+
+- **Objective:** implement the remaining const failure sites (cast-range, index-range, slice-boundary, pointer-difference) and deterministic failure-record emission `AIC-E0405..E0411` per spec §10.5/§11.3; enforce the never-trap guarantee.
+- **Scope:** cast/index/slice/ptr-diff failure evaluation; record emission for all 7 const failure codes; correct spans + deterministic order; never-trap guarantee.
+- **Exclusions:** checked-arithmetic failure kinds (12b1); runtime traps.
+- **Dependencies / inputs:** WP-M0-12a, WP-M0-12b1; spec §10.5, §11.3.
+- **Expected artifacts:** `bootstrap/src/const/eval_fail_rec.*`, `bootstrap/build/const_b2.txt`, failure-record tests + negative-corpus anchors.
+- **Sizing estimate:** 70–100 senior turns. Basis: ~1,200–1,700 LOC incl. tests, ~7 test functions, ~4 normative rules, high complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. All constant failures emit `AIC-E0405..E0411` per spec with correct spans and deterministic order (never traps).
+  2. Negative-corpus anchors for const failures pass with exact records.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** failure-path gaps; corpus anchor gaps. **Escalation:** const semantics ambiguity → Planner.
 
 ---
 
-### WP-M0-13 — Semantic validation (split: WP-M0-13a..13d)
+### WP-M0-13 — Semantic validation (split: WP-M0-13a..13d; each sub-split 13a1/13a2 … 13d1/13d2)
 
-- **Sizing estimate (whole):** ~280–360 senior turns. Above threshold → split below per §1b. Basis: 19 semantic codes (`AIC-E0401..E0419`) + remaining `AIC-T03xx` checks, §8/§10–§13 rule surface, comparable to parser actuals.
+- **Sizing estimate (whole):** ~540–730 senior turns (recalibrated 2026-08-11; was 280–360). Above threshold → split below per §1b. Basis: 19 semantic codes (`AIC-E0401..E0419`) + remaining `AIC-T03xx` checks, §8/§10–§13 rule surface; each 13x sub-package is estimated at optype scale (3,597 LOC actual) → two cards each.
 
-#### WP-M0-13a — Declarations and initialization
+#### WP-M0-13a — Declarations and initialization (sub-split: WP-M0-13a1..13a2)
 
-- **Objective:** implement declaration/initialization semantics per spec §8 and §9: constants, variables, storage, mutability/assignability, initializers.
-- **Scope:** §8 declaration rules; §9 initialization; assignment-to-const/non-lvalue checks (`AIC-E0403/E0404/E0419`); missing-initializer rules (`AIC-E0403`).
-- **Exclusions:** expressions/operators (13b); statements/control flow (13c); functions/reachability (13d).
-- **Dependencies / inputs:** WP-M0-06, WP-M0-09, WP-M0-10, WP-M0-11, WP-M0-12; spec §8, §9.
-- **Expected artifacts:** `bootstrap/src/sema/decl.*`, `bootstrap/build/sema_a.txt`, unit/integration tests per §18.4.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~12 test functions, ~8 normative rules.
+- **Sizing estimate (whole):** ~135–185 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b. Basis: optype-scale walker (3,597 LOC actual at ~17 LOC/turn) over all declaration/initializer sites, §8/§9 rule surface.
+
+##### WP-M0-13a1 — Declaration model and assignability
+
+- **Objective:** implement the declaration model and storage/mutability/assignability checks per spec §8: constants, variables, storage, assignment-to-const/non-lvalue rules.
+- **Scope:** §8 declaration rules; const/assignability checks (`AIC-E0404/E0419`); declaration-site walker.
+- **Exclusions:** initializers/§9 (13a2); expressions (13b); statements (13c); functions (13d).
+- **Dependencies / inputs:** WP-M0-06, WP-M0-09, WP-M0-10, WP-M0-11, WP-M0-12; spec §8.
+- **Expected artifacts:** `bootstrap/src/sema/decl_core.*`, `bootstrap/build/sema_a1.txt`, declaration/assignability tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Declaration/initialization rules match §8/§9 exactly; rejections carry correct codes/spans.
+  1. Declaration rules match §8 exactly; rejections carry correct codes/spans.
   2. Const/assignability rules (`AIC-E0404`, `AIC-E0419`) enforced.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** assignability edge cases. **Escalation:** semantic ambiguity → Planner.
+
+##### WP-M0-13a2 — Initializers
+
+- **Objective:** implement initialization semantics per spec §9: initializer forms, missing-initializer rules.
+- **Scope:** §9 initialization; missing-initializer rules (`AIC-E0403`); initializer-site walker.
+- **Exclusions:** declaration model/assignability (13a1); expressions (13b); statements (13c); functions (13d).
+- **Dependencies / inputs:** WP-M0-13a1; WP-M0-06, WP-M0-09..12; spec §9.
+- **Expected artifacts:** `bootstrap/src/sema/decl_init.*`, `bootstrap/build/sema_a2.txt`, initializer tests per §18.4.
+- **Sizing estimate:** 70–95 senior turns. Basis: ~1,200–1,600 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Initialization rules match §9 exactly; rejections carry correct codes/spans.
+  2. Missing-initializer rules (`AIC-E0403`) enforced.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** init edge cases. **Escalation:** semantic ambiguity → Planner.
 
 ---
 
-#### WP-M0-13b — Expressions, operators, and evaluation order
+#### WP-M0-13b — Expressions, operators, and evaluation order (sub-split: WP-M0-13b1..13b2)
 
-- **Objective:** implement expression/operator semantics per spec §10.1–10.4 and §11.3–11.6: precedence, evaluation order, checked-arithmetic decisions, comparison semantics.
-- **Scope:** expression validation; evaluation-order model; checked-arithmetic compile-time decisions; `AIC-E0401` const-context use.
-- **Exclusions:** declarations (13a); statements (13c); functions (13d).
-- **Dependencies / inputs:** WP-M0-06, WP-M0-09..12; spec §10.1–10.4, §11.3–11.6.
-- **Expected artifacts:** `bootstrap/src/sema/expr.*`, `bootstrap/build/sema_b.txt`, evaluation-order and operator tests per §18.4.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~12 test functions, ~8 normative rules.
+- **Sizing estimate (whole):** ~145–195 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b. Basis: expression/operator surface comparable to optype (3,597 LOC actual), §10.1–10.4/§11.3–11.6 rule surface.
+
+##### WP-M0-13b1 — Expression core and evaluation order
+
+- **Objective:** implement expression semantics and the evaluation-order model per spec §10.1–10.4: precedence, evaluation order, const-context use.
+- **Scope:** expression validation; precedence; evaluation-order model; `AIC-E0401` const-context use.
+- **Exclusions:** checked-arithmetic decisions/comparison semantics (13b2); declarations (13a); statements (13c); functions (13d).
+- **Dependencies / inputs:** WP-M0-06, WP-M0-09..12, WP-M0-13a; spec §10.1–10.4.
+- **Expected artifacts:** `bootstrap/src/sema/expr_core.*`, `bootstrap/build/sema_b1.txt`, expression/evaluation-order tests per §18.4.
+- **Sizing estimate:** 70–95 senior turns. Basis: ~1,200–1,600 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Evaluation-order rules (§10.4) modeled and testable.
-  2. No expression semantic rule silently passes an invalid program.
+  2. Const-context use (`AIC-E0401`) rejected at the correct sites.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** evaluation-order subtlety. **Escalation:** semantic ambiguity → Planner.
 
----
+##### WP-M0-13b2 — Operator semantics
 
-#### WP-M0-13c — Statements and control flow
-
-- **Objective:** implement statement/control-flow semantics per spec §13: braces-only blocks, switch no-fall-through, loops, break/continue placement, reachability.
-- **Scope:** §13 statement rules; switch terminator (`AIC-E0412`), duplicate case (`AIC-E0413`), break/continue placement (`AIC-E0414`); reachability (`AIC-E0416/E0417`).
-- **Exclusions:** declarations (13a); expressions (13b); functions (13d).
-- **Dependencies / inputs:** WP-M0-13a/b; spec §13, §18.4–18.5.
-- **Expected artifacts:** `bootstrap/src/sema/stmt.*`, `bootstrap/build/sema_c.txt`, control-flow/reachability tests per §18.4.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~12 test functions, ~8 normative rules.
+- **Objective:** implement operator semantics per spec §11.3–11.6: checked-arithmetic compile-time decisions, comparison semantics.
+- **Scope:** checked-arithmetic decisions; comparison semantics; operator-site checks.
+- **Exclusions:** precedence/evaluation-order (13b1); declarations (13a); statements (13c); functions (13d).
+- **Dependencies / inputs:** WP-M0-13b1; WP-M0-11/12; spec §11.3–11.6.
+- **Expected artifacts:** `bootstrap/src/sema/expr_ops.*`, `bootstrap/build/sema_b2.txt`, operator/comparison tests per §18.4.
+- **Sizing estimate:** 75–100 senior turns. Basis: ~1,300–1,700 LOC incl. tests, ~8 test functions, ~5 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Switch terminator rule (`AIC-E0412`), duplicate case (`AIC-E0413`), break/continue placement (`AIC-E0414`) match spec.
-  2. Reachability per §13.5 (`AIC-E0416/E0417`).
+  1. Checked-arithmetic compile-time decisions and comparison semantics match §11.3–11.6.
+  2. No expression semantic rule silently passes an invalid program.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** operator subtlety. **Escalation:** semantic ambiguity → Planner.
+
+---
+
+#### WP-M0-13c — Statements and control flow (sub-split: WP-M0-13c1..13c2)
+
+- **Sizing estimate (whole):** ~130–180 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b. Basis: statement/control-flow walker, §13 rule surface.
+
+##### WP-M0-13c1 — Statement rules and switch/break/continue
+
+- **Objective:** implement statement/control-flow semantics per spec §13: braces-only blocks, switch no-fall-through, loops, break/continue placement.
+- **Scope:** §13 statement rules; switch terminator (`AIC-E0412`), duplicate case (`AIC-E0413`), break/continue placement (`AIC-E0414`).
+- **Exclusions:** reachability (13c2); declarations (13a); expressions (13b); functions (13d).
+- **Dependencies / inputs:** WP-M0-13a/b; spec §13, §18.4–18.5.
+- **Expected artifacts:** `bootstrap/src/sema/stmt_core.*`, `bootstrap/build/sema_c1.txt`, statement/switch tests per §18.4.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~7 test functions, ~5 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Switch terminator (`AIC-E0412`), duplicate case (`AIC-E0413`), break/continue placement (`AIC-E0414`) match spec.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** control-flow edge cases. **Escalation:** semantic ambiguity → Planner.
+
+##### WP-M0-13c2 — Reachability
+
+- **Objective:** implement reachability analysis per spec §13.5.
+- **Scope:** reachability (`AIC-E0416/E0417`).
+- **Exclusions:** statement/switch rules (13c1); declarations (13a); expressions (13b); functions (13d).
+- **Dependencies / inputs:** WP-M0-13c1; spec §13.5.
+- **Expected artifacts:** `bootstrap/src/sema/stmt_reach.*`, `bootstrap/build/sema_c2.txt`, reachability tests per §18.4.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~2 normative rules, moderate complexity (reachability is subtle). Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Reachability per §13.5 (`AIC-E0416/E0417`).
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** reachability conservatism. **Escalation:** semantic ambiguity → Planner.
 
 ---
 
-#### WP-M0-13d — Functions, returns, and reserved names
+#### WP-M0-13d — Functions, returns, and reserved names (sub-split: WP-M0-13d1..13d2)
 
-- **Objective:** implement function-level semantics per spec §8/§13.5: return rules, non-void path without return, entry `main` validation, reserved-name enforcement (§4.5).
-- **Scope:** return value mismatch (`AIC-E0415`); missing return on non-void path (`AIC-E0416`); `main` validation (`AIC-E0418`); reserved-name enforcement (`AIC-E0419` where applicable).
-- **Exclusions:** statements (13c); IR lowering (WP-M0-16).
-- **Dependencies / inputs:** WP-M0-13a..c; spec §4.5, §8, §13.5, §18.5.
-- **Expected artifacts:** `bootstrap/src/sema/fn.*`, `bootstrap/build/sema_d.txt`, function/return/main tests per §18.5.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Sizing estimate (whole):** ~125–175 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b. Basis: function-level walker, §8/§13.5/§4.5 rule surface.
+
+##### WP-M0-13d1 — Return rules
+
+- **Objective:** implement function-level return semantics per spec §8/§13.5.
+- **Scope:** return value mismatch (`AIC-E0415`); missing return on non-void path (`AIC-E0416`).
+- **Exclusions:** main validation/reserved names (13d2); statements (13c); IR lowering (WP-M0-16).
+- **Dependencies / inputs:** WP-M0-13a..c; spec §8, §13.5.
+- **Expected artifacts:** `bootstrap/src/sema/fn_core.*`, `bootstrap/build/sema_d1.txt`, return/function tests per §18.5.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Return mismatch and missing-return rules match §13.5 (`AIC-E0415/E0416`).
-  2. Entry `main` validation per §18.5 (`AIC-E0418`); reserved-name enforcement per §4.5.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** return-rule edge cases. **Escalation:** semantic ambiguity → Planner.
 
+##### WP-M0-13d2 — Entry main and reserved names
+
+- **Objective:** implement entry `main` validation and reserved-name enforcement.
+- **Scope:** `main` validation (`AIC-E0418`); reserved-name enforcement (`AIC-E0419` where applicable, §4.5).
+- **Exclusions:** return rules (13d1); statements (13c); IR lowering (WP-M0-16).
+- **Dependencies / inputs:** WP-M0-13d1; spec §4.5, §18.5.
+- **Expected artifacts:** `bootstrap/src/sema/fn_main.*`, `bootstrap/build/sema_d2.txt`, main/reserved-name tests per §18.5.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Entry `main` validation per §18.5 (`AIC-E0418`); reserved-name enforcement per §4.5.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** reserved-name edge cases. **Escalation:** semantic ambiguity → Planner.
+
 ---
 
-### WP-M0-14 — Runtime allocator (rt.mem) (split: WP-M0-14a..14b)
+### WP-M0-14 — Runtime allocator (rt.mem) (split: WP-M0-14a..14b; each sub-split 14a1/14a2, 14b1/14b2)
 
-- **Sizing estimate (whole):** ~110–150 senior turns. Above threshold → split below per §1b. Basis: allocator determinism + reuse policy + trap integration, §15.1/ADR-004 rule surface.
+- **Sizing estimate (whole):** ~220–320 senior turns (recalibrated 2026-08-11; was 110–150). Above threshold → split below per §1b. Basis: allocator determinism + reuse policy + trap integration, §15.1/ADR-004 rule surface; runtime C packages estimated at ~17 LOC/turn moderate complexity.
 
-#### WP-M0-14a — Allocator core
+#### WP-M0-14a — Allocator core (sub-split: WP-M0-14a1..14a2)
 
-- **Objective:** implement the deterministic project-owned allocator core per spec §15.1 and ADR-004: zero-initialized allocation, `null` on exhaustion, zero-size → `null` no-op, alignment ≥16, controlled address region, `alloc_bytes`/`dealloc_bytes`/`copy`/`fill`.
+- **Sizing estimate (whole):** ~110–160 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-14a1 — Allocation registry and semantics
+
+- **Objective:** implement the deterministic project-owned allocator core per spec §15.1 and ADR-004: zero-initialized allocation, `null` on exhaustion, zero-size → `null` no-op, alignment ≥16, controlled address region.
 - **Scope:** allocator registry; allocation semantics; exhaustion/zero-size behavior.
-- **Exclusions:** reuse policy/0xDD poisoning/traps (14b); file I/O/process/trap implementation (WP-M0-15).
+- **Exclusions:** public alloc/dealloc/copy/fill API and integration (14a2); reuse policy/0xDD/traps (14b); file I/O/process/trap implementation (WP-M0-15).
 - **Dependencies / inputs:** spec §15.1, §15.5, §15.8; ADR-004; WP-M0-06 diag record shape via rt.trap contract.
-- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_core.*`, `bootstrap/build/rt_mem_a.txt`, allocator core unit tests (zero-init, exhaustion, zero-size, alignment).
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_alloc.*`, `bootstrap/build/rt_mem_a1.txt`, allocator core unit tests (zero-init, exhaustion, zero-size, alignment).
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~6 test functions, ~5 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Zero-initialized allocation; `alloc_bytes(0)` → `null` without state change; exhaustion → `null`, never a trap.
@@ -522,42 +664,93 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** host-allocator nondeterminism leaking. **Escalation:** allocator ambiguity → Planner; Windows behavior → Researcher.
 
+##### WP-M0-14a2 — Public allocator API and integration
+
+- **Objective:** implement the public allocator API (`alloc_bytes`/`dealloc_bytes`/`copy`/`fill`) and registry integration per spec §15.1/ADR-004.
+- **Scope:** public API surface; registry wiring; integration tests.
+- **Exclusions:** allocation semantics (14a1); reuse policy/traps (14b).
+- **Dependencies / inputs:** WP-M0-14a1; spec §15.1.
+- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_api.*`, `bootstrap/build/rt_mem_a2.txt`, API/integration tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. `alloc_bytes`/`dealloc_bytes`/`copy`/`fill` behave per §15.1 with deterministic observable behavior.
+  2. Registry integration complete; no host-allocator identity leaks into behavior.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** API drift. **Escalation:** allocator ambiguity → Planner.
+
 ---
 
-#### WP-M0-14b — Reuse policy and release traps
+#### WP-M0-14b — Reuse policy and release traps (sub-split: WP-M0-14b1..14b2)
 
-- **Objective:** implement exact-fit reuse with 0xDD overwrite before reuse, reverse-order-of-release within a size class, no split/coalesce, and duplicate/invalid-release traps.
-- **Scope:** reuse registry and policy; 0xDD poisoning; duplicate release (`AIC-R0812`); invalid release (`AIC-R0813`); trap-record integration (exit 70).
-- **Exclusions:** allocator core (14a); trap implementation (WP-M0-15c).
-- **Dependencies / inputs:** WP-M0-14a; spec §15.1, §15.5, §15.8; ADR-004.
-- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_reuse.*`, `bootstrap/build/rt_mem_b.txt`, reuse-order/poisoning/trap tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Sizing estimate (whole):** ~110–160 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-14b1 — Reuse policy and poisoning
+
+- **Objective:** implement exact-fit reuse with 0xDD overwrite before reuse and reverse-order-of-release within a size class per spec §15.1/ADR-004; no split/coalesce.
+- **Scope:** reuse registry and policy; 0xDD poisoning; reverse-order determinism (observable contract).
+- **Exclusions:** duplicate/invalid-release traps (14b2); allocator core (14a).
+- **Dependencies / inputs:** WP-M0-14a; spec §15.1, §15.8; ADR-004.
+- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_reuse.*`, `bootstrap/build/rt_mem_b1.txt`, reuse-order/poisoning tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Reuse order is exactly reverse-of-release within a size class; identical allocation/release sequences yield identical addresses (observable contract).
-  2. Deallocated memory overwritten 0xDD before reuse; duplicate release → `AIC-R0812`; invalid release → `AIC-R0813`; traps report exit 70.
+  2. Deallocated memory overwritten 0xDD before reuse.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** reuse-rule subtlety. **Escalation:** allocator ambiguity → Planner.
 
----
+##### WP-M0-14b2 — Release traps
 
-### WP-M0-15 — Runtime I/O, process, and trap (split: WP-M0-15a..15c)
-
-- **Sizing estimate (whole):** ~160–210 senior turns. Above threshold → split below per §1b. Basis: three modules + Windows API baseline doc, §15.2–15.5/§15.7 rule surface.
-
-#### WP-M0-15a — rt.io
-
-- **Objective:** implement `bootstrap/runtime/rt_io/` per spec §15.2: file handles/open/read/write/close/stdio; invalid-handle failures `AIC-R0814`.
-- **Scope:** rt_io module; handle model; `0` on failure; stdio behavior.
-- **Exclusions:** process args/exit (15b); trap reporting (15c); allocator internals (WP-M0-14).
-- **Dependencies / inputs:** WP-M0-14 allocator API; spec §15.2, §15.5; ADR-004 Windows baseline.
-- **Expected artifacts:** `bootstrap/runtime/rt_io/**`, `bootstrap/build/rt_io.txt`, I/O behavior tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~8 test functions, ~5 normative rules.
+- **Objective:** implement duplicate/invalid-release trap integration per spec §15.5/§15.8.
+- **Scope:** duplicate release (`AIC-R0812`); invalid release (`AIC-R0813`); trap-record integration (exit 70).
+- **Exclusions:** reuse policy (14b1); allocator core (14a); trap implementation (WP-M0-15c).
+- **Dependencies / inputs:** WP-M0-14b1; spec §15.5, §15.8; ADR-004.
+- **Expected artifacts:** `bootstrap/runtime/rt_mem/rt_mem_trap.*`, `bootstrap/build/rt_mem_b2.txt`, release-trap tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. File open/read/write/close and stdio behavior match §15.2 (handles, `0` on failure, `AIC-R0814` on invalid handles).
+  1. Duplicate release → `AIC-R0812`; invalid release → `AIC-R0813`; traps report exit 70.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** trap integration drift. **Escalation:** allocator ambiguity → Planner.
+
+---
+
+### WP-M0-15 — Runtime I/O, process, and trap (split: WP-M0-15a..15c; 15a/15c sub-split)
+
+- **Sizing estimate (whole):** ~265–395 senior turns (recalibrated 2026-08-11; was 160–210). Above threshold → split below per §1b. Basis: three modules + Windows API baseline doc, §15.2–15.5/§15.7 rule surface; 15a and 15c sub-split, 15b retained single (within threshold).
+
+#### WP-M0-15a — rt.io (sub-split: WP-M0-15a1..15a2)
+
+- **Sizing estimate (whole):** ~100–150 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-15a1 — rt.io core: handle model and file operations
+
+- **Objective:** implement the rt_io handle model and file operations per spec §15.2: file handles/open/read/write/close.
+- **Scope:** rt_io handle model; open/read/write/close; `0` on failure.
+- **Exclusions:** stdio behavior/failure paths (15a2); process args/exit (15b); trap reporting (15c); allocator internals (WP-M0-14).
+- **Dependencies / inputs:** WP-M0-14 allocator API; spec §15.2, §15.5; ADR-004 Windows baseline.
+- **Expected artifacts:** `bootstrap/runtime/rt_io/rt_io_core.*`, `bootstrap/build/rt_io1.txt`, file-operation tests.
+- **Sizing estimate:** 50–75 senior turns. Basis: ~800–1,200 LOC incl. tests, ~5 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. File open/read/write/close match §15.2 (handles, `0` on failure).
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** Windows API surface drift. **Escalation:** API/baseline question → Main Designer; environment → Coordinator.
+
+##### WP-M0-15a2 — rt.io stdio and failure paths
+
+- **Objective:** implement stdio behavior and invalid-handle failure paths per spec §15.2.
+- **Scope:** stdio behavior; invalid-handle failures (`AIC-R0814`).
+- **Exclusions:** handle model/open/read/write/close (15a1); process args/exit (15b); trap reporting (15c).
+- **Dependencies / inputs:** WP-M0-15a1; spec §15.2, §15.5.
+- **Expected artifacts:** `bootstrap/runtime/rt_io/rt_io_stdio.*`, `bootstrap/build/rt_io2.txt`, stdio/failure tests.
+- **Sizing estimate:** 50–75 senior turns. Basis: ~800–1,200 LOC incl. tests, ~5 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. stdio behavior per §15.2; invalid handles → `AIC-R0814`; `0` on failure.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** failure-path gaps. **Escalation:** API/baseline question → Main Designer.
 
 ---
 
@@ -568,7 +761,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 - **Exclusions:** I/O (15a); trap reporting (15c).
 - **Dependencies / inputs:** spec §15.3, §15.5; ADR-004 Windows baseline.
 - **Expected artifacts:** `bootstrap/runtime/rt_proc/**`, `bootstrap/build/rt_proc.txt`, args-conversion/exit tests.
-- **Sizing estimate:** 45–55 senior turns. Basis: ~500–700 LOC incl. tests, ~8 test functions, ~4 normative rules.
+- **Sizing estimate:** 60–90 senior turns (recalibrated 2026-08-11; was 45–55). Basis: ~1,000–1,500 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity — within threshold (≈105), retained single; smallest runtime module (args conversion + exit only).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. `rt.proc.args()` converts deterministically with U+FFFD replacement for invalid surrogates; `args()[0]` is the program path.
@@ -578,26 +771,43 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 
 ---
 
-#### WP-M0-15c — rt.trap and runtime Windows API baseline doc
+#### WP-M0-15c — rt.trap and runtime Windows API baseline doc (sub-split: WP-M0-15c1..15c2)
 
-- **Objective:** implement `bootstrap/runtime/rt_trap/` per spec §15.4/contract §10: trap reporting (JSONL record to stderr, exit 70), and produce `bootstrap/runtime/README.md` enumerating every runtime-facing Windows call against the pinned baseline (ADR-004).
-- **Scope:** rt_trap module; trap record shape (`AIC-U0000`, caller `trap_code`); Windows API enumeration doc.
-- **Exclusions:** allocator internals (WP-M0-14); rt_io (15a); rt_proc (15b).
+- **Sizing estimate (whole):** ~105–155 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-15c1 — rt.trap module
+
+- **Objective:** implement `bootstrap/runtime/rt_trap/` per spec §15.4/contract §10: trap reporting (JSONL record to stderr, exit 70).
+- **Scope:** rt_trap module; trap record shape (`AIC-U0000`, caller `trap_code`).
+- **Exclusions:** runtime README/Windows API doc (15c2); allocator internals (WP-M0-14); rt_io (15a); rt_proc (15b).
 - **Dependencies / inputs:** WP-M0-14 allocator API; spec §15.4–15.5, §15.7 (calling convention); ADR-004 Windows baseline.
-- **Expected artifacts:** `bootstrap/runtime/rt_trap/**`, `bootstrap/runtime/README.md`, `bootstrap/build/rt_trap.txt`, trap record/exit tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests + doc, ~8 test functions, ~5 normative rules.
+- **Expected artifacts:** `bootstrap/runtime/rt_trap/rt_trap.*`, `bootstrap/build/rt_trap1.txt`, trap record/exit tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~5 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. `rt.trap.report` emits a JSONL record (`AIC-U0000`, caller `trap_code`) and exits 70.
-  2. `README.md` enumerates every runtime-facing Windows call against Win10 22H2 x64 and notes the no-OS-updates baseline.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** trap record shape drift. **Escalation:** contract conflict → Planner.
+
+##### WP-M0-15c2 — Runtime Windows API baseline doc
+
+- **Objective:** produce `bootstrap/runtime/README.md` enumerating every runtime-facing Windows call against the pinned baseline (ADR-004).
+- **Scope:** Windows API enumeration doc (Win10 22H2 x64; no-OS-updates baseline); no code.
+- **Exclusions:** rt_trap module (15c1); allocator internals (WP-M0-14); rt_io (15a); rt_proc (15b).
+- **Dependencies / inputs:** ADR-004 Windows baseline; WP-M0-14/15 modules' call surface.
+- **Expected artifacts:** `bootstrap/runtime/README.md`, `bootstrap/build/rt_trap2.txt`.
+- **Sizing estimate:** 50–75 senior turns (recalibrated 2026-08-11; was 50–60). Basis: ~500–800 lines doc + review iterations, no code, low complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** no (doc; verifies against pinned baseline).
+- **Acceptance criteria:**
+  1. `README.md` enumerates every runtime-facing Windows call against Win10 22H2 x64 and notes the no-OS-updates baseline.
 - **Verification / review class:** self-review + Reviewer independent review; Windows API doc reviewed by Main Designer for baseline conformance (class: Reviewer + Main Designer for the API doc).
 - **Risks:** Windows API enumeration drift. **Escalation:** API/baseline question → Main Designer.
 
 ---
 
-### WP-M0-16 — Canonical IR contract and implementation (split: WP-M0-16a..16c)
+### WP-M0-16 — Canonical IR contract and implementation (split: WP-M0-16a..16c; 16b/16c sub-split)
 
-- **Sizing estimate (whole):** ~170–220 senior turns. Above threshold → split below per §1b. Basis: contract drafting (Main Designer gate) + core implementation + builder, §14.1(6)/ADR-001 rule surface.
+- **Sizing estimate (whole):** ~290–405 senior turns (recalibrated 2026-08-11; was 170–220). Above threshold → split below per §1b. Basis: contract drafting (Main Designer gate) + core implementation + builder, §14.1(6)/ADR-001 rule surface; 16a retained single (doc), 16b/16c sub-split.
 
 #### WP-M0-16a — IR contract document
 
@@ -606,7 +816,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 - **Exclusions:** IR implementation (16b/16c); optimizations (deferred per ADR-001); IR changes to the public language contract (none; IR is internal).
 - **Dependencies / inputs:** spec §14.1(6) boundary; ADR-001 pipeline stage 6; WP-M0-09/11/13 shapes.
 - **Expected artifacts:** `docs/contracts/IR-CONTRACT-*.md` (accepted by Main Designer) + acceptance record.
-- **Sizing estimate:** 45–55 senior turns. Basis: document + review iterations, ~5 normative sections; no code.
+- **Sizing estimate:** 45–60 senior turns (recalibrated 2026-08-11; was 45–55). Basis: document + review iterations, ~5 normative sections; no code — doc work is not covered by the compiler-core multiplier; within threshold (≈105), retained single.
 - **Capability:** `senior_specialist` (contract drafting; Main Designer review gate). **Host toolchain required:** no (spec work).
 - **Acceptance criteria:**
   1. Contract states IR determinism, target-neutrality, span/cause preservation, and representation coverage for every semantic rule; Main Designer accepts it.
@@ -615,105 +825,211 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 
 ---
 
-#### WP-M0-16b — IR core: node model, invariants, deterministic dump
+#### WP-M0-16b — IR core: node model, invariants, deterministic dump (sub-split: WP-M0-16b1..16b2)
 
-- **Objective:** implement the IR node model and core machinery per the accepted IR contract: node kinds, invariants, deterministic printing/verification support.
-- **Scope:** IR node model; invariant enforcement (`AIC-I0501`); deterministic dump/verification.
-- **Exclusions:** AST→IR builder (16c); contract drafting (16a); x86-64 codegen (WP-M0-17).
+- **Sizing estimate (whole):** ~120–170 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-16b1 — IR node model and invariants
+
+- **Objective:** implement the IR node model and invariant enforcement per the accepted IR contract.
+- **Scope:** IR node kinds; invariant enforcement (`AIC-I0501`).
+- **Exclusions:** deterministic dump (16b2); AST→IR builder (16c); contract drafting (16a); x86-64 codegen (WP-M0-17).
 - **Dependencies / inputs:** WP-M0-16a (accepted contract); WP-M0-06; spec §14.1(6).
-- **Expected artifacts:** `bootstrap/src/ir/ir_core.*`, `bootstrap/src/ir/ir_dump.*`, `bootstrap/build/ir.txt`, IR core unit tests (invariants, deterministic dump).
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Expected artifacts:** `bootstrap/src/ir/ir_core.*`, `bootstrap/build/ir1.txt`, IR core unit tests (invariants).
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Implementation matches the accepted contract; invariant violations reported `AIC-I0501`.
-  2. Dump/verification output deterministic.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** contract/implementation mismatch. **Escalation:** IR boundary conflict → Main Designer.
 
----
+##### WP-M0-16b2 — IR deterministic dump and verification
 
-#### WP-M0-16c — IR builder (typed AST → IR)
-
-- **Objective:** implement the IR builder mapping typed/resolved AST → IR per the accepted contract, preserving source spans and causal chains.
-- **Scope:** builder over typed AST; span/cause preservation; AST→IR mapping tests.
-- **Exclusions:** IR core (16b); contract (16a); codegen (WP-M0-17).
-- **Dependencies / inputs:** WP-M0-16b; WP-M0-09, WP-M0-11, WP-M0-13; spec §14.1(6).
-- **Expected artifacts:** `bootstrap/src/ir/ir_builder.*`, `bootstrap/build/ir_builder.txt`, IR builder unit tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Objective:** implement deterministic IR printing/verification support per the accepted IR contract.
+- **Scope:** deterministic dump; verification support; dump determinism tests.
+- **Exclusions:** node model/invariants (16b1); AST→IR builder (16c); x86-64 codegen (WP-M0-17).
+- **Dependencies / inputs:** WP-M0-16b1; spec §14.1(6).
+- **Expected artifacts:** `bootstrap/src/ir/ir_dump.*`, `bootstrap/build/ir2.txt`, dump determinism tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Identical AST → identical IR; IR preserves source spans and causal chains for diagnostics/traps.
+  1. Dump/verification output deterministic (identical IR → identical dump bytes).
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** dump nondeterminism. **Escalation:** IR boundary conflict → Main Designer.
+
+---
+
+#### WP-M0-16c — IR builder (typed AST → IR) (sub-split: WP-M0-16c1..16c2)
+
+- **Sizing estimate (whole):** ~130–180 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-16c1 — IR builder core mapping
+
+- **Objective:** implement the IR builder mapping typed/resolved AST → IR per the accepted contract.
+- **Scope:** builder over typed AST; AST→IR mapping tests.
+- **Exclusions:** span/cause preservation (16c2); IR core (16b); contract (16a); codegen (WP-M0-17).
+- **Dependencies / inputs:** WP-M0-16b; WP-M0-09, WP-M0-11, WP-M0-13; spec §14.1(6).
+- **Expected artifacts:** `bootstrap/src/ir/ir_builder_core.*`, `bootstrap/build/ir_builder1.txt`, IR builder unit tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Identical AST → identical IR (structural mapping per the contract).
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** builder coverage gaps. **Escalation:** IR boundary conflict → Main Designer.
 
----
+##### WP-M0-16c2 — IR span/cause preservation
 
-### WP-M0-17 — x86-64 backend (split: WP-M0-17a..17c)
-
-- **Sizing estimate (whole):** ~230–290 senior turns. Above threshold → split below per §1b. Basis: instruction selection + frame/regalloc + trap branches, §14.1(7)/§14.3/§15.7 rule surface; comparable to parser actuals.
-
-#### WP-M0-17a — Instruction selection and deterministic output
-
-- **Objective:** implement IR → x86-64 instruction selection per spec §14.1(7)/§14.3: baseline ≤ x86-64 + SSE2 (no AVX2 required), deterministic output ordering.
-- **Scope:** instruction selection; register-usage determinism; backend constraint violations (`AIC-B0601`); deterministic output ordering.
-- **Exclusions:** frame layout/regalloc (17b); trap branches (17c); COFF emission (WP-M0-18).
-- **Dependencies / inputs:** WP-M0-16 IR contract/impl; spec §14.1(7), §14.3.
-- **Expected artifacts:** `bootstrap/src/backend/isel.*`, `bootstrap/build/backend_a.txt`, codegen unit tests, assembly dump tests.
-- **Sizing estimate:** 55–60 senior turns. Basis: ~700–900 LOC incl. tests, ~12 test functions, ~8 normative rules.
+- **Objective:** implement source-span and causal-chain preservation on the IR builder output.
+- **Scope:** span/cause preservation; determinism tests.
+- **Exclusions:** structural mapping (16c1); IR core (16b); codegen (WP-M0-17).
+- **Dependencies / inputs:** WP-M0-16c1; WP-M0-09/11/13; spec §14.1(6).
+- **Expected artifacts:** `bootstrap/src/ir/ir_builder_cause.*`, `bootstrap/build/ir_builder2.txt`, span/cause tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Generated instruction set uses only x86-64 + SSE2; no AVX2/host-specific instructions required.
-  2. Output is deterministic: identical IR → identical assembly bytes.
+  1. IR preserves source spans and causal chains for diagnostics/traps; identical AST → byte-identical IR.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** span drift. **Escalation:** IR boundary conflict → Main Designer.
+
+---
+
+### WP-M0-17 — x86-64 backend (split: WP-M0-17a..17c; each sub-split)
+
+- **Sizing estimate (whole):** ~425–570 senior turns (recalibrated 2026-08-11; was 230–290). Above threshold → split below per §1b. Basis: instruction selection + frame/regalloc + trap branches, §14.1(7)/§14.3/§15.7 rule surface; each 17x sub-package sub-split into two cards.
+
+#### WP-M0-17a — Instruction selection and deterministic output (sub-split: WP-M0-17a1..17a2)
+
+- **Sizing estimate (whole):** ~145–195 senior turns (recalibrated 2026-08-11; was 55–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-17a1 — Instruction selection core
+
+- **Objective:** implement IR → x86-64 instruction selection core per spec §14.1(7)/§14.3: deterministic output ordering, register-usage determinism.
+- **Scope:** instruction selection; register-usage determinism; deterministic output ordering.
+- **Exclusions:** x86-64+SSE2 coverage/constraint checks (17a2); frame layout/regalloc (17b); trap branches (17c); COFF emission (WP-M0-18).
+- **Dependencies / inputs:** WP-M0-16 IR contract/impl; spec §14.1(7), §14.3.
+- **Expected artifacts:** `bootstrap/src/backend/isel_core.*`, `bootstrap/build/backend_a1.txt`, codegen unit tests, assembly dump tests.
+- **Sizing estimate:** 70–95 senior turns. Basis: ~1,200–1,600 LOC incl. tests, ~7 test functions, ~5 normative rules, moderate-high complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Instruction selection is deterministic: identical IR → identical assembly bytes.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** instruction-selection gaps. **Escalation:** backend constraint → Planner; ABI question → Main Designer.
 
+##### WP-M0-17a2 — x86-64 instruction coverage and constraints
+
+- **Objective:** implement full x86-64+SSE2 instruction coverage and backend constraint enforcement per spec §14.3.
+- **Scope:** instruction coverage (baseline ≤ x86-64 + SSE2, no AVX2); backend constraint violations (`AIC-B0601`).
+- **Exclusions:** selection core/order (17a1); frame layout/regalloc (17b); trap branches (17c); COFF emission (WP-M0-18).
+- **Dependencies / inputs:** WP-M0-17a1; spec §14.1(7), §14.3.
+- **Expected artifacts:** `bootstrap/src/backend/isel_x64.*`, `bootstrap/build/backend_a2.txt`, assembly dump tests.
+- **Sizing estimate:** 75–100 senior turns. Basis: ~1,300–1,700 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate-high complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Generated instruction set uses only x86-64 + SSE2; no AVX2/host-specific instructions required.
+  2. Backend constraint violations (`AIC-B0601`) enforced.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** instruction-set gaps. **Escalation:** backend constraint → Planner; ABI question → Main Designer.
+
 ---
 
-#### WP-M0-17b — Frame layout, register allocation, and calls
+#### WP-M0-17b — Frame layout, register allocation, and calls (sub-split: WP-M0-17b1..17b2)
 
-- **Objective:** implement stack layout, simple/deterministic register allocation, function prologue/epilogue, and call emission per spec §15.7 (Microsoft x64 convention).
-- **Scope:** frame layout; register allocation (simple/deterministic); prologue/epilogue; call emission (RCX/RDX/R8/R9, shadow space, 16-byte alignment, RAX return); `main` entry setup; noreturn handling.
-- **Exclusions:** instruction selection (17a); trap branches (17c); COFF (WP-M0-18).
+- **Sizing estimate (whole):** ~140–190 senior turns (recalibrated 2026-08-11; was 55–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-17b1 — Frame layout and prologue/epilogue
+
+- **Objective:** implement stack layout and function prologue/epilogue per spec §15.7 (Microsoft x64 convention).
+- **Scope:** frame layout; prologue/epilogue; `main` entry setup; noreturn handling.
+- **Exclusions:** register allocation/call emission (17b2); instruction selection (17a); trap branches (17c); COFF (WP-M0-18).
 - **Dependencies / inputs:** WP-M0-17a; spec §14.3, §15.5, §15.7.
-- **Expected artifacts:** `bootstrap/src/backend/frame.*`, `bootstrap/build/backend_b.txt`, calling-convention and frame tests.
-- **Sizing estimate:** 55–60 senior turns. Basis: ~700–900 LOC incl. tests, ~12 test functions, ~8 normative rules.
+- **Expected artifacts:** `bootstrap/src/backend/frame.*`, `bootstrap/build/backend_b1.txt`, frame tests.
+- **Sizing estimate:** 70–95 senior turns. Basis: ~1,200–1,600 LOC incl. tests, ~7 test functions, ~5 normative rules, moderate-high complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Prologue/epilogue and `main` entry setup correct; noreturn handled without corrupting the frame.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** frame layout errors. **Escalation:** ABI question → Main Designer.
+
+##### WP-M0-17b2 — Register allocation and call emission
+
+- **Objective:** implement simple/deterministic register allocation and call emission per spec §15.7.
+- **Scope:** register allocation (simple/deterministic); call emission (RCX/RDX/R8/R9, shadow space, 16-byte alignment, RAX return).
+- **Exclusions:** frame layout (17b1); instruction selection (17a); trap branches (17c); COFF (WP-M0-18).
+- **Dependencies / inputs:** WP-M0-17b1; spec §14.3, §15.7.
+- **Expected artifacts:** `bootstrap/src/backend/call.*`, `bootstrap/build/backend_b2.txt`, calling-convention tests.
+- **Sizing estimate:** 70–95 senior turns. Basis: ~1,200–1,600 LOC incl. tests, ~7 test functions, ~5 normative rules, moderate-high complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Runtime calls follow the §15.7 convention (RCX/RDX/R8/R9, shadow space, 16-byte alignment, RAX return).
-  2. Prologue/epilogue and `main` entry setup correct; noreturn handled without corrupting the frame.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** calling-convention errors. **Escalation:** ABI question → Main Designer.
 
 ---
 
-#### WP-M0-17c — Trap branches and checked-operation emission
+#### WP-M0-17c — Trap branches and checked-operation emission (sub-split: WP-M0-17c1..17c2)
 
-- **Objective:** implement deterministic trap branches for every runtime-failable checked operation (checked arithmetic, bounds, null deref, pointer-arithmetic overflow) with stable codes and source spans.
-- **Scope:** trap branch emission (`AIC-R0801..R0816` per operation); span/cause preservation on trap records.
-- **Exclusions:** instruction selection (17a); frame/regalloc (17b); COFF (WP-M0-18).
+- **Sizing estimate (whole):** ~130–180 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-17c1 — Trap branch emission
+
+- **Objective:** implement deterministic trap branches for runtime-failable checked operations per spec §14.3/§15.5 with stable codes and source spans.
+- **Scope:** trap branch emission (`AIC-R0801..R0816` per operation); stable codes and source spans.
+- **Exclusions:** checked-op emission details (17c2); instruction selection (17a); frame/regalloc (17b); COFF (WP-M0-18).
 - **Dependencies / inputs:** WP-M0-17a/b; spec §14.3, §15.5, §15.7.
-- **Expected artifacts:** `bootstrap/src/backend/trap.*`, `bootstrap/build/backend_c.txt`, trap-branch unit tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~7 normative rules.
+- **Expected artifacts:** `bootstrap/src/backend/trap_branch.*`, `bootstrap/build/backend_c1.txt`, trap-branch unit tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Every runtime-failable checked operation emits a deterministic trap branch with the correct `AIC-Rxxxx` code and source span.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** trap-branch determinism. **Escalation:** backend constraint → Planner.
 
+##### WP-M0-17c2 — Checked-operation emission with span/cause preservation
+
+- **Objective:** implement checked-operation trap emission with span/cause preservation on trap records.
+- **Scope:** checked-op emission; span/cause preservation on trap records.
+- **Exclusions:** trap branch structure (17c1); instruction selection (17a); frame/regalloc (17b); COFF (WP-M0-18).
+- **Dependencies / inputs:** WP-M0-17c1; spec §14.3, §15.5.
+- **Expected artifacts:** `bootstrap/src/backend/trap_checked.*`, `bootstrap/build/backend_c2.txt`, checked-op emission tests.
+- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Checked operations emit trap records preserving source spans and causal chains.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** span drift on trap records. **Escalation:** backend constraint → Planner.
+
 ---
 
-### WP-M0-18 — COFF object emission (split: WP-M0-18a..18b)
+### WP-M0-18 — COFF object emission (split: WP-M0-18a..18b; each sub-split)
 
-- **Sizing estimate (whole):** ~140–180 senior turns. Above threshold → split below per §1b. Basis: section/symbol/relocation tables + byte-determinism + link verification, §14.2/§14.3 rule surface.
+- **Sizing estimate (whole):** ~235–335 senior turns (recalibrated 2026-08-11; was 140–180). Above threshold → split below per §1b. Basis: section/symbol/relocation tables + byte-determinism + link verification, §14.2/§14.3 rule surface; 18a/18b each sub-split into two cards.
 
-#### WP-M0-18a — COFF writer core
+#### WP-M0-18a — COFF writer core (sub-split: WP-M0-18a1..18a2)
 
-- **Objective:** implement deterministic COFF object emission per spec §14.2/§14.3: section/symbol/relocation tables, canonical record/section order, zero compiler-controlled timestamps, repository-relative canonically separated paths, no random/host identifiers.
-- **Scope:** COFF writer; canonical ordering; object emission of the backend's sections.
-- **Exclusions:** link verification (18b); codegen (WP-M0-17); PE/linking (WP-M0-19).
+- **Sizing estimate (whole):** ~120–170 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-18a1 — COFF tables and canonical ordering
+
+- **Objective:** implement deterministic COFF object emission core per spec §14.2/§14.3: section/symbol/relocation tables, canonical record/section order.
+- **Scope:** COFF writer; section/symbol/relocation tables; canonical ordering; object emission of the backend's sections.
+- **Exclusions:** byte-determinism/timestamps/paths (18a2); link verification (18b); codegen (WP-M0-17); PE/linking (WP-M0-19).
 - **Dependencies / inputs:** WP-M0-17 backend output contract; spec §14.2, §14.3.
-- **Expected artifacts:** `bootstrap/src/coff/coff_emit.*`, `bootstrap/build/coff_a.txt`, byte-level determinism tests, object inspection tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Expected artifacts:** `bootstrap/src/coff/coff_sections.*`, `bootstrap/build/coff_a1.txt`, object inspection tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Section/symbol/relocation tables emitted in canonical order per §14.2/§14.3.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** COFF field ordering. **Escalation:** COFF detail → Planner.
+
+##### WP-M0-18a2 — COFF byte-determinism
+
+- **Objective:** implement byte-determinism for COFF emission per spec §14.3: zero compiler-controlled timestamps, repository-relative canonically separated paths, no random/host identifiers.
+- **Scope:** determinism machinery; timestamps/paths; byte-level determinism tests.
+- **Exclusions:** tables/canonical order (18a1); link verification (18b); codegen (WP-M0-17).
+- **Dependencies / inputs:** WP-M0-18a1; spec §14.2, §14.3.
+- **Expected artifacts:** `bootstrap/src/coff/coff_determinism.*`, `bootstrap/build/coff_a2.txt`, byte-level determinism tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Identical inputs → byte-identical COFF objects; zero timestamps, canonical order, relative paths; no host/build-machine identity.
@@ -722,79 +1038,149 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 
 ---
 
-#### WP-M0-18b — COFF verification and linker smoke
+#### WP-M0-18b — COFF verification and linker smoke (sub-split: WP-M0-18b1..18b2)
 
-- **Objective:** verify emitted objects link with accepted external linkers (`link.exe` / `lld-link`) and are readable by inspection tools (dumpbin/llvm-objdump); maintain byte-determinism machinery.
-- **Scope:** link smoke tests; object inspection tests; determinism verification.
-- **Exclusions:** COFF writer core (18a); PE/linking (WP-M0-19).
+- **Sizing estimate (whole):** ~110–160 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-18b1 — Link smoke and object inspection
+
+- **Objective:** verify emitted objects link with accepted external linkers (`link.exe` / `lld-link`) and are readable by inspection tools (dumpbin/llvm-objdump).
+- **Scope:** link smoke tests; object inspection tests.
+- **Exclusions:** determinism machinery (18b2); COFF writer core (18a); PE/linking (WP-M0-19).
 - **Dependencies / inputs:** WP-M0-18a; baseline tooling (dumpbin on PATH, llvm-objdump off PATH).
-- **Expected artifacts:** `bootstrap/src/coff/determinism.*`, `bootstrap/build/coff_b.txt`, link/inspection verification tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~8 test functions, ~5 normative rules.
+- **Expected artifacts:** `bootstrap/src/coff/coff_verify.*`, `bootstrap/build/coff_b1.txt`, link/inspection verification tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~5 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes (MSVC and/or Clang/LLVM for verification).
 - **Acceptance criteria:**
   1. Objects link with both `link.exe` (via initialized environment) and `lld-link`; inspection tools read them cleanly.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** tool-order canonicalization. **Escalation:** linker incompatibility → Main Designer/Researcher.
 
+##### WP-M0-18b2 — Determinism machinery maintenance
+
+- **Objective:** maintain the byte-determinism machinery and tool-order canonicalization for the COFF pipeline.
+- **Scope:** determinism verification; tool-order canonicalization; regression tests.
+- **Exclusions:** link smoke (18b1); COFF writer core (18a); PE/linking (WP-M0-19).
+- **Dependencies / inputs:** WP-M0-18a, WP-M0-18b1.
+- **Expected artifacts:** `bootstrap/src/coff/coff_detmach.*`, `bootstrap/build/coff_b2.txt`, determinism regression tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~5 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Determinism machinery maintained: repeated builds byte-identical; tool order canonical.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** tool-order drift. **Escalation:** linker nondeterminism → Main Designer.
+
 ---
 
-### WP-M0-19 — Build driver, manifest, and link integration (split: WP-M0-19a..19c)
+### WP-M0-19 — Build driver, manifest, and link integration (split: WP-M0-19a..19c; each sub-split)
 
-- **Sizing estimate (whole):** ~190–240 senior turns. Above threshold → split below per §1b. Basis: pipeline orchestration + manifest emission + linker integration, §14.1/§14.4/§16.3 rule surface.
+- **Sizing estimate (whole):** ~355–495 senior turns (recalibrated 2026-08-11; was 190–240). Above threshold → split below per §1b. Basis: pipeline orchestration + manifest emission + linker integration, §14.1/§14.4/§16.3 rule surface; 19a/19b/19c each sub-split into two cards.
 
-#### WP-M0-19a — Pipeline orchestration and CLI
+#### WP-M0-19a — Pipeline orchestration and CLI (sub-split: WP-M0-19a1..19a2)
 
-- **Objective:** implement `main()` and pipeline orchestration (load→lex→parse→name→types→const→sema→ir→backend→coff→link), deterministic CLI/options, diagnostics to stderr, and exit codes.
-- **Scope:** driver `main()`; pipeline driver; deterministic option parsing; exit codes.
-- **Exclusions:** build manifest emission (19b); linker invocation (19c); language semantics.
+- **Sizing estimate (whole):** ~120–170 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-19a1 — Pipeline orchestration
+
+- **Objective:** implement `main()` and pipeline orchestration (load→lex→parse→name→types→const→sema→ir→backend→coff→link) per spec §14.1.
+- **Scope:** driver `main()`; pipeline driver; exit codes.
+- **Exclusions:** CLI/options (19a2); build manifest emission (19b); linker invocation (19c); language semantics.
 - **Dependencies / inputs:** WP-M0-06..18; spec §14.1.
-- **Expected artifacts:** `bootstrap/src/driver/main.*`, `bootstrap/src/driver/cli.*`, `bootstrap/build/driver_a.txt`, pipeline unit tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Expected artifacts:** `bootstrap/src/driver/main.*`, `bootstrap/build/driver_a1.txt`, pipeline unit tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~5 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
   1. Pipeline orchestration runs all stages in order; invalid programs produce JSONL diagnostics and non-zero exit.
-  2. Option parsing is deterministic (sorted options).
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** exit-code ambiguity. **Escalation:** manifest/contract conflict → Planner.
 
----
+##### WP-M0-19a2 — Deterministic CLI and options
 
-#### WP-M0-19b — Build manifest emission
-
-- **Objective:** implement build-manifest emission per spec §14.4: schema version, project root, entry module, module list, AI-Co language/spec version field, sorted options, linker flag set, relative artifact paths, SHA-256 of each artifact excluding the manifest, diagnostic summary, exit status.
-- **Scope:** manifest writer; hashed-artifact set; self-hash exclusion (FIND-G2-02/03); stage-invariant version.
-- **Exclusions:** pipeline (19a); linker invocation (19c).
-- **Dependencies / inputs:** WP-M0-19a; spec §14.4.
-- **Expected artifacts:** `bootstrap/src/driver/manifest.*`, `bootstrap/build/driver_b.txt`, manifest fixture tests.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~7 normative rules.
+- **Objective:** implement deterministic CLI/options per spec §14.1: deterministic option parsing, diagnostics to stderr.
+- **Scope:** deterministic option parsing; sorted options; diagnostics to stderr.
+- **Exclusions:** pipeline (19a1); build manifest emission (19b); linker invocation (19c).
+- **Dependencies / inputs:** WP-M0-19a1; spec §14.1.
+- **Expected artifacts:** `bootstrap/src/driver/cli.*`, `bootstrap/build/driver_a2.txt`, CLI option tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Manifest fields match §14.4 exactly: no self-hash; identical relative output paths across stage builds; stage-invariant version field; sorted build options; recorded linker flag set.
+  1. Option parsing is deterministic (sorted options).
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** option drift. **Escalation:** manifest/contract conflict → Planner.
+
+---
+
+#### WP-M0-19b — Build manifest emission (sub-split: WP-M0-19b1..19b2)
+
+- **Sizing estimate (whole):** ~120–170 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-19b1 — Manifest writer
+
+- **Objective:** implement build-manifest emission per spec §14.4: schema version, project root, entry module, module list, AI-Co language/spec version field, sorted options, linker flag set, relative artifact paths, diagnostic summary, exit status.
+- **Scope:** manifest writer; §14.4 fields; stage-invariant version.
+- **Exclusions:** hashed-artifact set/self-hash exclusion (19b2); pipeline (19a); linker invocation (19c).
+- **Dependencies / inputs:** WP-M0-19a; spec §14.4.
+- **Expected artifacts:** `bootstrap/src/driver/manifest_writer.*`, `bootstrap/build/driver_b1.txt`, manifest fixture tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~5 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Manifest fields match §14.4 exactly: schema version, project root, module list, stage-invariant version, sorted options, linker flag set, relative artifact paths, diagnostic summary, exit status.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** manifest drift. **Escalation:** manifest/contract conflict → Planner.
 
+##### WP-M0-19b2 — Hashed artifact set and self-hash exclusion
+
+- **Objective:** implement the hashed-artifact set and self-hash exclusion per spec §14.4 (FIND-G2-02/03).
+- **Scope:** SHA-256 of each artifact excluding the manifest; self-hash exclusion; fixture tests.
+- **Exclusions:** manifest writer fields (19b1); pipeline (19a); linker invocation (19c).
+- **Dependencies / inputs:** WP-M0-19b1; spec §14.4.
+- **Expected artifacts:** `bootstrap/src/driver/manifest_hash.*`, `bootstrap/build/driver_b2.txt`, hash/self-hash fixture tests.
+- **Sizing estimate:** 60–85 senior turns. Basis: ~1,000–1,400 LOC incl. tests, ~6 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Artifact hashes correct; manifest never self-hashes; identical relative output paths across stage builds.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** self-hash regression. **Escalation:** manifest/contract conflict → Planner.
+
 ---
 
-#### WP-M0-19c — External linker integration and end-to-end compile
+#### WP-M0-19c — External linker integration and end-to-end compile (sub-split: WP-M0-19c1..19c2)
 
-- **Objective:** implement external linker invocation per spec §16.3 (never bare `link`; explicit path/initialized env), entry validation (`AIC-E0418`), and end-to-end compile tests on corpus programs.
-- **Scope:** linker invocation; entry validation; end-to-end compile tests; link-failure reporting (`AIC-O0702`).
-- **Exclusions:** pipeline (19a); manifest (19b); M2 project-owned linker (out of scope).
+- **Sizing estimate (whole):** ~110–160 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+
+##### WP-M0-19c1 — External linker invocation
+
+- **Objective:** implement external linker invocation per spec §16.3 (never bare `link`; explicit path/initialized env) and link-failure reporting.
+- **Scope:** linker invocation; link-failure reporting (`AIC-O0702`); linker identity/version recorded only in comparison evidence.
+- **Exclusions:** end-to-end compile tests (19c2); pipeline (19a); manifest (19b); M2 project-owned linker (out of scope).
 - **Dependencies / inputs:** WP-M0-19a/b; spec §14.1, §16.3; baseline linker paths.
-- **Expected artifacts:** `bootstrap/src/driver/link.*`, `bootstrap/build/driver_c.txt`, end-to-end compile tests on corpus programs, manifest fixtures.
-- **Sizing estimate:** 50–60 senior turns. Basis: ~600–800 LOC incl. tests, ~10 test functions, ~6 normative rules.
+- **Expected artifacts:** `bootstrap/src/driver/link_invoke.*`, `bootstrap/build/driver_c1.txt`, linker-invocation tests.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~5 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes (MSVC and Clang; both linkers).
+- **Acceptance criteria:**
+  1. Never invokes bare `link`; linker identity/version recorded only in comparison evidence (spec §16.3), never in the manifest.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** linker-mode mismatch. **Escalation:** linker nondeterminism → Main Designer.
+
+##### WP-M0-19c2 — End-to-end compile
+
+- **Objective:** implement end-to-end compile tests on corpus programs per spec §16.3 and entry validation (`AIC-E0418`).
+- **Scope:** end-to-end compile tests; entry validation.
+- **Exclusions:** linker invocation mechanics (19c1); pipeline (19a); manifest (19b).
+- **Dependencies / inputs:** WP-M0-19c1; spec §14.1, §16.3.
+- **Expected artifacts:** `bootstrap/src/driver/link_e2e.*`, `bootstrap/build/driver_c2.txt`, end-to-end compile tests on corpus programs.
+- **Sizing estimate:** 55–80 senior turns. Basis: ~900–1,300 LOC incl. tests, ~5 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes (MSVC and Clang; both linkers).
 - **Acceptance criteria:**
   1. End-to-end compile of valid programs produces COFF + linked PE via the accepted linker modes; invalid programs produce JSONL diagnostics and non-zero exit.
-  2. Never invokes bare `link`; linker identity/version recorded only in comparison evidence (spec §16.3), never in the manifest.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
-- **Risks:** linker-mode mismatch. **Escalation:** linker nondeterminism → Main Designer.
+- **Risks:** fixture drift. **Escalation:** linker nondeterminism → Main Designer.
 
 ---
 
 ### WP-M0-20 — Stage-0 integration verification
 
-- **Sizing estimate:** 40–55 senior turns — within threshold, no split. Basis: execution/evidence work, no new source; ~4 normative checks (both compilers, suite pass, determinism, manifest conformance).
+- **Sizing estimate:** 40–55 senior turns (recalibrated 2026-08-11; unchanged) — within threshold, no split. Basis: execution/evidence work, no new source; ~4 normative checks (both compilers, suite pass, determinism, manifest conformance); evidence work is not covered by the compiler-core multiplier.
 - **Objective:** execute the full M0 exit gate — build Stage 0 with both accepted host compilers, run conformance/negative/smoke suites via the harness, run determinism checks, record evidence in `docs/verification/STAGE0-INTEGRATION-*.md`, and produce the M0 completion claim for Reviewer/Main Designer.
 - **Scope:** integration runs; evidence report; gap/deferral log; handoff to M1 planning.
 - **Exclusions:** new source code (finds defects → returns to package owner via Coordinator); M1 execution.
@@ -827,3 +1213,5 @@ M1 acceptance is normative in spec §16.5/§16.6 and is not restated as a new de
 For each WP-M0 card, verify before dispatch: assignee profile Active and capability matches; workspace `E:\Hermes_Agent\projects\Sneedworks\projects\AI-Co`; parent dependency edges set (WP-M0-N depends on WP-M0-(N-1); WP-M0-05 also depends on WP-M0-02..04 schemas; WP-M0-14/WP-M0-15 coordinate the rt.trap interface — represent as a documented interface note, not a shared file); delivery destination = owned area in §2; acceptance criteria present; review class recorded; card body carries the completion protocol rule (manifest §1.8 — worker must block `review-required:` and must not `kanban_complete` own review-class work); no human gate outstanding. If any package requires a Planner refinement (e.g., harness schema conflict), return to the Planner rather than inventing content.
 
 **Task-sizing and supersession (binding, from the 2026-08-10 amendment):** for the remaining unrun packages (WP-M0-11..20), dispatch per the §3 split cards, not the original oversized packages. When the amended manifest reaches the Coordinator, create the new split cards per the manifest (each with its own owned area, acceptance criteria, review class, serial edges, and sizing estimate) and supersede the original oversized card for that package (supersession pattern already used for push cards). Existing already-created M0 cards keep their bodies — no board edits for cards already dispatched or in-flight. Each split card's body must carry its §1b sizing estimate; dispatch split siblings strictly serially (e.g., WP-M0-11a → 11b → 11c → 11d) and do not start a split group until the previous group's cards are verified.
+
+**Recalibration supersession (binding, from the 2026-08-11 amendment):** before dispatching any card from WP-M0-12b onward, the Coordinator must (1) execute or decline the recommended senior-lane budget change (§1b: `hermes -p senior_specialist config set agent.max_turns 150`), recording it on the board and verifying it takes effect — if declined, return over-threshold cards to the Planner for re-splitting rather than dispatching them over-threshold; and (2) supersede the first-level split cards (WP-M0-12b, 13a..13d, 14a..14b, 15a, 15c, 16b..16c, 17a..17c, 18a..18b, 19a..19c) with the §3 second-level sub-split cards (12b1/12b2 … 19c1/19c2), each with its own owned area (§2), acceptance criteria, review class, serial edges, and recalibrated §1b sizing estimate. Dispatch sub-split siblings strictly serially (e.g., 12b1 → 12b2, then 13a1 → 13a2 → 13b1 → 13b2 → …); do not start a split group until the previous group's cards are verified. WP-M0-15b, 16a, and 20 are dispatched as single cards with their revised estimates.
