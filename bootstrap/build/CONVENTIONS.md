@@ -25,7 +25,7 @@ One deterministic build entry point per accepted host compiler, both in `bootstr
 
 | Entry point | Host compiler | Toolchain init |
 |---|---|---|
-| `build-stage0-msvc.cmd` | MSVC `cl` 19.50.35717 (VS Build Tools 2026) | `vcvarsall.bat x64` via `init-msvc.cmd` |
+| `build-stage0-msvc.cmd` | MSVC `cl` 19.50.35728 (binary self-report; VS Build Tools 2026, toolset dir 14.50.35717) | `vcvarsall.bat x64` via `init-msvc.cmd` |
 | `build-stage0-clang.cmd` | LLVM Clang 22.1.8 `clang-cl` (off PATH, full path) | `vcvarsall.bat x64` (SDK headers/libs) + `init-clang.cmd` (LLVM full paths) |
 
 ### 2.1 Usage
@@ -96,10 +96,12 @@ The entry point reads the fragments in sorted filename order (`dir /b /on`) and 
 
 ## 4. Toolchain initializers
 
-- `init-msvc.cmd` — locates and calls `vcvarsall.bat x64`. Pinned path: VS Build Tools 2026 `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvarsall.bat` (cl 19.50.35717). Fallback: `vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`. Fails loudly if no `vcvarsall.bat` is found.
+- `init-msvc.cmd` — locates and calls `vcvarsall.bat x64`. Pinned path: VS Build Tools 2026 `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvarsall.bat` (cl 19.50.35728, binary self-report; toolset dir 14.50.35717). Fallback: `vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`. Fails loudly if no `vcvarsall.bat` is found.
 - `init-clang.cmd` — pins LLVM 22.1.8 at `C:\Program Files\LLVM` (off PATH per baseline) and exports full paths: `CLANG_DIR`, `CLANG_CL`, `CLANG_DRIVER`, `LLD_LINK`, `LLVM_AR`. Fails loudly if the pinned directory is missing.
 
 Environment deviation (toolchain moved, version changed, new host) → escalate to the Coordinator per the manifest; do not silently repin.
+
+**Version notation (FIND-M0-01-01):** the pinned `cl` compiler binary self-reports **19.50.35728**; the MSVC toolset **directory** identity under `VC\Tools\MSVC\` is **14.50.35717**. These are distinct fields: the environment-deviation tripwire above compares the compiler binary self-report (19.50.35728), never the toolset directory name.
 
 ## 5. Environment hazards (binding)
 

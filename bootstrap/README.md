@@ -23,7 +23,7 @@ host compiler and put the executable under `bootstrap/stage0/` on the E:
 workspace. From the repository root, in Git Bash:
 
 ```bash
-# MSVC host compiler (cl 19.50.35717 via vcvarsall.bat x64)
+# MSVC host compiler (cl 19.50.35728 via vcvarsall.bat x64)
 ./bootstrap/build/build-stage0-msvc.cmd bootstrap/build/verify-hello.c
 ./bootstrap/stage0/msvc/verify-hello.exe
 # expected: hello from AI-Co stage0
