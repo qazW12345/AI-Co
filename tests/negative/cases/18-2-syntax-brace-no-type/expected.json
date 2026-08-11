@@ -16,8 +16,8 @@
         },
         "end": {
           "line": 3,
-          "col": 30,
-          "offset": 75
+          "col": 17,
+          "offset": 62
         }
       },
       "recovery": "authoritative"

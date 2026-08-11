@@ -11,13 +11,13 @@
         "file": "input.ai",
         "start": {
           "line": 2,
-          "col": 1,
-          "offset": 13
+          "col": 8,
+          "offset": 20
         },
         "end": {
           "line": 2,
-          "col": 11,
-          "offset": 23
+          "col": 10,
+          "offset": 22
         }
       },
       "recovery": "authoritative"

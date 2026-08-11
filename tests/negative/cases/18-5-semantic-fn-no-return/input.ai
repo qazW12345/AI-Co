@@ -1,7 +1,8 @@
 module main;
 fn bad(n: i32) -> i32 {
   switch (n) {
-    case 0: { var x: i32 = 1; }
+    case 0: { var x: i32 = 1; break; }
     case 1: { return 1; }
+    default: { return 0; }
   }
 }

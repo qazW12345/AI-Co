@@ -3,6 +3,27 @@
   "records": [
     {
       "schema_version": "1",
+      "code": "AIC-E0416",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "non-void function 'bad' has a path without return",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 4,
+          "offset": 16
+        },
+        "end": {
+          "line": 2,
+          "col": 7,
+          "offset": 19
+        }
+      },
+      "recovery": "authoritative"
+    },
+    {
+      "schema_version": "1",
       "code": "AIC-E0412",
       "severity": "error",
       "phase": "semantic",

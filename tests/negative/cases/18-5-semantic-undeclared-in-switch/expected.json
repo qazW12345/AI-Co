@@ -11,13 +11,55 @@
         "file": "input.ai",
         "start": {
           "line": 5,
-          "col": 15,
-          "offset": 98
+          "col": 22,
+          "offset": 105
         },
         "end": {
           "line": 5,
           "col": 23,
           "offset": 106
+        }
+      },
+      "recovery": "authoritative"
+    },
+    {
+      "schema_version": "1",
+      "code": "AIC-E0416",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "non-void function 'bad' has a path without return",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 2,
+          "col": 4,
+          "offset": 16
+        },
+        "end": {
+          "line": 2,
+          "col": 7,
+          "offset": 19
+        }
+      },
+      "recovery": "authoritative"
+    },
+    {
+      "schema_version": "1",
+      "code": "AIC-E0412",
+      "severity": "error",
+      "phase": "semantic",
+      "message": "switch case 0 body lacks a terminating statement; fall-through is prohibited",
+      "primary_span": {
+        "file": "input.ai",
+        "start": {
+          "line": 4,
+          "col": 13,
+          "offset": 64
+        },
+        "end": {
+          "line": 4,
+          "col": 29,
+          "offset": 80
         }
       },
       "recovery": "authoritative"
