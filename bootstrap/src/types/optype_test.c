@@ -557,6 +557,108 @@ static void test_site_binary_mismatch(void)
     pipeline_free(&p);
 }
 
+/* ---------------------------------------------------------------------------
+ * Pointer arithmetic pair validity (spec sec. 12.5 closed enumeration:
+ * p + i, p - i, p += i, p -= i, p - q with identical pointee; i + p and
+ * mixed-pointee p - q are rejected AIC-T0306 - Planner ruling R-1,
+ * review t_0db758e5 Minor-1)
+ * ------------------------------------------------------------------------- */
+
+static void test_site_ptr_add_int_left(void)
+{
+    /* i + p is not in the sec. 12.5 enumeration: rejected AIC-T0306. */
+    const char *src =
+        "module main;\n"
+        "fn main() -> i32 {\n"
+        "  var p: i32* = null;\n"
+        "  var i: i32 = 1;\n"
+        "  var r: i32* = i + p;\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.cst == CONVERT_OK);
+    CHECK(p.ost == OPTYPE_DIAG_ERROR);
+    CHECK(p.orn == 1);
+    if (p.orn >= 1) {
+        check_record_at(&p, 0, "AIC-T0306",
+                        "'+' operator not applicable to operand type 'i32'",
+                        src, "+");
+    }
+    pipeline_free(&p);
+}
+
+static void test_site_ptr_sub_mixed_pointee(void)
+{
+    /* p - q with different pointees (i32* - i64*) is not in the sec. 12.5
+     * enumeration (both operands must be T*): rejected AIC-T0306. */
+    const char *src =
+        "module main;\n"
+        "fn main() -> i32 {\n"
+        "  var p: i32* = null;\n"
+        "  var q: i64* = null;\n"
+        "  var r: isize = p - q;\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    int64_t sl, sc, so, el, ec, eo;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.cst == CONVERT_OK);
+    CHECK(p.ost == OPTYPE_DIAG_ERROR);
+    CHECK(p.orn == 1);
+    if (p.orn >= 1) {
+        /* the "-" needle would match the "->" in the fn signature first;
+         * recover the operator-token span from the unique "p - q" needle
+         * (the '-' is its third byte) */
+        span_of(src, "p - q", &sl, &sc, &so, &el, &ec, &eo);
+        if (!rec_matches(p.orecs[0], "AIC-T0306",
+                         "'-' operator not applicable to operand type 'i32*'",
+                         sl, sc + 2, so + 2, sl, sc + 3, so + 3, 0)) {
+            fprintf(stderr, "  [T0306] record mismatch: code=%s msg=%s "
+                            "span=(%lld,%lld,%lld)-(%lld,%lld,%lld)\n",
+                    p.orecs[0]->code, p.orecs[0]->message,
+                    (long long)p.orecs[0]->primary_span->start.line,
+                    (long long)p.orecs[0]->primary_span->start.col,
+                    (long long)p.orecs[0]->primary_span->start.offset,
+                    (long long)p.orecs[0]->primary_span->end.line,
+                    (long long)p.orecs[0]->primary_span->end.col,
+                    (long long)p.orecs[0]->primary_span->end.offset);
+            g_failures++;
+        }
+    }
+    pipeline_free(&p);
+}
+
+static void test_positive_pointer_arithmetic(void)
+{
+    /* The sec. 12.5 enumeration stays valid: p + i, p - i, p += i, p -= i,
+     * and same-pointee p - q produce zero records. */
+    const char *src =
+        "module main;\n"
+        "fn main() -> i32 {\n"
+        "  var p: i32* = null;\n"
+        "  var q: i32* = null;\n"
+        "  var a: i32* = p + 1;\n"
+        "  var b: i32* = p - 1;\n"
+        "  p += 1;\n"
+        "  p -= 1;\n"
+        "  var d: isize = p - q;\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.tst == TYPE_CHECK_OK);
+    CHECK(p.cst == CONVERT_OK);
+    CHECK(p.ost == OPTYPE_OK);
+    CHECK(p.orn == 0);
+    pipeline_free(&p);
+}
+
 static void test_site_binary_shift_bool(void)
 {
     const char *src =
@@ -1560,6 +1662,9 @@ int main(void)
     test_site_chained_comparison();
     test_site_binary_bool_plus();
     test_site_binary_mismatch();
+    test_site_ptr_add_int_left();
+    test_site_ptr_sub_mixed_pointee();
+    test_positive_pointer_arithmetic();
     test_site_binary_shift_bool();
     test_site_unary_unsigned_neg();
     test_site_unary_not_int();

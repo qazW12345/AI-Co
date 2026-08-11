@@ -10,6 +10,10 @@
  *     with the rejections of sec. 11.2/11.4 (AIC-T0306), equality on
  *     array/struct (AIC-T0304), chained comparisons (AIC-T0305), void
  *     misuse at cast/wrap targets;
+ *   - pointer-arithmetic pair validity is the closed sec. 12.5
+ *     enumeration (p + i, p - i, p += i, p -= i, and p - q with
+ *     identical pointee T*); i + p and mixed-pointee p - q are rejected
+ *     AIC-T0306 (Planner ruling R-1, review t_0db758e5 Minor-1);
  *   - conditions (sec. 13.1 AIC-T0310), switch selectors (sec. 13.2
  *     AIC-T0311), call argument counts (sec. 11.4 AIC-T0312);
  *   - array literal element counts in typed contexts (sec. 7.3

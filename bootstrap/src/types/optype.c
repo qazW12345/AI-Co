@@ -773,7 +773,10 @@ static bool comp_pair_applicable(const Type *lt, bool lnull,
  *     common type exists - 11c owns that record);
  *   - shifts: the left operand type;
  *   - comparisons: bool;
- *   - pointer arithmetic (+/-): the pointer type / isize;
+ *   - pointer arithmetic (+/-): the pointer type / isize, per the closed
+ *     sec. 12.5 enumeration (p + i, p - i, p - q with identical pointee;
+ *     i + p and mixed-pointee p - q are not enumerated - their rejection
+ *     is AIC-T0306 in check_binary_od; Planner ruling R-1);
  *   - logical: bool.
  * Returns TYP_OK with *out set, or TYP_UNKNOWN (no record; either the
  * operands were not typable or the integer pair lacks a common type). */
@@ -798,13 +801,8 @@ static TyperStatus binary_result_od(OptypeCtx *c, AstBinaryOp op,
             *out = type_clone(lt);
             return *out ? TYP_OK : oom(c);
         }
-        if (op == AST_BIN_ADD && rt && rt->kind == TYPE_PTR &&
-            lt && type_is_prim_int(lt)) {
-            *out = type_clone(rt);
-            return *out ? TYP_OK : oom(c);
-        }
         if (op == AST_BIN_SUB && lt && lt->kind == TYPE_PTR &&
-            rt && rt->kind == TYPE_PTR) {
+            rt && rt->kind == TYPE_PTR && type_identical(lt, rt)) {
             *out = type_prim_new(AST_PRIM_ISIZE);
             return *out ? TYP_OK : oom(c);
         }
@@ -883,16 +881,17 @@ static TyperStatus check_binary_od(OptypeCtx *c, const NameModule *module,
         return binary_result_od(c, op, lt, rt, out);
     }
 
-    /* arithmetic/bitwise: + - * / % & | ^ */
+    /* arithmetic/bitwise: + - * / % & | ^ (pointer pairs per the closed
+     * sec. 12.5 enumeration: p + i, p - i, p - q with identical pointee;
+     * i + p and mixed-pointee p - q are not applicable - Planner ruling
+     * R-1) */
     {
         bool ok = (type_is_prim_int(lt) && type_is_prim_int(rt)) ||
                   (lt && lt->kind == TYPE_PTR &&
                    ((op == AST_BIN_ADD || op == AST_BIN_SUB) &&
                     rt && type_is_prim_int(rt))) ||
-                  (rt && rt->kind == TYPE_PTR && op == AST_BIN_ADD &&
-                   lt && type_is_prim_int(lt)) ||
                   (op == AST_BIN_SUB && lt && lt->kind == TYPE_PTR &&
-                   rt && rt->kind == TYPE_PTR);
+                   rt && rt->kind == TYPE_PTR && type_identical(lt, rt));
         if (!ok) {
             emit_t0306_op(c, bin_op_text(op), lt, lnull, opsp);
         }
