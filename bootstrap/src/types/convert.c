@@ -770,7 +770,7 @@ static TyperStatus type_of_expr(ConvertCtx *c, const NameModule *module,
         if (op == AST_BIN_LT || op == AST_BIN_LE || op == AST_BIN_GT ||
             op == AST_BIN_GE || op == AST_BIN_EQ || op == AST_BIN_NE) {
             /* comparisons: integer operands use common-type promotion
-             * (sec. 11.4); result bool. Non-integer pairs (bool/bool,
+             * (sec. 11.1 bullet 2); result bool. Non-integer pairs (bool/bool,
              * enum/enum, str/str, T* vs T*, slice/slice, mismatched)
              * involve no implicit conversion; their validity is 11d's. */
             if (lt && rt && !lnull && !rnull &&

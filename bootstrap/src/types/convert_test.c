@@ -1,7 +1,7 @@
 /* bootstrap/src/types/convert_test.c
  *
  * WP-M0-11c unit and integration tests: the implicit-conversion whitelist
- * (spec sec. 11.1), common-type promotion (sec. 11.1 bullet / sec. 11.4),
+ * (spec sec. 11.1), common-type promotion (sec. 11.1 bullet 2),
  * the build-level AIC-T0307 rejection with correct spans at every
  * conversion site (initializers, assignments, compound assignments, call
  * arguments, return values, binary integer operators, ternary, array
@@ -236,7 +236,7 @@ static void test_whitelist_composite_identity(void)
 }
 
 /* ---------------------------------------------------------------------------
- * Common type (spec sec. 11.1 bullet / sec. 11.4)
+ * Common type (spec sec. 11.1 bullet 2)
  * ------------------------------------------------------------------------- */
 
 static void check_common(AstPrimKind a, AstPrimKind b, AstPrimKind expected)
