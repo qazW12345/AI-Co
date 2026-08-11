@@ -6,18 +6,18 @@
       "code": "AIC-T0308",
       "severity": "error",
       "phase": "type",
-      "message": "invalid explicit cast pair: bool to i32",
+      "message": "invalid explicit cast pair: str to i32",
       "primary_span": {
         "file": "input.ai",
         "start": {
           "line": 4,
           "col": 16,
-          "offset": 69
+          "offset": 71
         },
         "end": {
           "line": 4,
           "col": 28,
-          "offset": 81
+          "offset": 83
         }
       },
       "recovery": "authoritative"
