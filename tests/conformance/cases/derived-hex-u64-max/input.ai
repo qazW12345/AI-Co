@@ -1,5 +1,5 @@
 module main;
 // §4.3 — hex literal for u64 max
-var max: u64 = 0xFFFF_FFFF_FFFF_FFFF;
+var max: u64 = 0xFFFF_FFFF_FFFF_FFFFu64;
 
 fn main() -> i32 { return 0; }
