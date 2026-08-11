@@ -4,7 +4,7 @@
  *
  * Implements the implicit-conversion whitelist of spec sec. 11.1 (exactly
  * the table rows; anything else is rejected with AIC-T0307) and the
- * binary-operator common-type promotion of sec. 11.1/11.4, over the
+ * binary-operator common-type promotion of sec. 11.1 bullet 2, over the
  * resolved build (WP-M0-10 NameResult) and the type descriptors of
  * WP-M0-11a.
  *
@@ -36,7 +36,8 @@
  *     operand to the left operand's type (the shift result is the left
  *     operand type per sec. 10.2, so the right operand is assignment-
  *     converted, not common-type-promoted); comparisons < <= > >= and
- *     equality == != on integers use common-type promotion (sec. 11.4);
+ *     equality == != on integers use common-type promotion (sec. 11.1
+ *     bullet 2);
  *     logical && || are bool/bool and produce no conversion checks here;
  *   - ternary ?: (then/else must have a common type; the ternary's type
  *     is that common type, sec. 10.2);
@@ -135,11 +136,11 @@ bool convert_implicit_allowed_ex(const Type *from, bool from_is_null,
                                  const Type *to);
 
 /* ---------------------------------------------------------------------------
- * Common type (spec sec. 11.1 bullet / sec. 11.4)
+ * Common type (spec sec. 11.1 bullet 2)
  * ------------------------------------------------------------------------- */
 
 /* Compute the common type of two integer binary operands (spec sec. 11.1
- * bullet): when both operands have the same type, the common type is that
+ * bullet 2): when both operands have the same type, the common type is that
  * type; when they differ, both must be implicitly convertible to the
  * common type - the wider of the two by bit width, with both conversions
  * present in Table 11.1 - else there is no common type (NULL; the caller
