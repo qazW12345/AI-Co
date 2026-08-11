@@ -11,12 +11,12 @@
         "file": "input.ai",
         "start": {
           "line": 2,
-          "col": 4,
-          "offset": 16
+          "col": 1,
+          "offset": 13
         },
         "end": {
           "line": 2,
-          "col": 7,
+          "col": 6,
           "offset": 19
         }
       },
@@ -37,7 +37,7 @@
         },
         "end": {
           "line": 4,
-          "col": 11,
+          "col": 10,
           "offset": 62
         }
       },

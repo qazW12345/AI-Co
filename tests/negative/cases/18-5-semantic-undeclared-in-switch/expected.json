@@ -32,12 +32,12 @@
         "file": "input.ai",
         "start": {
           "line": 2,
-          "col": 4,
-          "offset": 16
+          "col": 1,
+          "offset": 13
         },
         "end": {
           "line": 2,
-          "col": 7,
+          "col": 6,
           "offset": 19
         }
       },
@@ -53,13 +53,13 @@
         "file": "input.ai",
         "start": {
           "line": 4,
-          "col": 13,
-          "offset": 64
+          "col": 5,
+          "offset": 56
         },
         "end": {
           "line": 4,
-          "col": 29,
-          "offset": 80
+          "col": 10,
+          "offset": 62
         }
       },
       "recovery": "authoritative"
