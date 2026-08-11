@@ -45,9 +45,7 @@
  *     (or "array type 'i32[3]'"); span: the ==/!= operator token.
  *   - AIC-T0305: "chained comparison is not allowed"; span: the
  *     leftmost comparison operator of the chain (corpus-pinned;
- *     DIAGNOSTIC-CONTRACT sec. 11.4 text says "the second comparison
- *     operator" - the accepted corpus pins the first/leftmost operator
- *     and is the stable oracle here; documented discrepancy).
+ *     consistent with DIAGNOSTIC-CONTRACT sec. 11.4).
  *   - AIC-T0306: "'+' operator not applicable to operand type 'bool'";
  *     span: the operator token (recovered from the source text between
  *     the operand spans - the AST does not store operator token spans).
