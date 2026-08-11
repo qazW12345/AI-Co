@@ -1,8 +1,11 @@
 module main;
 // §11.2 — compound assignment operators
-var x: i32 = 10;
-x += 5;
-x -= 3;
-x *= 2;
-x /= 4;
-x %= 3;
+fn main() -> i32 {
+  var x: i32 = 10;
+  x += 5;
+  x -= 3;
+  x *= 2;
+  x /= 4;
+  x %= 3;
+  return 0;
+}

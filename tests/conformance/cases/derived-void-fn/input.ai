@@ -2,3 +2,5 @@ module main;
 // §13.4 — void function (no return value)
 fn noop() -> void {
 }
+
+fn main() -> i32 { return 0; }

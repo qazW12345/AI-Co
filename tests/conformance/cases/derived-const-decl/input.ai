@@ -1,6 +1,7 @@
 module main;
 // §8.1 — constant declaration with compile-time expression
 const PI: i32 = 3;
-const MAX: u64 = 0xFFFF;
+const MAX: u64 = 0xFFFFu64;
 const FLAG: bool = true;
 const LABEL: str = "hello";
+fn main() -> i32 { return 0; }

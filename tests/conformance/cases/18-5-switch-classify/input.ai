@@ -7,3 +7,5 @@ fn classify(n: i32) -> str {
     default: { return "other"; }
   }
 }
+
+fn main() -> i32 { return 0; }

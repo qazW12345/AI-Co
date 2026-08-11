@@ -2,3 +2,5 @@ module main;
 // §18.2 — struct literal with named type
 struct Point { x: i32; y: i32; }
 var q: Point = Point { x: 1, y: 2 };
+
+fn main() -> i32 { return 0; }

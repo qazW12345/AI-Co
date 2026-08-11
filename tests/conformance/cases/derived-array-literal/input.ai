@@ -1,3 +1,5 @@
 module main;
 // §7.2 — array type T[N] and array literal
 var arr: i32[3] = [10, 20, 30];
+
+fn main() -> i32 { return 0; }

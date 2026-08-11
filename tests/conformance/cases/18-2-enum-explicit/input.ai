@@ -1,3 +1,5 @@
 module main;
 // §18.2 — enum with explicit values
 enum Mask: u8 { None = 0, A = 1, B = 2 }
+
+fn main() -> i32 { return 0; }

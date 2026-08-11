@@ -1,3 +1,5 @@
 module main;
 // §18.4 — wrap truncating conversion (300 mod 256 = 44)
 var e: u8 = wrap<u8>(300);
+
+fn main() -> i32 { return 0; }

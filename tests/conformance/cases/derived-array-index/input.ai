@@ -1,4 +1,7 @@
 module main;
 // §7.2 — array indexed access
 var arr: i32[3] = [10, 20, 30];
-var first: i32 = arr[0];
+fn main() -> i32 {
+  var first: i32 = arr[0];
+  return 0;
+}

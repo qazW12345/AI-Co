@@ -6,3 +6,5 @@ var c: i32 = 0xFF ^ 0x0F;
 var d: i32 = 1 << 4;
 var e: i32 = 256 >> 4;
 var f: i32 = ~0;
+
+fn main() -> i32 { return 0; }

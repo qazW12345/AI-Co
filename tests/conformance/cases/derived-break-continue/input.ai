@@ -8,3 +8,16 @@ fn first_even(n: i32) -> i32 {
   }
   return 0 - 1;
 }
+fn main() -> i32 {
+  var sum: i32 = 0;
+  for (var i: i32 = 0; i < 10; i += 1) {
+    if (i % 2 != 0) {
+      continue;
+    }
+    if (i == 6) {
+      break;
+    }
+    sum += i;
+  }
+  return 0;
+}

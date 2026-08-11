@@ -1,4 +1,8 @@
 module main;
-// §18.3 — calling a pub function from imported module
-import a.b;
-var x: i32 = a.b.f();
+// §18.3 — calling a pub function (single-module form)
+pub fn f() -> i32 {
+  return 1;
+}
+fn main() -> i32 {
+  return f();
+}

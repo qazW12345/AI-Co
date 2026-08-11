@@ -5,3 +5,5 @@ var t: str = "tab\there";
 var u: str = "caf\xC3\xA9";
 var v: str = "back\\slash";
 var w: str = "quote\"";
+
+fn main() -> i32 { return 0; }

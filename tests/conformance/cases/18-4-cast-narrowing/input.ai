@@ -1,3 +1,5 @@
 module main;
 // §18.4 — explicit narrowing cast
 var a: i8 = cast<i8>(100);
+
+fn main() -> i32 { return 0; }

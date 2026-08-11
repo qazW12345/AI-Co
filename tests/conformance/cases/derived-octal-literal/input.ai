@@ -1,3 +1,5 @@
 module main;
 // §4.3 — octal literal
 var o: i32 = 0o17;
+
+fn main() -> i32 { return 0; }

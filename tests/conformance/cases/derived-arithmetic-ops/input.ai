@@ -5,3 +5,5 @@ var b: i32 = 10 - 3;
 var c: i32 = 10 * 3;
 var d: i32 = 10 / 3;
 var e: i32 = 10 % 3;
+
+fn main() -> i32 { return 0; }

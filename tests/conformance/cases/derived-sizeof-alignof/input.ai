@@ -4,3 +4,5 @@ var a: usize = sizeof(i32);
 var b: usize = sizeof(bool);
 var c: usize = alignof(i32);
 var d: usize = alignof(bool);
+
+fn main() -> i32 { return 0; }

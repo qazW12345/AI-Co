@@ -3,3 +3,5 @@ module main;
 const MAX: i32 = 100;
 var counter: i32 = 0;
 var label: str = "hello";
+
+fn main() -> i32 { return 0; }

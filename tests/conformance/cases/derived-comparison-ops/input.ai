@@ -6,3 +6,5 @@ var c: bool = 2 > 1;
 var d: bool = 1 >= 1;
 var e: bool = 1 == 1;
 var f: bool = 1 != 2;
+
+fn main() -> i32 { return 0; }

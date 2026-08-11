@@ -1,3 +1,5 @@
 module main;
 // §18.1 — binary integer literal
 var c: i32 = 0b1010;
+
+fn main() -> i32 { return 0; }

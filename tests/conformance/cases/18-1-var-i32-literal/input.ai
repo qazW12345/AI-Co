@@ -1,3 +1,5 @@
 module main;
 // §18.1 — decimal integer literal
 var x: i32 = 42;
+
+fn main() -> i32 { return 0; }

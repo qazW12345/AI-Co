@@ -1,3 +1,5 @@
 module main;
 // §18.1 — bool literal
 var b: bool = true;
+
+fn main() -> i32 { return 0; }

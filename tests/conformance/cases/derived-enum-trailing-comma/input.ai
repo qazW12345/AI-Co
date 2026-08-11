@@ -1,3 +1,5 @@
 module main;
 // §7.5 — enum with trailing comma
 enum Dir: i32 { North, South, East, West, }
+
+fn main() -> i32 { return 0; }

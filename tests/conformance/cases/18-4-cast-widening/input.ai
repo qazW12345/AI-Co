@@ -1,4 +1,5 @@
 module main;
 // §18.4 — implicit widening conversion (i8 -> i16)
-var a: i8 = cast<i8>(100);
+const a: i8 = cast<i8>(100);
 var b: i16 = a;
+fn main() -> i32 { return 0; }

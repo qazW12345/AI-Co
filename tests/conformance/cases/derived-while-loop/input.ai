@@ -7,3 +7,5 @@ fn countdown(n: i32) -> i32 {
   }
   return c;
 }
+
+fn main() -> i32 { return 0; }

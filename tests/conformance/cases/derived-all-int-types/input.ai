@@ -1,12 +1,13 @@
 module main;
 // §7.1 — all integer types declared
-var a: i8 = 0;
-var b: i16 = 0;
-var c: i32 = 0;
-var d: i64 = 0;
-var e: u8 = 0;
-var f: u16 = 0;
-var g: u32 = 0;
-var h: u64 = 0;
-var i: isize = 0;
-var j: usize = 0;
+var a: i8 = 0i8;
+var b: i16 = 0i16;
+var c: i32 = 0i32;
+var d: i64 = 0i64;
+var e: u8 = 0u8;
+var f: u16 = 0u16;
+var g: u32 = 0u32;
+var h: u64 = 0u64;
+var i: isize = 0isize;
+var j: usize = 0usize;
+fn main() -> i32 { return 0; }

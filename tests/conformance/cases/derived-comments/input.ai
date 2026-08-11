@@ -2,4 +2,5 @@ module main;
 // §4.1 — line and block comments
 /* block comment */
 var x: i32 = 1; // line comment
-/* not /* nested */ still comment
+/* not /* nested */
+fn main() -> i32 { return 0; }

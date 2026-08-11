@@ -3,3 +3,5 @@ module main;
 var a: bool = true == true;
 var b: bool = true != false;
 var c: bool = !false;
+
+fn main() -> i32 { return 0; }

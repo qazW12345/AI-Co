@@ -2,5 +2,8 @@ module main;
 // §7.4 — struct field access via dot
 struct Point { x: i32; y: i32; }
 var p: Point = Point { x: 10, y: 20 };
-var vx: i32 = p.x;
-var vy: i32 = p.y;
+fn main() -> i32 {
+  var vx: i32 = p.x;
+  var vy: i32 = p.y;
+  return 0;
+}

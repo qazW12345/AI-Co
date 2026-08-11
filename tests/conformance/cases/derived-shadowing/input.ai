@@ -1,6 +1,9 @@
 module main;
 // §6.1 — shadowing: inner declaration shadows outer
-var x: i32 = 1;
-{
-  var x: i32 = 2;
+fn main() -> i32 {
+  var x: i32 = 1;
+  {
+    var x: i32 = 2;
+  }
+  return 0;
 }

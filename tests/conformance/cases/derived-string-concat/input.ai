@@ -1,3 +1,5 @@
 module main;
 // §4.4 — adjacent string literal concatenation
 var full: str = "hel" "lo";
+
+fn main() -> i32 { return 0; }
