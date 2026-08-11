@@ -41,9 +41,13 @@
  *      declarations of the remaining cycle members.
  *   7. rt.* rules (spec sec. 6.5): module declarations with the reserved "rt"
  *      prefix are N0207; imports of rt submodules outside the runtime
- *      surface are N0208; bare `import rt;` is N0209; runtime members are
- *      not auto-available (a reference to a reserved runtime name without
- *      the matching import is an ordinary undeclared name, N0202).
+ *      surface are N0208; bare `import rt;` is N0209; a valid rt submodule
+ *      import binds a compiler-provided module and registers its Section 15
+ *      surface members as compiler-provided NAME_SYM_FN symbols (decl==NULL,
+ *      public) so with-import references resolve (spec sec. 15.8); runtime
+ *      members are not auto-available (a reference to a reserved runtime
+ *      name without the matching import is an ordinary undeclared name,
+ *      N0202).
  *   8. Records are collected and sorted with the contract sec. 9 comparator
  *      (diag_sort_records) before being returned; every name record is
  *      phase "name", severity "error", recovery "authoritative".
@@ -1000,7 +1004,9 @@ static NameModule *match_module_prefix(NameCtx *c, NameModule *module,
  *  - module-qualified reference: the longest prefix of the chain that is
  *    the current module or an imported module selects the module; the rest
  *    of the chain resolves in that module's scope (visibility checked,
- *    AIC-N0203 for private items reached from another module);
+ *    AIC-N0203 for private items reached from another module); runtime
+ *    submodule members resolve because the rt.* surface is registered as
+ *    compiler-provided symbols (decl==NULL) when the submodule is imported;
  *  - enum member access: EnumType.Member resolves through the enum type
  *    name only;
  *  - value member access (p.x): the base resolves here; the field name is
@@ -1498,6 +1504,84 @@ static void emit_cycle(NameCtx *c, NameModule *const *stack, size_t nstack,
     rec_push(c, r);
 }
 
+/* Register the runtime surface members of a valid rt submodule as
+ * compiler-provided NAME_SYM_FN symbols with decl == NULL (public).
+ * The runtime API is source-visible (spec sec. 15.8: programs may call
+ * any listed function directly) and its signatures are not in the build;
+ * the types package (WP-M0-11) treats a function symbol with no decl as a
+ * runtime built-in. Member lists per spec sec. 15.1-15.4. Returns false
+ * only on allocation failure. */
+static bool register_runtime_surface(NameCtx *c, NameModule *rm)
+{
+    static const char *const mem_members[] = {
+        "alloc_bytes", "dealloc_bytes", "copy", "fill"
+    };
+    static const char *const io_members[] = {
+        "open", "read", "write", "close", "stdin", "stdout", "stderr"
+    };
+    static const char *const proc_members[] = {
+        "args", "exit"
+    };
+    static const char *const trap_members[] = {
+        "report"
+    };
+
+    const char *const *members = NULL;
+    size_t nmembers = 0;
+
+    if (strcmp(rm->fqn, "rt.mem") == 0) {
+        members = mem_members;
+        nmembers = sizeof(mem_members) / sizeof(mem_members[0]);
+    } else if (strcmp(rm->fqn, "rt.io") == 0) {
+        members = io_members;
+        nmembers = sizeof(io_members) / sizeof(io_members[0]);
+    } else if (strcmp(rm->fqn, "rt.proc") == 0) {
+        members = proc_members;
+        nmembers = sizeof(proc_members) / sizeof(proc_members[0]);
+    } else if (strcmp(rm->fqn, "rt.trap") == 0) {
+        members = trap_members;
+        nmembers = sizeof(trap_members) / sizeof(trap_members[0]);
+    } else {
+        return true;   /* not a runtime-surface submodule; nothing to add */
+    }
+
+    for (size_t i = 0; i < nmembers; i++) {
+        const char *name = members[i];
+
+        /* idempotent: a module is registered once, but guard anyway */
+        if (name_module_lookup(rm, name)) continue;
+
+        char *fqn = NULL;
+        {
+            size_t fl = strlen(rm->fqn) + 1 + strlen(name) + 1;
+            fqn = (char *)xmalloc(c, fl);
+            if (!fqn) return false;
+            snprintf(fqn, fl, "%s.%s", rm->fqn, name);
+        }
+        /* decl == NULL: compiler-provided, public, no source span. */
+        NameSymbol *s = symbol_new(c, rm, NAME_SYM_FN, name, fqn,
+                                   true /* is_pub */, NULL /* decl */,
+                                   NULL /* span */, 0 /* module scope */);
+        free(fqn);
+        if (!s) return false;
+
+        /* append to the module scope */
+        if (rm->nmodule_scope == 0) {
+            NameSymbol **nm = (NameSymbol **)xmalloc(c, sizeof(NameSymbol *));
+            if (!nm) return false;
+            rm->module_scope = nm;
+        } else {
+            NameSymbol **nm = (NameSymbol **)realloc(
+                rm->module_scope,
+                (rm->nmodule_scope + 1) * sizeof(NameSymbol *));
+            if (!nm) { c->oom = true; return false; }
+            rm->module_scope = nm;
+        }
+        rm->module_scope[rm->nmodule_scope++] = s;
+    }
+    return true;
+}
+
 /* Load and resolve one import statement in `from`. Handles rt.* rules,
  * canonical path resolution, cycle detection, dedup, file load/lex/parse,
  * module-declaration checks, and recursive module resolution. Returns false
@@ -1549,13 +1633,18 @@ static bool load_and_resolve_import(NameCtx *c, NameModule *from,
             return true;
         }
         /* valid runtime submodule: bind (or reuse) the compiler-provided
-         * module; no user file is consulted. */
+         * module; no user file is consulted. Register the runtime surface
+         * members as compiler-provided NAME_SYM_FN symbols (decl == NULL,
+         * public) so with-import member references resolve through the
+         * name phase (spec sec. 6.5 explicit-import requirement, sec. 15.8
+         * source-visible runtime API). */
         NameModule *rm = module_by_fqn_internal(c, fqn);
         if (!rm) {
             rm = module_new(c, (const char *const *)qn->parts, n, NULL, fqn);
             if (!rm) { free(fqn); return false; }
             rm->is_runtime = true;
             if (!module_push(c, rm)) { free(fqn); return false; }
+            if (!register_runtime_surface(c, rm)) { free(fqn); return false; }
         }
         if (!add_import_edge(c, from, rm)) { free(fqn); return false; }
         free(fqn);

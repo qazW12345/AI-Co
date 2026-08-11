@@ -35,9 +35,13 @@ and the diagnostic contract §11.3 / §7.
   `rt.trap` bind to compiler-provided modules (no user file is
   consulted); `AIC-N0207` for a user `module` with the `rt` prefix,
   `AIC-N0208` for an import of a reserved `rt` submodule outside the
-  runtime surface, `AIC-N0209` for bare `import rt;`. Runtime members are
-  not auto-available: without the matching import a reference resolves
-  as an ordinary undeclared name (`AIC-N0202`).
+  runtime surface, `AIC-N0209` for bare `import rt;`. A valid rt
+  submodule import registers its Section 15 surface members as
+  compiler-provided `NAME_SYM_FN` symbols (`decl == NULL`, public) so
+  with-import member references resolve through the name phase (spec
+  §15.8: the runtime API is source-visible). Runtime members are not
+  auto-available: without the matching import a reference resolves as an
+  ordinary undeclared name (`AIC-N0202`).
 - Reference map: every resolved identifier/named-type/member-chain node
   maps to its symbol (`NameModule::refs`), so the same fully qualified
   name always resolves to the same declaration within a build (spec
@@ -117,12 +121,19 @@ areas.
    with the reserved `rt` prefix is `AIC-N0207`. An import of a reserved
    `rt` submodule outside the runtime surface (the four Section 15
    submodules `rt.mem`, `rt.io`, `rt.proc`, `rt.trap`) is `AIC-N0208`.
-   Bare `import rt;` is `AIC-N0209`. Runtime members are not
-   auto-available: a reference to a reserved runtime name without the
-   matching import resolves as an ordinary undeclared name (`AIC-N0202`,
-   primary span = the reference). No file under `<project_root>/rt/` is
-   ever consulted for a reserved import; a valid runtime submodule
-   import binds to a compiler-provided module with no user source.
+   Bare `import rt;` is `AIC-N0209`. A valid rt submodule import binds a
+   compiler-provided module and registers its Section 15 surface members
+   as compiler-provided `NAME_SYM_FN` symbols (`decl == NULL`, public):
+   with the matching import, `rt.mem.alloc_bytes` etc. resolve through
+   the name phase (spec §15.8: the runtime API is source-visible, and the
+   WP-M0-11 types contract treats a function symbol with no decl as a
+   runtime built-in whose signature is not in the build). Runtime members
+   are not auto-available: a reference to a reserved runtime name without
+   the matching import resolves as an ordinary undeclared name
+   (`AIC-N0202`, primary span = the reference). No file under
+   `<project_root>/rt/` is ever consulted for a reserved import; a valid
+   runtime submodule import binds to a compiler-provided module with no
+   user source.
 8. **Records are collected and sorted before return.** Every name record
    is phase `name`, severity `error`, recovery `authoritative`; records
    are sorted with the contract §9 comparator (`diag_sort_records`).
@@ -193,8 +204,13 @@ Clang build. Expected: `name_test: N checks, 0 failures`, exit 0.
   `AIC-N0205` when the entry module name does not match the manifest.
 - rt.\* rules: `AIC-N0209` for bare `import rt;`, `AIC-N0208` for
   `import rt.internal;`, successful binding of `import rt.mem;` (module
-  registered with `is_runtime`, `path == NULL`), and `AIC-N0202` when a
-  runtime name is referenced without the matching import.
+  registered with `is_runtime`, `path == NULL`), `AIC-N0202` when a
+  runtime name is referenced without the matching import, and positive
+  with-import member resolution: `import rt.mem; rt.mem.alloc_bytes(16)`
+  resolves to a compiler-provided `NAME_SYM_FN` symbol (`decl == NULL`,
+  public) with no record emitted; the full Section 15 member lists
+  (`rt.mem` 4, `rt.io` 7, `rt.proc` 2, `rt.trap` 1) are registered and
+  references to `rt.io.stdout`, `rt.proc.args`, `rt.trap.report` resolve.
 - Integration (multi-module fixtures): private-access `AIC-N0203` with
   cross-module secondary span, `AIC-N0204` not-found, `AIC-N0206` cycle
   (naming the cycle via secondary spans), diamond import reuse

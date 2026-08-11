@@ -473,6 +473,147 @@ static void test_runtime_not_auto_available(void)
 }
 
 /* ---------------------------------------------------------------------------
+ * Runtime surface member registration (spec sec. 6.5 explicit-import
+ * requirement, sec. 15.1-15.4 surface, sec. 15.8 source-visible API)
+ * ------------------------------------------------------------------------- */
+
+static void test_runtime_member_resolves_with_import(void)
+{
+    /* The reviewer probe: with the matching import, rt.mem.alloc_bytes
+     * resolves through the name phase (NAME_OK, no record). */
+    const char *src =
+        "module main;\n"
+        "import rt.mem;\n"
+        "fn main() -> i32 {\n"
+        "  var p: u8* = rt.mem.alloc_bytes(16);\n"
+        "  rt.mem.dealloc_bytes(p);\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.rn == 0);
+    if (p.result) {
+        NameModule *rm = name_module_by_fqn(p.result, "rt.mem");
+        CHECK(rm != NULL);
+        if (rm) {
+            /* the full Section 15.1 surface is registered */
+            CHECK(rm->nmodule_scope == 4);
+            NameSymbol *ab = name_module_lookup(rm, "alloc_bytes");
+            CHECK(ab != NULL);
+            if (ab) {
+                CHECK(ab->kind == NAME_SYM_FN);
+                CHECK(ab->is_pub);
+                CHECK(ab->decl == NULL);
+                CHECK(strcmp(ab->fqn, "rt.mem.alloc_bytes") == 0);
+            }
+            CHECK(name_module_lookup(rm, "dealloc_bytes") != NULL);
+            CHECK(name_module_lookup(rm, "copy") != NULL);
+            CHECK(name_module_lookup(rm, "fill") != NULL);
+            /* the reference maps to the registered member symbol */
+            NameModule *main_m = p.result->modules[0];
+            CHECK(main_m != NULL);
+            if (main_m && ab) {
+                size_t found = 0;
+                for (size_t i = 0; i < main_m->nrefs; i++) {
+                    if (main_m->refs[i].sym == ab) found++;
+                }
+                CHECK(found >= 1);
+            }
+        }
+    }
+    pipeline_free(&p);
+}
+
+static void test_runtime_member_without_import_is_n0202(void)
+{
+    /* The reviewer probe (negative side): even a real surface member name
+     * without the matching import stays an ordinary undeclared name. */
+    const char *src =
+        "module main;\n"
+        "fn main() -> i32 {\n"
+        "  var p: u8* = rt.mem.alloc_bytes(16);\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_DIAG_ERROR);
+    CHECK(p.rn == 1);
+    if (p.rn >= 1) {
+        CHECK(strcmp(p.recs[0]->code, "AIC-N0202") == 0);
+    }
+    pipeline_free(&p);
+}
+
+static void test_runtime_surface_all_submodules(void)
+{
+    /* Importing every rt submodule registers its exact Section 15 member
+     * list; with-import references to a member of each resolve. */
+    const char *src =
+        "module main;\n"
+        "import rt.mem;\n"
+        "import rt.io;\n"
+        "import rt.proc;\n"
+        "import rt.trap;\n"
+        "fn main() -> i32 {\n"
+        "  var h: usize = rt.io.open(\"f\", 0);\n"
+        "  var o: usize = rt.io.stdout();\n"
+        "  rt.io.close(h);\n"
+        "  rt.proc.args();\n"
+        "  rt.trap.report(1, \"boom\");\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    CHECK(p.rn == 0);
+    if (p.result) {
+        NameModule *io = name_module_by_fqn(p.result, "rt.io");
+        CHECK(io != NULL);
+        if (io) {
+            CHECK(io->nmodule_scope == 7);
+            CHECK(name_module_lookup(io, "open") != NULL);
+            CHECK(name_module_lookup(io, "read") != NULL);
+            CHECK(name_module_lookup(io, "write") != NULL);
+            CHECK(name_module_lookup(io, "close") != NULL);
+            CHECK(name_module_lookup(io, "stdin") != NULL);
+            CHECK(name_module_lookup(io, "stdout") != NULL);
+            CHECK(name_module_lookup(io, "stderr") != NULL);
+            NameSymbol *stdout_sym = name_module_lookup(io, "stdout");
+            CHECK(stdout_sym != NULL);
+            if (stdout_sym) {
+                CHECK(stdout_sym->kind == NAME_SYM_FN);
+                CHECK(stdout_sym->is_pub);
+                CHECK(stdout_sym->decl == NULL);
+                CHECK(strcmp(stdout_sym->fqn, "rt.io.stdout") == 0);
+            }
+        }
+        NameModule *proc = name_module_by_fqn(p.result, "rt.proc");
+        CHECK(proc != NULL);
+        if (proc) {
+            CHECK(proc->nmodule_scope == 2);
+            NameSymbol *args = name_module_lookup(proc, "args");
+            CHECK(args != NULL && args->kind == NAME_SYM_FN &&
+                  args->decl == NULL);
+            NameSymbol *exit_sym = name_module_lookup(proc, "exit");
+            CHECK(exit_sym != NULL && exit_sym->kind == NAME_SYM_FN &&
+                  exit_sym->decl == NULL);
+        }
+        NameModule *trap = name_module_by_fqn(p.result, "rt.trap");
+        CHECK(trap != NULL);
+        if (trap) {
+            CHECK(trap->nmodule_scope == 1);
+            NameSymbol *report = name_module_lookup(trap, "report");
+            CHECK(report != NULL && report->kind == NAME_SYM_FN &&
+                  report->decl == NULL);
+        }
+        NameModule *mem = name_module_by_fqn(p.result, "rt.mem");
+        CHECK(mem != NULL && mem->nmodule_scope == 4);
+    }
+    pipeline_free(&p);
+}
+
+/* ---------------------------------------------------------------------------
  * Integration: multi-module fixtures (imports, canonical mapping, cycles)
  * ------------------------------------------------------------------------- */
 
@@ -910,6 +1051,9 @@ int main(void)
     test_import_reserved_rt_submodule();
     test_import_valid_rt_submodule();
     test_runtime_not_auto_available();
+    test_runtime_member_resolves_with_import();
+    test_runtime_member_without_import_is_n0202();
+    test_runtime_surface_all_submodules();
     test_import_and_visibility();
     test_import_not_found();
     test_import_cycle();
