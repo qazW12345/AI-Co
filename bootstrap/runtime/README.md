@@ -434,7 +434,8 @@ To regenerate the enumeration and detect drift, run from the repository root:
 
 ```
 # All Windows API call sites in the runtime library (excluding tests).
-# The `\s*\(` pattern matches actual call sites, not comment mentions:
+# Note: the `\s*\(` pattern also matches call-shaped prose in comments, so
+# the output below includes two comment lines (see Expected result):
 grep -rnE "\b(GetSystemInfo|VirtualAlloc|VirtualFree|MultiByteToWideChar|CreateFileW|SetFilePointerEx|ReadFile|WriteFile|CloseHandle|GetStdHandle|GetCommandLineW)\s*\(" \
   bootstrap/runtime/ --include='*.c' | grep -v _test.c
 
@@ -450,10 +451,11 @@ grep -rnE "\b(LoadLibrary|GetProcAddress|GetLastError|HeapAlloc|LocalAlloc|Globa
 # Expected: no output.
 ```
 
-Expected result: the first grep's output is exactly the 11 distinct functions
-of §3 across 15 call sites (`CloseHandle` 4, `VirtualAlloc` 2, the remaining
-9 functions 1 each; comment mentions such as the `LocalAlloc`/`CreateProcess`
-prose in `rt_proc.c` do not match the call-site pattern), and the third grep
+Expected result: the first grep's output is 17 lines — the 15 executable
+call sites covering exactly the 11 distinct functions of §3 (`CloseHandle` 4,
+`VirtualAlloc` 2, the remaining 9 functions 1 each) plus 2 comment lines whose
+prose matches the call-site pattern (`rt_mem_alloc.c:24` `VirtualAlloc (` /
+`GetSystemInfo (`, `rt_proc.c:9` `GetCommandLineW (`) — and the third grep
 produces no output. If a new runtime-facing Windows call is introduced, this
 document must be updated in the same change (ADR-004 enumeration obligation).
 
