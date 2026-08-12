@@ -1,0 +1,19 @@
+# bootstrap/build/rt_mem_b2.txt
+# WP-M0-14b2 release traps (spec sec. 15.5 / 15.8, DIAGNOSTIC-CONTRACT
+# sec. 10 / 11.8).
+# Area source list (owned by WP-M0-14b2). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level rt_mem_b.txt entry per
+# manifest §5 (sub-split WP-M0-14b1/14b2).
+#
+# rt_mem_trap.c depends on the WP-M0-06 diag record shape
+# (bootstrap/src/diag/diag.h); the diag sources are listed in the
+# WP-M0-06-owned fragment bootstrap/build/diag.txt, which the aggregate
+# build includes.
+#
+# rt_mem_trap_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with the library sources (see the build comment at the
+# top of rt_mem_trap_test.c).
+bootstrap/runtime/rt_mem/rt_mem_trap.c
