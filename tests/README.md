@@ -26,6 +26,13 @@ Each corpus case is a directory under `tests/<corpus>/cases/<case-name>/` contai
 
 A corpus-level `manifest.json` lists all case names with `{"schema_version": 1}`.
 
+Schema strictness (manifest §1a, normative): missing/extra fields are format
+errors, not silent passes. Unknown fields are rejected in `manifest.json`,
+`meta.json`, and each `expected.json` record. `stdout` is required on `run`
+expected records (no silent `""` default). In diagnostic records, `recovery`
+is required on `error`/`trap` records and optional on `warning`/`note`
+records, per DIAGNOSTIC-CONTRACT §3.
+
 ## Running the harness
 
 **Language**: Python 3.11.15 (`python`, NOT `python3`).
@@ -61,6 +68,10 @@ python -m tests.harness identity --stage1 <dir> --stage2 <dir> [--pe1 <pe>] [--p
 ```bash
 python -m tests.harness manifest <path-to-build-manifest.json>
 ```
+
+The validator rejects stage/identity fields (`stage`, `host_compiler`,
+FIND-G2-03), requires `build_options` to be a list (sorted), and reports
+missing required fields as format errors.
 
 ## Running unit tests
 

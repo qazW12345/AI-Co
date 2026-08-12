@@ -26,7 +26,16 @@ REQUIRED_DIAG_FIELDS = {
     "phase": str,
     "message": str,
     "primary_span": (dict, type(None)),
-    "recovery": str,
+}
+
+# All fields a diagnostic record may contain per DIAGNOSTIC-CONTRACT §3-§4
+# (required + optional).  Unknown fields in expected records are format
+# errors per manifest §1a ("missing/extra fields are format errors").
+KNOWN_DIAG_RECORD_FIELDS = {
+    "schema_version", "code", "severity", "phase", "message",
+    "primary_span", "recovery", "secondary_spans",
+    "expected", "actual", "causes", "corrections", "related",
+    "trap_code", "exit_code",
 }
 
 VALID_SEVERITIES = {"error", "warning", "note"}
@@ -116,6 +125,13 @@ def validate_diag_record(record: dict[str, Any], *, strict: bool = True) -> None
     if not isinstance(record, dict):
         raise SchemaError(f"diagnostic record must be object, got {type(record).__name__}")
 
+    # Manifest §1a: extra fields in expected records are format errors
+    for key in record:
+        if key not in KNOWN_DIAG_RECORD_FIELDS:
+            raise SchemaError(
+                f"diagnostic record contains unknown field '{key}'"
+            )
+
     # Check required fields exist with correct types
     for field_name, expected_type in REQUIRED_DIAG_FIELDS.items():
         if field_name not in record:
@@ -152,7 +168,7 @@ def validate_diag_record(record: dict[str, Any], *, strict: bool = True) -> None
 
     # recovery is required on error and trap records
     if record["severity"] == "error" or record["phase"] == "trap":
-        if record["recovery"] not in VALID_RECOVERIES:
+        if record.get("recovery") not in VALID_RECOVERIES:
             raise SchemaError(
                 f"record.recovery must be one of {VALID_RECOVERIES} "
                 f"(required for error/trap), got '{record.get('recovery')}'"
@@ -182,11 +198,18 @@ def validate_expected(expected: dict[str, Any], corpus: str) -> RunExpected | Di
         raise SchemaError("expected.json missing 'kind' field")
 
     if kind == "run":
+        # Validate allowed fields for run expected
+        allowed_keys = {"kind", "stdout", "exit_code", "stderr_contains", "trap"}
+        for key in expected:
+            if key not in allowed_keys:
+                raise SchemaError(f"expected.json contains unknown field '{key}' for run record")
         if "exit_code" not in expected:
             raise SchemaError("run expected record missing 'exit_code'")
         if not isinstance(expected["exit_code"], int):
             raise SchemaError(f"exit_code must be int, got {type(expected['exit_code']).__name__}")
-        stdout = expected.get("stdout", "")
+        if "stdout" not in expected:
+            raise SchemaError("run expected record missing 'stdout'")
+        stdout = expected["stdout"]
         if not isinstance(stdout, str):
             raise SchemaError(f"stdout must be string, got {type(stdout).__name__}")
         stderr_contains = expected.get("stderr_contains", [])
@@ -204,6 +227,11 @@ def validate_expected(expected: dict[str, Any], corpus: str) -> RunExpected | Di
         )
 
     elif kind == "diagnostics":
+        # Validate allowed fields for diagnostics expected
+        allowed_keys = {"kind", "records"}
+        for key in expected:
+            if key not in allowed_keys:
+                raise SchemaError(f"expected.json contains unknown field '{key}' for diagnostics record")
         records = expected.get("records", [])
         if not isinstance(records, list):
             raise SchemaError("diagnostics records must be array")
@@ -222,6 +250,11 @@ def validate_meta(meta: dict[str, Any]) -> Meta:
     """Validate and parse meta.json content."""
     if not isinstance(meta, dict):
         raise SchemaError("meta.json must be a JSON object")
+    # Manifest §1a: extra fields in meta.json are format errors
+    known_meta_fields = {"spec_ref", "codes", "deferral_reason"}
+    for key in meta:
+        if key not in known_meta_fields:
+            raise SchemaError(f"meta.json contains unknown field '{key}'")
     return Meta(
         spec_ref=meta.get("spec_ref", ""),
         codes=meta.get("codes", []),
@@ -299,5 +332,11 @@ def load_manifest(manifest_path: str) -> dict[str, Any]:
         if name in seen:
             raise SchemaError(f"duplicate case name '{name}'")
         seen.add(name)
+
+    # Manifest §1a: reject unknown top-level fields
+    known_keys = {"schema_version", "corpus", "description", "cases"}
+    for key in manifest:
+        if key not in known_keys:
+            raise SchemaError(f"manifest.json contains unknown field '{key}'")
 
     return manifest

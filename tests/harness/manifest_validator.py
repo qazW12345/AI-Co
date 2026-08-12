@@ -113,9 +113,11 @@ def validate_manifest(manifest_path: str) -> ManifestValidationResult:
             f"project_root must be relative, got '{project_root}'"
         )
 
-    # Check build_options is sorted
-    build_options = manifest.get("build_options", [])
-    if isinstance(build_options, list):
+    # Check build_options is a list and sorted
+    build_options = manifest.get("build_options")
+    if not isinstance(build_options, list):
+        errors.append("build_options must be a list")
+    else:
         if build_options != sorted(build_options):
             errors.append("build_options must be in sorted order")
 
@@ -188,6 +190,15 @@ def validate_manifest(manifest_path: str) -> ManifestValidationResult:
             errors.append(
                 f"manifest must not contain self-referential hash field '{key}' "
                 f"(FIND-G2-02: self-hash exclusion)"
+            )
+
+    # STAGE-IDENTITY FIELDS (FIND-G2-03): reject known stage/identity keys
+    stage_identity_fields = {"stage", "host_compiler"}
+    for key in stage_identity_fields:
+        if key in manifest:
+            errors.append(
+                f"manifest must not contain stage/identity field '{key}' "
+                f"(FIND-G2-03: stage-invariance enforcement)"
             )
 
     # Check entry_module
