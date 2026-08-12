@@ -1,5 +1,7 @@
 module main;
+import rt.proc;
 
 pub fn main() -> void {
-  var x: i8 = cast<i8>(200i32);
+  var n: i32 = cast<i32>(len(rt.proc.args()));
+  var x: i8 = cast<i8>(200i32 + n);
 }
