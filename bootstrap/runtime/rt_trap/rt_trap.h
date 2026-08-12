@@ -77,6 +77,20 @@
  * (the caller code). This matches the 14b2/15a1/15a2 trap-record
  * conventions and the user-trap golden fixture shape
  * (bootstrap/src/diag/golden/user-trap-null-span.jsonl).
+ *
+ * Line endings and CRT text-mode translation: at the emitter/DiagBuf
+ * level (and in rt_trap_format's in-process byte assertions) the
+ * record is a single LF-terminated JSONL line. On the live trap path
+ * the record is written to the C standard error stream via fwrite,
+ * and on the ADR-004 Windows baseline the CRT standard streams are
+ * text-mode by default: the CRT translates each LF to CRLF at the OS
+ * handle, so the bytes observed on a console, pipe, or file capture
+ * are CRLF-terminated ("...}\r\n"). This matches every sibling trap
+ * path (14b2/15a1/15a2 and the rt_mem AIC-R0812 path) and is not a
+ * contract deviation: DIAGNOSTIC-CONTRACT sec. 10 defines the JSONL
+ * record fields and shape, not the physical line terminator of the
+ * text-mode stderr stream. Both byte forms are deterministic; only
+ * the observation level differs.
  */
 #ifndef AICO_BOOTSTRAP_RUNTIME_RT_TRAP_RT_TRAP_H
 #define AICO_BOOTSTRAP_RUNTIME_RT_TRAP_RT_TRAP_H
