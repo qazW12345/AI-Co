@@ -1,26 +1,4 @@
 {
   "kind": "diagnostics",
-  "records": [
-    {
-      "schema_version": "1",
-      "code": "AIC-E0401",
-      "severity": "error",
-      "phase": "semantic",
-      "message": "expression is not a constant expression",
-      "primary_span": {
-        "file": "input.ai",
-        "start": {
-          "line": 2,
-          "col": 7,
-          "offset": 19
-        },
-        "end": {
-          "line": 2,
-          "col": 8,
-          "offset": 20
-        }
-      },
-      "recovery": "authoritative"
-    }
-  ]
+  "records": []
 }
