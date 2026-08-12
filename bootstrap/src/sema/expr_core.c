@@ -106,14 +106,16 @@ ExprPrecedence expr_precedence_of(const AstNode *expr)
 typedef struct PlanCtx {
     ExprStep *steps;
     size_t nsteps, cap;
-    bool oom;
+    bool oom;          /* allocation failure; nothing owned */
+    bool unsupported;  /* defensive: unknown/malformed node kind;
+                        * nothing owned */
 } PlanCtx;
 
 static bool plan_push(PlanCtx *c, ExprStepKind kind, const AstNode *node,
                       bool conditional)
 {
     ExprStep *grown;
-    if (c->oom) return false;
+    if (c->oom || c->unsupported) return false;
     if (c->nsteps == c->cap) {
         size_t ncap = c->cap ? c->cap * 2 : 16;
         grown = (ExprStep *)realloc(c->steps, ncap * sizeof(ExprStep));
@@ -138,7 +140,7 @@ static void plan_of(PlanCtx *c, const AstNode *expr, bool as_location,
                     bool conditional)
 {
     size_t i;
-    if (!expr || c->oom) return;
+    if (!expr || c->oom || c->unsupported) return;
     switch (expr->kind) {
     case AST_EXPR_INT_LITERAL:
     case AST_EXPR_STR_LITERAL:
@@ -270,8 +272,9 @@ static void plan_of(PlanCtx *c, const AstNode *expr, bool as_location,
         plan_push(c, EXPR_STEP_VALUE, expr, conditional);
         return;
     default:
-        /* defensive: unknown expression node kind - no steps */
-        c->oom = true;
+        /* defensive: unknown/malformed expression node kind - no
+         * steps; the header contract returns EXPR_ORDER_UNSUPPORTED */
+        c->unsupported = true;
         return;
     }
 }
@@ -285,6 +288,10 @@ ExprOrderStatus expr_order_plan(const AstNode *expr, bool as_location,
     if (!expr) return EXPR_ORDER_UNSUPPORTED;
     memset(&c, 0, sizeof(c));
     plan_of(&c, expr, as_location, false);
+    if (c.unsupported) {
+        free(c.steps);
+        return EXPR_ORDER_UNSUPPORTED;
+    }
     if (c.oom) {
         free(c.steps);
         return EXPR_ORDER_OOM;
