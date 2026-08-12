@@ -260,8 +260,9 @@ static void stmt_register_label(StmtCtx *c, const NameModule *module,
 
     st = const_eval_expr(&c->ev, value, &v, &fail);
     if (st == EVAL_OOM) { c->ev.oom = true; return; }
-    if (st == EVAL_UNSUPPORTED) { c->unsupported = true; return; }
-    if (st != EVAL_OK) return;      /* NOT_CONST / FAILURE: upstream owns */
+    if (st != EVAL_OK) return;      /* NOT_CONST / FAILURE / UNSUPPORTED:
+                                     * skipped - the const-context stages
+                                     * own those records (header contract) */
     if (v.kind != EVAL_VAL_INT) {   /* defensive; a valid pipeline never */
         eval_value_free(&v);        /* reaches here (selector is int/enum) */
         return;

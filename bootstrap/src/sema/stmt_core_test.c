@@ -258,7 +258,9 @@ static void test_terminators_ok(void)
 static void test_e0412_corpus(void)
 {
     /* byte-identical to tests/negative/cases/18-5-semantic-case-no-terminate
-     * (the E0412 record; E0416 belongs to 13c2 and is not produced here) */
+     * except a trailing EOF newline the corpus file lacks (spans
+     * unaffected); the E0412 record; E0416 belongs to 13c2 and is not
+     * produced here */
     static const char src[] =
         "module main;\n"
         "fn bad(n: i32) -> i32 {\n"
@@ -331,7 +333,9 @@ static void test_e0412_more(void)
 
 static void test_e0413_corpus(void)
 {
-    /* byte-identical to tests/negative/cases/derived-semantic-duplicate-case */
+    /* byte-identical to tests/negative/cases/derived-semantic-duplicate-case
+     * except a trailing EOF newline the corpus file lacks (spans
+     * unaffected) */
     static const char src[] =
         "module main;\n"
         "fn main() -> i32 {\n"
@@ -417,7 +421,9 @@ static void test_e0413_nonduplicate_and_enum(void)
 
 static void test_e0414_corpus(void)
 {
-    /* byte-identical to tests/negative/cases/derived-semantic-break-outside-loop */
+    /* byte-identical to tests/negative/cases/derived-semantic-break-outside-loop
+     * except a trailing EOF newline the corpus file lacks (spans
+     * unaffected) */
     static const char src[] =
         "module main;\n"
         "fn main() -> i32 {\n"
@@ -599,7 +605,62 @@ static void test_boundaries(void)
 }
 
 /* ---------------------------------------------------------------------------
- * 6. Determinism: two runs produce byte-identical records
+ * 6. EVAL_UNSUPPORTED case label: skipped, walk continues (MIN-1 fix)
+ * ------------------------------------------------------------------------- */
+
+static void test_eval_unsupported_label_skip(void)
+{
+    /* An EVAL_UNSUPPORTED case label (`&C` where C is a const;
+     * address-of-const is AIC-E0402, owned by a later package, so the
+     * evaluator returns EVAL_UNSUPPORTED with no record - eval_core.h
+     * boundary note) must be SKIPPED in duplicate detection and must
+     * NOT abort the build walk: a later switch in the same build with
+     * a genuine E0412 violation still produces its record (header
+     * contract: labels that do not evaluate are skipped; the
+     * const-context stages own those records). */
+    static const char src[] =
+        "module main;\n"
+        "const C: i32 = 1;\n"
+        "fn f(x: i32) -> i32 {\n"
+        "  switch (x) {\n"
+        "    case &C: { break; }\n"          /* EVAL_UNSUPPORTED label */
+        "    default: { break; }\n"
+        "  }\n"
+        "  return 0;\n"
+        "}\n"
+        "fn g(n: i32) -> i32 {\n"
+        "  switch (n) {\n"
+        "    case 0: { var q: i32 = 1; }\n"  /* E0412: no terminator */
+        "    case 1: { return 1; }\n"
+        "  }\n"
+        "}\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    if (p.st != NAME_OK) { pipeline_free(&p); return; }
+    /* the `&C` label is EVAL_UNSUPPORTED in the const stages too:
+     * 12a does not own case labels, 13b1/13b2 mark defensive with no
+     * record - so stmt_core is the only stage that sees the site */
+    CHECK(p.esc == CONST_EVAL_OK);
+    CHECK(p.xsc == EXPR_CORE_UNSUPPORTED);
+    CHECK(p.xrn == 0);
+    CHECK(p.osc == EXPR_OPS_UNSUPPORTED);
+    CHECK(p.opsrn == 0);
+    /* stmt_core skips the label and CONTINUES: g's E0412 is emitted */
+    CHECK(p.ssc == STMT_CORE_DIAG_ERROR);   /* NOT STMT_CORE_UNSUPPORTED */
+    CHECK(p.srn == 1);
+    if (p.srn != 1) { pipeline_free(&p); return; }
+    check_fail_span(p.srecs[0], src, "AIC-E0412", "case 0", 6);
+    check_message(p.srecs[0],
+                  "switch case 0 body lacks a terminating statement; "
+                  "fall-through is prohibited");
+    pipeline_free(&p);
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. Determinism: two runs produce byte-identical records
  * ------------------------------------------------------------------------- */
 
 static void test_determinism(void)
@@ -669,6 +730,8 @@ int main(void)
     fprintf(stderr, "after test_e0414_continue_and_switch\n");
     test_boundaries();
     fprintf(stderr, "after test_boundaries\n");
+    test_eval_unsupported_label_skip();
+    fprintf(stderr, "after test_eval_unsupported_label_skip\n");
     test_determinism();
     fprintf(stderr, "after test_determinism\n");
 
