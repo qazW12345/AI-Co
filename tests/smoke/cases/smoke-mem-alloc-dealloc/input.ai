@@ -2,6 +2,7 @@ module main;
 import rt.mem;
 
 pub fn main() -> i32 {
+  // Exit 0 presumes alloc_bytes(16) succeeds (memory availability is an environmental input, Section 15.6).
   var p: u8* = rt.mem.alloc_bytes(16);
   if (p == null) { return 1; }
   rt.mem.dealloc_bytes(p);

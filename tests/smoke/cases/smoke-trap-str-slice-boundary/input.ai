@@ -1,6 +1,6 @@
 module main;
 
 pub fn main() -> void {
-  var s: str = "H\u{00e9}llo";
+  var s: str = "H\xC3\xA9llo";
   var sl: str = s[1..2];
 }
