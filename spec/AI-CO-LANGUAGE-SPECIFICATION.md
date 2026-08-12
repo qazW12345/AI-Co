@@ -1,10 +1,10 @@
-# AI-Co Language Specification v0.1.4 (Accepted)
+# AI-Co Language Specification v0.1.5 (Accepted)
 
 **Status:** Accepted
 **Owner:** Planner
 **Decision owner:** Main Designer (architecture); decisions recorded in ADR-004 are Human Sponsor approvals and are applied here as governing direction.
 **Approver:** Main Designer (architectural acceptance); Reviewer (independent conformance review); Marcel (Human Sponsor) for purpose-affecting questions.
-**Version:** 0.1.4
+**Version:** 0.1.5
 **Date:** 2026-08-12
 **Scope:** project AI-Co
 
@@ -17,10 +17,11 @@ This specification is derived from, and must not contradict:
 3. `docs/adr/ADR-002-minimal-core-language-semantics.md` (Accepted)
 4. `docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md` (Superseded by ADR-004; retained as historical evidence of the Main Designer's interim containment response)
 5. `docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md` (Accepted; Human Sponsor resolutions on the escalated open questions; supersedes the targeted parts of ADR-003 and ADR-002 identified therein)
-6. `research/ENVIRONMENT_BASELINE_2026-08-08.md` (evidence)
-7. `../../governance/CONSTITUTION.md` and `../../governance/OPERATIONS_MANUAL.md`
-8. Marcel's accepted base direction as durably captured in the charter.
-9. `docs/reviews/INITIAL-ARCHITECTURE-REVIEW-2026-08-08.md` (Approved with Minor findings; FIND-001/FIND-002 architecture-resolved, FIND-003/FIND-004/FIND-005 Planner gates closed in this specification).
+6. `docs/adr/ADR-005-rt-io-standard-stream-failure-contract.md` (Accepted; supersedes only the §15.2 standard-stream `never 0` parenthetical for `rt.io.stdin()`/`rt.io.stdout()`/`rt.io.stderr()`)
+7. `research/ENVIRONMENT_BASELINE_2026-08-08.md` (evidence)
+8. `../../governance/CONSTITUTION.md` and `../../governance/OPERATIONS_MANUAL.md`
+9. Marcel's accepted base direction as durably captured in the charter.
+10. `docs/reviews/INITIAL-ARCHITECTURE-REVIEW-2026-08-08.md` (Approved with Minor findings; FIND-001/FIND-002 architecture-resolved, FIND-003/FIND-004/FIND-005 Planner gates closed in this specification).
 
 This document is an *Accepted* normative specification (2026-08-08). It was a Proposed normative draft until the required review gates passed: Planner self-review, independent Reviewer conformance review, and Main Designer architectural acceptance. The review gates in Section 21 are now met; see Section 21 for the acceptance record.
 
@@ -896,7 +897,7 @@ The runtime is project-owned and small (ADR-002). It is exposed as the reserved 
 - `rt.io.read(handle: usize, buf: u8[], count: usize) -> usize` — reads up to `count` bytes into `buf` (must have `len(buf) >= count`, else trap `AIC-R0807`); returns the number of bytes read (0 at EOF). Invalid handle → trap `AIC-R0814`.
 - `rt.io.write(handle: usize, buf: u8[], count: usize) -> usize` — writes up to `count` bytes from `buf`; returns bytes written. Invalid handle → trap `AIC-R0814`.
 - `rt.io.close(handle: usize) -> void` — closes; closing an invalid or already-closed handle is a trap `AIC-R0814`.
-- `rt.io.stdin() -> usize`, `rt.io.stdout() -> usize`, `rt.io.stderr() -> usize` — returns the standard stream handles (never `0`).
+- `rt.io.stdin() -> usize`, `rt.io.stdout() -> usize`, `rt.io.stderr() -> usize` — return the standard stream handle after successful registration (a nonzero runtime-managed handle), or `0` when the process environment supplies no valid corresponding OS standard handle or when the runtime handle table is exhausted (ADR-005). `0` is an explicit failure value, not a trap. An available stream successfully registered never returns `0`; repeated successful calls return the cached handle. A conforming implementation must not fabricate a successful stream, silently redirect an absent stream to a null device, or expose an invalid OS handle as a nonzero successful runtime handle.
 - I/O operates on bytes; no text translation, no buffering semantics beyond what the OS provides (deterministic per run).
 
 ### 15.3 Module `rt.proc` (process)
@@ -935,7 +936,7 @@ Stack exhaustion: recursion that exhausts the available stack is a deterministic
 
 ### 15.6 Environmental inputs
 
-File contents, available memory, and system-provided arguments are environmental inputs: they influence observable behavior deterministically but are not language ambiguity (ADR-002). Given identical inputs and identical environmental inputs, behavior is identical.
+File contents, available memory, system-provided arguments, the availability of OS standard handles, and runtime resource availability (for example, handle-table capacity) are environmental inputs: they influence observable behavior deterministically but are not language ambiguity (ADR-002). Given identical inputs and identical environmental inputs, behavior is identical.
 
 ### 15.7 Calling convention and ABI obligations (internal contract)
 
@@ -1196,6 +1197,7 @@ pub fn main() -> i32 {
 | ADR-002 modules | module decl; imports name modules; one project root; cycle rejection; explicit visibility | §6 | negative suite |
 | ADR-002 runtime | small runtime; platform calls behind modules; no FFI promise | §15 | smoke suite |
 | ADR-002 failure model | valid program fully specified; invalid rejected; dynamic failure = named trap | §2, §15 | trap suite |
+| ADR-005 standard-stream failure contract | standard-stream accessors return a nonzero handle after successful registration; `0` explicit failure value on absent OS standard handle or handle-table exhaustion; no trap; no fabricated stream, null-device redirect, or invalid OS handle as nonzero success; cached handle on repeated successful calls | §15.2, §15.6 | conformance + trap suite (absent-handle and full-table cases) |
 | Review FIND-001 | exact bootstrap comparison artifacts/inputs, zero metadata rules, accepted linker modes, raw byte identity, no normalization | §16.2–16.3 | M1 acceptance evidence |
 | Review FIND-002 | external linker time-bounded; milestone boundaries and acceptance criteria | §16.5 | M1/M2 gates |
 | Review FIND-003 | explicit function-pointer necessity evaluation | §17.3 | spec review |
@@ -1218,7 +1220,7 @@ pub fn main() -> i32 {
 Self-checklist against the task acceptance criteria:
 
 - [x] Status/owner/version/authority and normative vocabulary explicit — header, §2.
-- [x] All accepted ADRs and supersession are accurately represented — header, §19 (ADR-001, ADR-002 accepted; ADR-003 superseded by ADR-004; ADR-004 accepted).
+- [x] All accepted ADRs and supersession are accurately represented — header, §19 (ADR-001, ADR-002, ADR-004, ADR-005 accepted; ADR-003 superseded by ADR-004).
 - [x] Every syntax form has exactly one grammar interpretation; `pub`, postfix types, struct literals, runtime imports, case braces, and negative literals are coherent — §4.3, §5.2, §6.5, §12.7, §13.2.
 - [x] Every supported operation has static and dynamic semantics or a specified rejection — §10–§13.
 - [x] No undefined/unspecified/implementation-defined behavior remains in the stated minimal set; accepted raw-pointer limits and deferred features are explicit — §2.2, §11.3, §12.8, `OPEN-QUESTIONS.md`.
@@ -1246,6 +1248,7 @@ Self-checklist against the task acceptance criteria:
   - FIND-005 (diagnostic schema v1, code registry, compatibility): closed in `DIAGNOSTIC-CONTRACT.md` (schema version 1; Sections 5, 11.9, and 11.10 of that document).
   - FIND-G2-01..09 (gate-2 conformance review, 2026-08-08): corrected in the correction round below; closure confirmed by the gate-2 re-review round 1 (2026-08-08), with FIND-G2-08's residual RER-G2-01 closed in the entry below.
 - Changes from review will be recorded as new versions of this document; supersession is handled per organization governance.
+- **v0.1.5 (2026-08-12):** aligned §15.2 with ADR-005 (Main Designer ruling t_ace8dae7; ADR-005 committed at de3e380). The standard-stream accessors `rt.io.stdin()`, `rt.io.stdout()`, `rt.io.stderr()` now state: a nonzero runtime-managed handle after successful registration; `0` — an explicit failure value, not a trap — when the process environment supplies no valid corresponding OS standard handle or the runtime handle table is exhausted; an available stream successfully registered never returns `0`; repeated successful calls return the cached handle; no fabricated stream, silent null-device redirect, or invalid OS handle presented as nonzero success. ADR-005 supersedes only the previous `never 0` parenthetical; all other §15.2 obligations are unchanged. §15.6 now enumerates OS standard-handle availability and runtime resource availability as environmental inputs; §19 carries an ADR-005 traceability row. No production-source change (implementation a5921a3 already conforms). Authority: ADR-005 (Main Designer decision within delegated project-architecture authority; no Human Sponsor gate). Reviewer conformance re-review pending per OM §6.1.
 - **v0.1.4 (2026-08-12):** applied the Planner duplicate-default ruling R-2 (parent card t_4afe0ff3 comment 916, closing reviewer2 MIN-2 of review t_21ae48ed): §13.2 now states that a duplicate `default` clause is **rejected** with `AIC-E0420` (new code allocated in `DIAGNOSTIC-CONTRACT.md` §11.5 as the next unused code in class `E` per §11.9; registry note and §14 review-state entry added there). No other §13.2 change, no grammar change, no DIAGNOSTIC-CONTRACT schema/version change (stays `"1"` / 0.1.1). Authority: Planner per milestone plan §9 (spec/contract ambiguity → Planner); ambiguity ruling within accepted direction — no new architecture decision, no ADR/contract change, no Human Sponsor gate. Implementation: senior_specialist remediation card t_2532c371 (stmt_core duplicate-default detection + negative-corpus anchor `derived-semantic-duplicate-default`); Reviewer re-review pending per OM §6.1.
 - **v0.1.3 (2026-08-12):** applied the Planner ambiguity ruling t_dcb5540e (escalation from WP-M0-13a2 t_b174081d, specialist evidence comment 744): made the initializer **syntactically optional** for `var` declarations in §5.2 — `var_decl = "var" IDENT ":" type [ "=" expr ] ";"` and `global_var_decl = "var" IDENT ":" type [ "=" const_expr ] ";"`. A `var` declaration without an initializer is a valid parse; the rejection is the semantic rule `AIC-E0403` (spec §8.2, DIAGNOSTIC-CONTRACT §11.5, corpus anchor `derived-semantic-missing-init`) — previously unreachable because the grammar required `=`. `const` forms are unchanged (initializer remains syntactically required; missing `=` stays `AIC-S0101`). Decision record: `docs/planning/AI-CO-PLANNER-RULING-E0403-MISSING-INIT-2026-08-12.md`. Authority: Planner per milestone plan §9 (spec/contract ambiguity → Planner); ambiguity ruling within accepted direction — no new architecture decision, no ADR/contract change, no Human Sponsor gate. Follow-up owners: senior_specialist (parser leniency fix, WP-M0-09 area; then WP-M0-13a2 E0403 enforcement), Reviewer (independent verification of this revision pending).
 - **v0.1.2 (2026-08-11):** applied the Main Designer-approved precision amendments recorded in t_5f69de3e comment 216 (2026-08-11): (1) §18.1 lexical example `var h: u64 = 0xFF_FF;` corrected to `0xFF_FFu64` (u64-suffixed literal) so the example conforms to the §4.3 literal-typing rule and the §11.1 Table 11.1 conversion whitelist (no i32→u64 implicit conversion exists); (2) §10.5 constant-expression enumeration now explicitly includes recursively constant composite literals (struct literals, array literals, and repetition-form array literals) whose element/field/count expressions are constant expressions; (3) §18 conventions paragraph now states that examples illustrate individual constructs and are not necessarily complete programs, and that a complete runnable program requires an entry module declaring `fn main() -> i32` or `fn main() -> void` per §15.3. The amendment text was applied exactly as accepted by the Main Designer; no semantic expansion, no §18.4 change, no diagnostic-contract or ADR change. Authority: Main Designer decision t_5f69de3e comment 216; Planner authored and applied this revision; independent Reviewer verification of this artifact is pending per the Planner follow-up task t_9410ebc6.
