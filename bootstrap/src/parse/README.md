@@ -99,6 +99,18 @@ the dump format, and the ownership helpers live in the ast package.
     (valid UTF-8 text, token stream ending in exactly one EOF token) and
     always terminates on EOF; the `cur_is_eof` guard is checked at every
     loop and entry point.
+11. **Missing initializer on `var` declarations** (spec §5.2 v0.1.3,
+    Planner ruling t_dcb5540e). `var_decl` and `global_var_decl` accept an
+    optional `"=" expr`; a missing initializer leaves `init == NULL` with
+    **no** syntax record and the declaration is kept in the AST (it is not
+    dropped by recovery). The rejection is the semantic rule `AIC-E0403`
+    (spec §8.2), emitted later in the pipeline. `const_decl` /
+    `global_const_decl` keep the strict grammar: a missing `=` is still
+    `AIC-S0101` and the declaration is dropped by recovery (unchanged).
+    Note: `ast_dump()` in the ast package does not yet render a declaration
+    with `init == NULL` (`dump_node` requires a non-NULL child), so the
+    parse tests assert the lenient form structurally on the AST rather
+    than via golden dumps.
 
 ## Diagnostics emitted (contract §11.2; all phase `syntax`, severity
 `error`)
@@ -149,6 +161,11 @@ Clang build. Expected: `parse_test: N checks, 0 failures`, exit 0.
   phases, recovery flags, and spans (single- and two-error files), plus
   record validation and deterministic JSONL emission with
   `recovery_derived` visible.
+- Missing-initializer leniency (Planner ruling t_dcb5540e): local and
+  module-scope `var` declarations without `=` parse with `init == NULL`
+  and no syntax record (asserted structurally on the AST, incl. for-init
+  reuse); `const` forms with a missing `=` still report `AIC-S0101
+  "expected '='"` and are dropped by recovery.
 - Re-execution of the parser-owned negative-corpus anchors against the
   real fixture files under `tests/negative/cases/` (read-only).
 

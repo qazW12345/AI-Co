@@ -1724,7 +1724,10 @@ static AstNode *parse_statement(ParseCtx *c)
     return parse_expr_stmt(c);
 }
 
-/* local var/const decl: ("var"|"const") IDENT ":" type "=" expr ";" */
+/* local var/const decl:
+ * var_decl = "var" IDENT ":" type [ "=" expr ] ";" (init optional per
+ *            spec sec. 5.2 v0.1.3, Planner ruling t_dcb5540e)
+ * const_decl = "const" IDENT ":" type "=" expr ";" (init required) */
 static AstNode *parse_local_var_decl(ParseCtx *c, bool is_const)
 {
     size_t s = c->pos;
@@ -1751,10 +1754,18 @@ static AstNode *parse_local_var_decl(ParseCtx *c, bool is_const)
     type = parse_type(c);
     if (!type) { ast_node_free(node); return NULL; }
     node->u.local_decl.type = type;
-    if (!expect_punct(c, PUNCT_ASSIGN)) { ast_node_free(node); return NULL; }
-    init = parse_expr(c);
-    if (!init) { ast_node_free(node); return NULL; }
-    node->u.local_decl.init = init;
+    /* var_decl: the initializer is optional — a missing one leaves
+     * init == NULL with no syntax record, and the semantic stage rejects
+     * it (AIC-E0403, spec sec. 8.2). const_decl keeps the strict grammar
+     * (missing "=" is AIC-S0101 and the declaration is dropped by
+     * recovery). Planner ruling t_dcb5540e, spec sec. 5.2 v0.1.3. */
+    if (is_const || cur_is_punct(c, PUNCT_ASSIGN)) {
+        if (is_const && !expect_punct(c, PUNCT_ASSIGN)) { ast_node_free(node); return NULL; }
+        if (!is_const) advance(c);
+        init = parse_expr(c);
+        if (!init) { ast_node_free(node); return NULL; }
+        node->u.local_decl.init = init;
+    }
     if (!expect_punct(c, PUNCT_SEMI)) { ast_node_free(node); return NULL; }
     node->span = span_from(c, s, c->pos);
     return node;
@@ -2373,7 +2384,9 @@ fail:
 }
 
 /* global_var_decl / global_const_decl:
- * ("var"|"const") IDENT ":" type "=" const_expr ";" */
+ * global_var_decl = "var" IDENT ":" type [ "=" const_expr ] ";" (init
+ *                   optional per spec sec. 5.2 v0.1.3, ruling t_dcb5540e)
+ * global_const_decl = "const" IDENT ":" type "=" const_expr ";" (required) */
 static AstNode *parse_global_var(ParseCtx *c, bool is_pub, bool is_const)
 {
     size_t s = c->pos;
@@ -2393,9 +2406,17 @@ static AstNode *parse_global_var(ParseCtx *c, bool is_pub, bool is_const)
     if (!expect_punct(c, PUNCT_COLON)) { ast_node_free(node); return NULL; }
     node->u.global_decl.type = parse_type(c);
     if (!node->u.global_decl.type) { ast_node_free(node); return NULL; }
-    if (!expect_punct(c, PUNCT_ASSIGN)) { ast_node_free(node); return NULL; }
-    node->u.global_decl.init = parse_expr(c);
-    if (!node->u.global_decl.init) { ast_node_free(node); return NULL; }
+    /* global_var_decl: the initializer is optional — a missing one leaves
+     * init == NULL with no syntax record, and the semantic stage rejects
+     * it (AIC-E0403, spec sec. 8.2). global_const_decl keeps the strict
+     * grammar (missing "=" is AIC-S0101 and the declaration is dropped by
+     * recovery). Planner ruling t_dcb5540e, spec sec. 5.2 v0.1.3. */
+    if (is_const || cur_is_punct(c, PUNCT_ASSIGN)) {
+        if (is_const && !expect_punct(c, PUNCT_ASSIGN)) { ast_node_free(node); return NULL; }
+        if (!is_const) advance(c);
+        node->u.global_decl.init = parse_expr(c);
+        if (!node->u.global_decl.init) { ast_node_free(node); return NULL; }
+    }
     if (!expect_punct(c, PUNCT_SEMI)) { ast_node_free(node); return NULL; }
     node->span = span_from(c, s, c->pos);
     return node;

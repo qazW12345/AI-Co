@@ -570,6 +570,172 @@ static void test_records_valid_and_emit(void)
 }
 
 /* ---------------------------------------------------------------------------
+ * Missing-initializer leniency (Planner ruling t_dcb5540e; spec sec. 5.2
+ * v0.1.3): `var` declarations may omit the initializer — the parse succeeds
+ * with init == NULL and no syntax record (the rejection is the semantic rule
+ * AIC-E0403, spec sec. 8.2, later in the pipeline). `const` declarations
+ * keep the strict required-initializer grammar.
+ * ------------------------------------------------------------------------- */
+
+static void test_var_decl_no_init_lenient(void)
+{
+    /* AC1: local `var x: i32;` parses with NO syntax record; the AST holds
+     * AST_VAR_DECL name="x", init == NULL, span = the whole declaration. */
+    static const char *local =
+        "module main;\n"
+        "fn f() -> i32 {\n"
+        "  var x: i32;\n"
+        "  return 0;\n"
+        "}\n";
+    /* AC2: module-scope `var g: i32;` — AST_GLOBAL_VAR_DECL, init == NULL,
+     * full declaration span. */
+    static const char *global =
+        "module main;\n"
+        "var g: i32;\n";
+    /* AC3: production reuse in a for-init (spec sec. 5.2 for_stmt). */
+    static const char *for_init =
+        "module main;\n"
+        "fn f() -> i32 {\n"
+        "  for (var x: i32; x < 10; x = x + 1) { break; }\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+    AstNode *decl;
+
+    /* local var */
+    pipeline_run(&p, local);
+    CHECK(p.pst == PARSE_OK);
+    CHECK(p.recs == NULL && p.rn == 0);
+    if (p.pst != PARSE_OK || p.program == NULL) {
+        pipeline_free(&p);
+    } else {
+        AstNode *body = p.program->u.program.decls[0]->u.fn_decl.body;
+        CHECK(p.program->u.program.ndecls == 1);
+        CHECK(p.program->u.program.decls[0]->kind == AST_FN_DECL);
+        CHECK(body != NULL && body->u.list.count == 2);
+        decl = body->u.list.items[0];
+        CHECK(decl->kind == AST_VAR_DECL);
+        CHECK(decl->u.local_decl.name != NULL &&
+              strcmp(decl->u.local_decl.name, "x") == 0);
+        CHECK(decl->u.local_decl.init == NULL);
+        CHECK(decl->span != NULL);
+        if (decl->span != NULL) {
+            CHECK(decl->span->start.line == 3 && decl->span->start.col == 3 &&
+                  decl->span->start.offset == 31);
+            CHECK(decl->span->end.line == 3 && decl->span->end.col == 14 &&
+                  decl->span->end.offset == 42);
+        }
+        pipeline_free(&p);
+    }
+
+    /* module-scope var */
+    pipeline_run(&p, global);
+    CHECK(p.pst == PARSE_OK);
+    CHECK(p.recs == NULL && p.rn == 0);
+    if (p.pst != PARSE_OK || p.program == NULL) {
+        pipeline_free(&p);
+    } else {
+        CHECK(p.program->u.program.ndecls == 1);
+        decl = p.program->u.program.decls[0];
+        CHECK(decl->kind == AST_GLOBAL_VAR_DECL);
+        CHECK(decl->u.global_decl.name != NULL &&
+              strcmp(decl->u.global_decl.name, "g") == 0);
+        CHECK(decl->u.global_decl.init == NULL);
+        CHECK(decl->span != NULL);
+        if (decl->span != NULL) {
+            CHECK(decl->span->start.line == 2 && decl->span->start.col == 1 &&
+                  decl->span->start.offset == 13);
+            CHECK(decl->span->end.line == 2 && decl->span->end.col == 12 &&
+                  decl->span->end.offset == 24);
+        }
+        pipeline_free(&p);
+    }
+
+    /* for-init var (production reuse) */
+    pipeline_run(&p, for_init);
+    CHECK(p.pst == PARSE_OK);
+    CHECK(p.recs == NULL && p.rn == 0);
+    if (p.pst != PARSE_OK || p.program == NULL) {
+        pipeline_free(&p);
+    } else {
+        AstNode *body = p.program->u.program.decls[0]->u.fn_decl.body;
+        CHECK(p.program->u.program.ndecls == 1);
+        CHECK(p.program->u.program.decls[0]->kind == AST_FN_DECL);
+        CHECK(body != NULL && body->u.list.count == 2);
+        CHECK(body->u.list.items[0]->kind == AST_FOR);
+        decl = body->u.list.items[0]->u.for_loop.init;
+        CHECK(decl != NULL && decl->kind == AST_VAR_DECL);
+        CHECK(decl->u.local_decl.init == NULL);
+        pipeline_free(&p);
+    }
+}
+
+static void test_const_decl_strict_init(void)
+{
+    /* AC4: local and global `const` with a missing `=` still report
+     * AIC-S0101 "expected '='" at the offending token and the declaration is
+     * dropped by recovery (unchanged strict grammar). */
+    static const char *local =
+        "module main;\n"
+        "fn f() -> i32 {\n"
+        "  const c: i32;\n"
+        "  return 0;\n"
+        "}\n";
+    static const char *global =
+        "module main;\n"
+        "const C: i32;\n";
+    Pipeline p;
+
+    pipeline_run(&p, local);
+    CHECK(p.pst == PARSE_DIAG_ERROR);
+    CHECK(p.recs != NULL && p.rn == 1);
+    if (p.recs != NULL && p.rn >= 1) {
+        const DiagRecord *r = p.recs[0];
+        CHECK(strcmp(r->code, "AIC-S0101") == 0);
+        CHECK(strcmp(r->message, "expected '='") == 0);
+        CHECK(r->primary_span != NULL);
+        if (r->primary_span != NULL) {
+            CHECK(r->primary_span->start.line == 3 &&
+                  r->primary_span->start.col == 15 &&
+                  r->primary_span->start.offset == 43);
+            CHECK(r->primary_span->end.line == 3 &&
+                  r->primary_span->end.col == 16 &&
+                  r->primary_span->end.offset == 44);
+        }
+    }
+    /* dropped by recovery: only the `return` statement survives in the
+     * function body. */
+    if (p.program != NULL && p.program->u.program.ndecls == 1 &&
+        p.program->u.program.decls[0]->kind == AST_FN_DECL &&
+        p.program->u.program.decls[0]->u.fn_decl.body != NULL) {
+        CHECK(p.program->u.program.decls[0]->u.fn_decl.body->u.list.count == 1);
+    }
+    pipeline_free(&p);
+
+    pipeline_run(&p, global);
+    CHECK(p.pst == PARSE_DIAG_ERROR);
+    CHECK(p.recs != NULL && p.rn == 1);
+    if (p.recs != NULL && p.rn >= 1) {
+        const DiagRecord *r = p.recs[0];
+        CHECK(strcmp(r->code, "AIC-S0101") == 0);
+        CHECK(strcmp(r->message, "expected '='") == 0);
+        CHECK(r->primary_span != NULL);
+        if (r->primary_span != NULL) {
+            CHECK(r->primary_span->start.line == 2 &&
+                  r->primary_span->start.col == 13 &&
+                  r->primary_span->start.offset == 25);
+            CHECK(r->primary_span->end.line == 2 &&
+                  r->primary_span->end.col == 14 &&
+                  r->primary_span->end.offset == 26);
+        }
+    }
+    if (p.program != NULL) {
+        CHECK(p.program->u.program.ndecls == 0); /* dropped: no top-level decl */
+    }
+    pipeline_free(&p);
+}
+
+/* ---------------------------------------------------------------------------
  * Corpus anchors: re-execute the parser-owned negative fixtures.
  * ------------------------------------------------------------------------- */
 
@@ -719,6 +885,8 @@ int main(void)
     test_recovery_derived();
     test_unexpected_token();
     test_records_valid_and_emit();
+    test_var_decl_no_init_lenient();
+    test_const_decl_strict_init();
     test_corpus_anchors();
 
     ast_node_free(NULL);
