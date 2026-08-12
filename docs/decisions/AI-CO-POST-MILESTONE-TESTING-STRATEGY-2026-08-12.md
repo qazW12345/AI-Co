@@ -83,6 +83,57 @@ normal Planner/design process when adopted.
 - **Why valuable:** catches miscompiles that the spec-derived corpus, written for
   diagnostics coverage, may not exercise.
 
+### S2a — Feature-scoped differential micro-programs (per-feature correctness)
+
+- **Targets:** G2, G3, G4 (with the refinements below).
+- **Idea:** a suite of **minimal programs, each exercising exactly one AI-Co
+  feature** (or a small deliberately-composed batch), each with a reference
+  translation and expected observable behavior. A failure of a feature micro-
+  program **localizes the bug by construction**: the bug must be in the code
+  path for that feature, and — given the IR boundary — in the backend rules
+  that translate that feature's IR node kind. This makes the "find the bug"
+  step nearly automatic; the debugging loop becomes
+  *run → fail → inspect that program's IR → inspect emitted bytes → fix one rule*.
+  This is the concrete implementation shape that merges S1 (external reference)
+  with S2 (per-feature stress) into a per-feature correctness check.
+- **Refinement R1 — dual-reference discipline.** The "reference compiler is
+  always correct" assumption must not be taken literally. For features that map
+  cleanly to C semantics, compare against **agreement between two independent
+  compilers** (e.g., Clang + MSVC, or Clang + GCC) on the equivalent C program;
+  if the two references disagree on a micro-program, treat it as a reference
+  problem, not an AI-Co problem. For AI-Co-specific features with **no C
+  equivalent** (checked-arithmetic traps with AIC-R codes, the cast matrix,
+  defined wrapping), the reference is a **hand-computed oracle** derived from
+  the spec, not a compiler.
+- **Refinement R2 — boundary values mandatory.** Each micro-program must test
+  **edge values**, not typical values: 0, INT32_MIN/MAX, -1, 64-bit boundaries,
+  overflow-into-trap cases, negative immediates, max loop iterations. A wrong
+  codegen path (e.g., a 32-bit truncating add or a signedness slip) often
+  produces the *correct* answer for typical inputs; boundary values are what
+  turn "wrong but observably correct" into "wrong and caught."
+- **Composition subset.** Single-feature tests miss feature-**interaction** bugs
+  (each feature works alone; two interact wrongly). Include a modest set of
+  composition programs deliberately combining 2–3 features (e.g., struct
+  returns inside loops, slice indexing + checked arithmetic). These localize to
+  the *intersection* of the involved code paths — still a small search space.
+- **Implementation sketch:** `tests/features/` with per-feature subdirectories
+  (`arith-wrap/`, `cast-matrix/`, `control-flow/`, `struct-return/`, `trap/`,
+  ...), each containing `input.ai` + reference C (where applicable) + expected
+  behavior + boundary-value notes; a runner that compiles with the AI-Co
+  compiler and the reference toolchain(s) and diffs observable behavior
+  (stdout / exit code / trap code), plus hand-oracle checks for AI-Co-specific
+  features.
+- **Why valuable:** highest value-per-effort of the candidate strategies; every
+  failure is small and localizable; it works at the M0 boundary with no external
+  oracle infrastructure beyond an available reference toolchain; and it breaks
+  the spec-echo loop per feature.
+- **Status note (2026-08-12):** recorded as an *approach we may utilize*;
+  adoption is deferred to the M0-20 review point per Main Designer direction
+  ("we can decide later, when we come to that point"). No work package exists
+  yet; if adopted it becomes a work package via the normal Planner/design
+  process.
+
+
 ### S3 — Differential fuzzing (post-M0, higher effort)
 
 - **Targets:** G2, G3, G5.
@@ -127,10 +178,13 @@ normal Planner/design process when adopted.
 
 1. **At M0 completion:** run the corpus against the real compiler (`--compiler`)
    — this is the first true behavior gate; fix whatever it surfaces.
-2. **First post-M0 package:** S2 (torture tests) + S5 (spec-echo audit) —
-   cheap, high value, no external dependency.
-3. **Second:** S1 (differential vs reference) — needs the reference mapping of
-   AI-Co semantics to an available toolchain; medium effort.
+2. **First post-M0 package:** S2a (feature-scoped differential micro-programs)
+   — highest value-per-effort, no external oracle infrastructure beyond an
+   available reference toolchain; every failure is small and localizable. Plus
+   S5 (spec-echo audit). S2 (torture) may be folded into S2a's boundary-value
+   discipline rather than run as a separate corpus.
+3. **Second:** S1 (differential vs reference) — S2a's dual-reference discipline
+   generalizes into the full differential corpus; medium effort.
 4. **Third:** S4 (self-hosting behavioral comparison) — natural once the stage
    chain is proven byte-identical.
 5. **Ongoing:** S3 (fuzzing) — highest effort, most powerful; start after S1
