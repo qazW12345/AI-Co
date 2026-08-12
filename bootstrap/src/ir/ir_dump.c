@@ -39,7 +39,11 @@
  * unregistered code in a dump is malformed input). Empty text fields
  * are rejected on parse (see ir_dump.h): a zero-width field (leading or
  * consecutive separators) and a token that decodes to a zero-length
- * string both produce a deterministic malformed-dump error.
+ * string both produce a deterministic malformed-dump error. Numeric
+ * tokens that overflow strtoll/strtoull (errno ERANGE) are rejected the
+ * same way: tok_int/tok_uint check errno after conversion and refuse a
+ * token whose value is out of range instead of silently clamping it
+ * (MIN-2, reviewer2 t_47cce3e7).
  *
  * Ownership: ir_dump_parse returns an owned IrBuild on IR_DUMP_OK
  * (ir_build_free); on failure nothing is owned. ir_dump_verify returns
@@ -52,6 +56,7 @@
 #include "ir_dump.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -850,7 +855,9 @@ static bool line_has_empty_field(const DumpLine *dl, char *errbuf,
     return true;
 }
 
-/* Parse a non-negative integer token; returns false if malformed. */
+/* Parse a non-negative integer token; returns false if malformed or if
+ * the value overflows int64 (errno == ERANGE; the token is rejected
+ * rather than silently clamped). */
 static bool tok_int(const char *tok, int64_t *out)
 {
     char *end = NULL;
@@ -858,15 +865,18 @@ static bool tok_int(const char *tok, int64_t *out)
     if (tok == NULL) {
         return false;
     }
+    errno = 0;
     v = strtoll(tok, &end, 10);
-    if (end == tok || *end != '\0') {
+    if (errno == ERANGE || end == tok || *end != '\0') {
         return false;
     }
     *out = (int64_t)v;
     return true;
 }
 
-/* Parse an unsigned integer token (constant bit patterns / enum values). */
+/* Parse an unsigned integer token (constant bit patterns / enum values);
+ * returns false if malformed or if the value overflows uint64 (errno ==
+ * ERANGE; the token is rejected rather than silently clamped). */
 static bool tok_uint(const char *tok, uint64_t *out)
 {
     char *end = NULL;
@@ -874,8 +884,9 @@ static bool tok_uint(const char *tok, uint64_t *out)
     if (tok == NULL) {
         return false;
     }
+    errno = 0;
     v = strtoull(tok, &end, 10);
-    if (end == tok || *end != '\0') {
+    if (errno == ERANGE || end == tok || *end != '\0') {
         return false;
     }
     *out = (uint64_t)v;

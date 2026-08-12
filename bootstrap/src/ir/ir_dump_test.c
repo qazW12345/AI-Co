@@ -1183,6 +1183,123 @@ static void test_dump_parse_nonempty_text_field_ok(void)
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * MIN-2 remediation (reviewer2 t_47cce3e7): tok_int/tok_uint must reject
+ * numeric tokens that overflow strtoll/strtoull (errno == ERANGE) with
+ * a deterministic malformed-dump error instead of silently clamping the
+ * value. The canonical writer never emits an out-of-range token (all
+ * emitted integers fit int64/uint64), so the rejection only affects
+ * hand-crafted hostile dumps; dump determinism is unaffected.
+ * ------------------------------------------------------------------------- */
+
+static void test_dump_parse_numeric_overflow(void)
+{
+    char dump[2048];
+
+    /* signed overflow: the header's ntypes token exceeds INT64_MAX
+     * (tok_int through the header parse) */
+    expect_malformed_dump("H 1 99999999999999999999999999 0 0\n");
+
+    /* signed overflow: a span line number exceeds INT64_MAX (tok_int
+     * through tok_span in the node header) */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 0 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - a.ai 99999999999999999999999999 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+
+    /* unsigned overflow: a const int bit pattern exceeds UINT64_MAX
+     * (tok_uint through the const table) */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 1 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "C 0 int 4 18446744073709551616\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - a.ai 1 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+
+    /* in-range control: maximal in-range tokens (INT64_MAX in a span
+     * line, UINT64_MAX as a const int bit pattern) still parse */
+    {
+        IrBuild *r = NULL;
+        char errbuf[256];
+        IrDumpStatus st;
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 1 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "C 0 int 4 18446744073709551615\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - a.ai 9223372036854775807 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+        st = ir_dump_parse(dump, strlen(dump), &r, errbuf, sizeof(errbuf));
+        CHECK(st == IR_DUMP_OK);
+        if (st == IR_DUMP_OK) {
+            CHECK(r != NULL);
+            CHECK(r->nconsts == 1);
+            CHECK(r->consts[0]->u.int_bits == UINT64_MAX);
+            CHECK(r->modules[0]->span != NULL);
+            if (r->modules[0]->span != NULL) {
+                CHECK(r->modules[0]->span->start.line == INT64_MAX);
+            }
+            ir_build_free(r);
+        } else {
+            fprintf(stderr, "  parse error: %s\n", errbuf);
+        }
+    }
+}
+
 static void test_dump_verify(void)
 {
     /* ir_dump_verify: IR_OK on a valid build; IR_VIOLATION with
@@ -1293,6 +1410,8 @@ int main(void)
     fprintf(stderr, "after test_dump_parse_empty_decoded_string\n");
     test_dump_parse_nonempty_text_field_ok();
     fprintf(stderr, "after test_dump_parse_nonempty_text_field_ok\n");
+    test_dump_parse_numeric_overflow();
+    fprintf(stderr, "after test_dump_parse_numeric_overflow\n");
     test_dump_verify();
     fprintf(stderr, "after test_dump_verify\n");
 
