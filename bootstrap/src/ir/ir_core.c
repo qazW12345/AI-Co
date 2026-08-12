@@ -2521,6 +2521,13 @@ static void verify_kind(IrVerify *v, const IrNode *node, Encl *encl)
                                  "%s id %lld result type is not an integer "
                                  "type", ir_kind_text(node->kind), node->id);
         }
+        if (node->u.binary.left != NULL &&
+            !ir_type_identical(node->type, node->u.binary.left->type)) {
+            verify_add_violation(v, node, 4, IR_INV_TYPING,
+                                 "%s id %lld result type does not match the "
+                                 "left operand's type (contract sec. 5.3)",
+                                 ir_kind_text(node->kind), node->id);
+        }
         verify_child(v, node->u.binary.left, encl);
         verify_child(v, node->u.binary.right, encl);
         break;

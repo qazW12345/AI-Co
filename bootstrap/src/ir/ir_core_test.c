@@ -973,6 +973,128 @@ static void test_operand_typing(void)
 #undef FN_BODY_SETUP
 }
 
+static void test_shift_result_type(void)
+{
+    /* helper: void fn f() { <stmts> } */
+#define FN_BODY_SETUP(prefix) \
+    IrBuild *b = ir_build_new(); \
+    IrNode *m = mk_module(b, "main", "a.ai"); \
+    IrNode *fn = mk(b, IR_FUNCTION, "a.ai", 2); \
+    IrNode *body = mk_block(b, "a.ai", 3); \
+    fn->u.function.name = strdup(prefix "_f"); \
+    fn->u.function.ret_type = ir_type_void(b); \
+    fn->u.function.body = body; \
+    ir_module_add_decl(b, m, fn); \
+    ir_build_add_module(b, m); \
+    (void)body
+
+    /* IR_SHL result type must equal the left operand's type (contract
+     * sec. 5.3 row; invariant 4): left i32 / result i64 is a violation. */
+    {
+        FN_BODY_SETUP("shl_mismatch");
+        IrNode *e = mk(b, IR_SHL, "a.ai", 5);
+        IrNode *l = mk_int(b, "a.ai", ir_type_i32(b), 4);
+        IrNode *rr = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        DiagRecord **r = NULL;
+        size_t n;
+        e->type = ir_type_i64(b);   /* wrong: must be the left type (i32) */
+        e->trap_code = "AIC-R0804";
+        e->u.binary.left = l;
+        e->u.binary.right = rr;
+        es->u.expr_stmt.expr = e;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_VIOLATION, &r);
+        CHECK(n >= 1);
+        if (n >= 1) {
+            check_record_shape(r[0], 4, "a.ai", 5);
+        }
+        ir_records_free(r, n);
+        ir_build_free(b);
+    }
+    /* IR_SHR result type must equal the left operand's type: left i32 /
+     * result i64 is a violation. */
+    {
+        FN_BODY_SETUP("shr_mismatch");
+        IrNode *e = mk(b, IR_SHR, "a.ai", 5);
+        IrNode *l = mk_int(b, "a.ai", ir_type_i32(b), 4);
+        IrNode *rr = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        DiagRecord **r = NULL;
+        size_t n;
+        e->type = ir_type_i64(b);   /* wrong: must be the left type (i32) */
+        e->trap_code = "AIC-R0804";
+        e->u.binary.left = l;
+        e->u.binary.right = rr;
+        es->u.expr_stmt.expr = e;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_VIOLATION, &r);
+        CHECK(n >= 1);
+        if (n >= 1) {
+            check_record_shape(r[0], 4, "a.ai", 5);
+        }
+        ir_records_free(r, n);
+        ir_build_free(b);
+    }
+    /* compliant: IR_SHL with left i32 / result i32 verifies clean */
+    {
+        FN_BODY_SETUP("shl_ok");
+        IrNode *e = mk(b, IR_SHL, "a.ai", 5);
+        IrNode *l = mk_int(b, "a.ai", ir_type_i32(b), 4);
+        IrNode *rr = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        size_t n;
+        e->type = ir_type_i32(b);   /* matches the left operand's type */
+        e->trap_code = "AIC-R0804";
+        e->u.binary.left = l;
+        e->u.binary.right = rr;
+        es->u.expr_stmt.expr = e;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_OK, NULL);
+        CHECK(n == 0);
+        ir_build_free(b);
+    }
+    /* compliant: IR_SHR with left i32 / result i32 verifies clean */
+    {
+        FN_BODY_SETUP("shr_ok");
+        IrNode *e = mk(b, IR_SHR, "a.ai", 5);
+        IrNode *l = mk_int(b, "a.ai", ir_type_i32(b), 4);
+        IrNode *rr = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        size_t n;
+        e->type = ir_type_i32(b);   /* matches the left operand's type */
+        e->trap_code = "AIC-R0804";
+        e->u.binary.left = l;
+        e->u.binary.right = rr;
+        es->u.expr_stmt.expr = e;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_OK, NULL);
+        CHECK(n == 0);
+        ir_build_free(b);
+    }
+    /* compliant: IR_SHL with left i32 / result i32 and a count of a
+     * different integer type (u8): the count need not match the left
+     * type; only the result must equal the left operand's type. */
+    {
+        FN_BODY_SETUP("shl_count_u8");
+        IrNode *e = mk(b, IR_SHL, "a.ai", 5);
+        IrNode *l = mk_int(b, "a.ai", ir_type_i32(b), 4);
+        IrNode *rr = mk_int(b, "a.ai", ir_type_u8(b), 1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        size_t n;
+        e->type = ir_type_i32(b);   /* matches the left operand's type */
+        e->trap_code = "AIC-R0804";
+        e->u.binary.left = l;
+        e->u.binary.right = rr;
+        es->u.expr_stmt.expr = e;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_OK, NULL);
+        CHECK(n == 0);
+        ir_build_free(b);
+    }
+#undef FN_BODY_SETUP
+}
+
 static void test_terminators(void)
 {
     /* non-void function tail without a terminator */
@@ -1690,6 +1812,8 @@ int main(void)
     fprintf(stderr, "after test_type_wellformed\n");
     test_operand_typing();
     fprintf(stderr, "after test_operand_typing\n");
+    test_shift_result_type();
+    fprintf(stderr, "after test_shift_result_type\n");
     test_terminators();
     fprintf(stderr, "after test_terminators\n");
     test_break_continue();
