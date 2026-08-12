@@ -1,9 +1,9 @@
-# AI-Co Canonical IR Contract v0.1.0 (Proposed draft — WP-M0-16a)
+# AI-Co Canonical IR Contract v0.1.1 (Accepted — WP-M0-16a)
 
-**Status:** Proposed (draft v0.1.0); pending Main Designer architecture review (WP-M0-16a gate)
+**Status:** Accepted (2026-08-12, Main Designer architecture gate PASS WITH MINOR FINDINGS; MIN-1 remediated in v0.1.1)
 **Owner:** WP-M0-16a (`docs/contracts/` area; manifest §2 file-ownership matrix)
 **Decision owner:** Main Designer (architecture acceptance of the IR instruction set; spec §14.1(6) delegates the instruction set to the implementation planning phase, milestone plan §9)
-**Version:** 0.1.0 (draft)
+**Version:** 0.1.1 (accepted)
 **Date:** 2026-08-12
 **Scope:** project AI-Co; tenant ai-co
 **Companion to:** `spec/AI-CO-LANGUAGE-SPECIFICATION.md` (v0.1.6, Accepted); `spec/DIAGNOSTIC-CONTRACT.md` (v0.1.1, Accepted)
@@ -227,7 +227,7 @@ Scalar results are direct values; composite results are address-resident (Sectio
 | `IR_LEN` | array/slice/str value | `usize` | operand | element count for arrays/slices, byte count for `str` (spec §12.2–12.3). Array extent is constant; slice/str length is the runtime pair. |
 | `IR_PTR` | array/slice/str value | element pointer / `u8*` | operand | first-element address; empty array/slice or zero-length `str` → null (spec §12.2–12.3). |
 | `IR_SLICE` | base (array/slice lvalue or `str`), optional start (usize), optional end (usize) | slice type (or `str` for a `str` base) | base, then start, then end (spec §10.4) | bounds check `0 <= start <= end <= extent`; failure → trap `AIC-R0807` (constant out-of-range rejected pre-IR `AIC-E0409`). For a `str` base: byte offsets must fall on UTF-8 code point boundaries; failure → trap `AIC-R0808` (constant `AIC-E0410`). |
-| `IR_CAST` | value, target type | target type | operand | checked conversion per the §11.2 matrix: representability failure → trap `AIC-R0801` (bool↔int, narrowing, enum, pointer↔int signedness); `u8[]`→`str` invalid UTF-8 → trap `AIC-R0806`; `str`↔`u8[]` is a bit-preserving reinterpret (no failure); `T*`→`U*` is bit-preserving with the alignment obligation carried by the dereference (spec §11.5/§12.8). Constant out-of-range rejected pre-IR (`AIC-E0408`). |
+| `IR_CAST` | value, target type | target type | operand | checked conversion per the §11.2 matrix: representability failure → trap `AIC-R0801` (bool↔int, narrowing, enum, pointer↔int signedness); `str`→`u8[]` is a bit-preserving reinterpret (no failure); `u8[]`→`str` adds the UTF-8 validation — invalid UTF-8 → trap `AIC-R0806` (constant `AIC-E0408`); `T*`→`U*` is bit-preserving with the alignment obligation carried by the dereference (spec §11.5/§12.8). Constant out-of-range rejected pre-IR (`AIC-E0408`). |
 | `IR_WRAP` | value, target type | target type | operand | wrapping/truncating conversion: mathematical value reduced modulo `2^width`, re-read as the target type; never checked, never traps (spec §11.3/§11.5/ADR-004). The operand itself evaluates under ordinary checked semantics (spec §11.3). |
 | `IR_PTR_ADD` | pointer, integer offset | `T*` | pointer, then offset | `p + i` scaled by `sizeof(T)`; the scaling product and resulting byte address must be representable; failure → trap `AIC-R0816` (constant rejected pre-IR `AIC-E0405`; spec §12.5). |
 | `IR_PTR_SUB` | pointer, integer offset | `T*` | pointer, then offset | `p - i` scaled by `sizeof(T)`; same checked arithmetic as `IR_PTR_ADD` → trap `AIC-R0816`. |
@@ -457,23 +457,26 @@ The builder's mapping is 1:1 with the AST for structure (Section 3 principle 2) 
 
 ## 13. Review state and acceptance record
 
-**Status:** Proposed (draft v0.1.0), pending Main Designer architecture review (WP-M0-16a gate; class: Reviewer + Main Designer per manifest §WP-M0-16a).
+**Status:** Accepted (2026-08-12, Main Designer architecture gate PASS WITH MINOR FINDINGS; MIN-1 remediated in v0.1.1 below).
 
 **Acceptance criteria coverage (self-check against the card):**
 
 - [x] **IR determinism stated** — Section 6 (identical source + options → byte-identical IR; observable via deterministic dump; spec §14.1(6)/§14.2/§16.2).
 - [x] **Target-neutrality stated** — Section 7 (no x86-64 specifics; language facts vs. implementation facts; spec §14.1(6), ADR-001 stage 6).
 - [x] **Span/cause preservation stated** — Section 8 (every node carries primary span + cause chain; lowering preserves causality; diagnostics/traps never reconstructed from strings; spec §14.1(6), ADR-001 §54).
-- [x] **Representation coverage for every semantic rule** — Section 9 matrix (§3–§16 rule families: representation + enforcement), with interpretation notes IRC-N1..N3 flagged for the gate.
-- [x] **Main Designer acceptance** — pending; recorded in the acceptance entry below when the gate passes.
+- [x] **Representation coverage for every semantic rule** — Section 9 matrix (§3–§16 rule families: representation + enforcement), with interpretation notes IRC-N1..N3 confirmed at the gate.
+- [x] **Main Designer acceptance** — GRANTED (architecture lane t_d7b7f8d6, PASS WITH MINOR FINDINGS; recorded in the acceptance entry below).
 
 **Exclusions honored:** no IR implementation (16b/16c), no optimizations (ADR-001), no public language-contract change (IR internal), no spec/ADR/governance modification.
 
-**Review record to be appended after the gate:**
+**Review record (gate applied 2026-08-12):**
 
-- *[pending]* Main Designer architecture review verdict (task t_24eee034; reviewer/gate cards created by the OM §6.1 watchdog routing).
-- *[pending]* Interpretation notes IRC-N1 (repetition-form evaluation count) and IRC-N3 (no IR-level optimization passes) — confirmed or routed to Planner; IRC-N2 is an implementation-latitude note needing no decision.
+- **Independent review** — reviewer2 t_bc4f03a7 (verdict recorded on t_bc4f03a7 and t_24eee034): PASS WITH MINOR FINDINGS (0 Critical, 0 Major, 1 Minor MIN-1, 1 Suggestion S-1); AC1 MET; all 41 distinct AIC codes cross-checked against DIAGNOSTIC-CONTRACT §11.8.
+- **Main Designer architecture review** — architecture lane t_d7b7f8d6 (comment 1212; recorded on t_24eee034 comment 1213): PASS WITH MINOR FINDINGS; architecture acceptance **GRANTED**; IRC-N1 (repetition-form `[e; N]` evaluate-exactly-once) **ACCEPTED** as a Main Designer interpretation filling a public-spec silence — Planner-owned specification/conformance alignment routed and recorded separately (`docs/planning/AI-CO-PLANNER-ALIGNMENT-IRC-N1-REPETITION-EVAL-2026-08-12.md`, planner task t_72c6d57b); IRC-N2 (composite constant image placement) **CONFIRMED** as implementation latitude under observable-value and dump-determinism constraints; IRC-N3 (no Stage-0 IR transformation passes) **ACCEPTED** (a future transforming pass requires architecture review); step-less `for` `continue` interpretation (reviewer S-1) **CONFIRMED** (proceeds to the next condition evaluation).
+- **Coordinator gate** — t_02f8b6ff applied per OM §6.1 step 3 / OM §5 / ADR-004; unblocked t_24eee034 for terminal completion.
+- **MIN-1 remediated** — in v0.1.1 below (follow-up t_2397b562): §5.3 `IR_CAST` row corrected directionally — `str`→`u8[]` non-failing bit-preserving reinterpret; `u8[]`→`str` UTF-8 validation with trap `AIC-R0806` runtime / `AIC-E0408` constant (spec §11.2/§11.5).
 
 **Change record:**
 
+- **v0.1.1 (2026-08-12):** MIN-1 remediation (reviewer2 t_bc4f03a7 finding MIN-1; Main Designer retention t_d7b7f8d6 comment 1212; follow-up t_2397b562): corrected the §5.3 `IR_CAST` row directionally — `str`→`u8[]` is a bit-preserving reinterpret (no failure); `u8[]`→`str` adds the UTF-8 validation, invalid UTF-8 → trap `AIC-R0806` (constant evaluation `AIC-E0408`). Bounded wording correction in a normative table cell; no semantics change (trap codes unchanged in the row); no other file, no spec/ADR/governance modification. Reviewer re-review pending per OM §6.1.
 - **v0.1.0 (2026-08-12):** initial Proposed draft authored by WP-M0-16a (senior_specialist). No changes from any review yet.
