@@ -1,1 +1,1 @@
-{"spec_ref":"§15.5","codes":["AIC-R0815"],"deferral_reason":"stack exhaustion depends on runtime stack limit (default 8 MiB); not deterministic across environments without controlled recursion depth"}
+{"spec_ref":"§15.5","codes":["AIC-R0815"]}

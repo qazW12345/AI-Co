@@ -1,1 +1,1 @@
-{"spec_ref":"§15.5","codes":["AIC-R0805"],"deferral_reason":"requires raw byte reinterpretation as bool which is not expressible in the minimal language without compiler intrinsics"}
+{"spec_ref":"§15.5","codes":["AIC-R0805"],"deferral_reason":"constructible via §11.2 T*→U* cast + §15.1 rt.mem.fill into bool storage, but §9.1's closing sentence ('Programs cannot construct such a bool value through well-typed operations') is in tension with the byte-reinterpretation trap path; escalated to Main Designer (spec-defect §9.1 vs §9.4); do not activate until resolved."}

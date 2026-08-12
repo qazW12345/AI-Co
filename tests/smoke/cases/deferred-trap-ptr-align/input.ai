@@ -1,0 +1,6 @@
+module main;
+
+pub fn main() -> void {
+  var p: u32* = cast<u32*>(0x1u64);
+  var x: u32 = *p;
+}

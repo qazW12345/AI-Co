@@ -1,1 +1,1 @@
-{"spec_ref":"§15.5","codes":["AIC-R0811"],"deferral_reason":"requires deliberately misaligned pointer dereference; not constructible without raw address arithmetic"}
+{"spec_ref":"§15.5","codes":["AIC-R0811"]}
