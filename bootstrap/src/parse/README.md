@@ -107,10 +107,15 @@ the dump format, and the ownership helpers live in the ast package.
     (spec §8.2), emitted later in the pipeline. `const_decl` /
     `global_const_decl` keep the strict grammar: a missing `=` is still
     `AIC-S0101` and the declaration is dropped by recovery (unchanged).
+    If both `=` and `;` are missing (for example `var x: i32` at EOF), the
+    lenient grammar skips the absent initializer and the single diagnostic
+    becomes `AIC-S0101 "expected ';'"` (previously `"expected '='"`); still
+    exactly one syntax record, no pinned test changes.
     Note: `ast_dump()` in the ast package does not yet render a declaration
     with `init == NULL` (`dump_node` requires a non-NULL child), so the
     parse tests assert the lenient form structurally on the AST rather
-    than via golden dumps.
+    than via golden dumps. That dump limitation is tracked to its follow-up
+    owner WP-M0-13a2 (task t_b174081d).
 
 ## Diagnostics emitted (contract §11.2; all phase `syntax`, severity
 `error`)
