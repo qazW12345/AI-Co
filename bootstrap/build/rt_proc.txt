@@ -1,0 +1,17 @@
+# bootstrap/build/rt_proc.txt
+# WP-M0-15b rt.proc process module (spec sec. 15.3).
+# Area source list (owned by WP-M0-15b). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root.
+#
+# rt_proc.c has no dependency on the WP-M0-06 diag module: rt.proc
+# emits no diagnostic records (args() has no failure mode; exit() is a
+# plain termination, not a trap), so it needs no diag sources. It
+# depends only on the Windows API (GetCommandLineW, kernel32) and the
+# C library (exit), and on its own header.
+#
+# rt_proc_test.c is intentionally NOT listed here: it is a unit-test
+# program with its own main() and is built explicitly together with the
+# library source (see the build comment at the top of rt_proc_test.c).
+bootstrap/runtime/rt_proc/rt_proc.c
