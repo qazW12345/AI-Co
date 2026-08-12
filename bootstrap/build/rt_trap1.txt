@@ -1,0 +1,18 @@
+# bootstrap/build/rt_trap1.txt
+# WP-M0-15c1 rt.trap module (spec sec. 15.4 / DIAGNOSTIC-CONTRACT
+# sec. 10 / 15.8).
+# Area source list (owned by WP-M0-15c1). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level rt_trap.txt entry per
+# manifest §5 (sub-split WP-M0-15c1/15c2).
+#
+# rt_trap.c depends on the WP-M0-06 diag record shape for the AIC-U0000
+# user-trap record (bootstrap/src/diag/diag.h); the diag sources are
+# listed in the WP-M0-06-owned fragment bootstrap/build/diag.txt, which
+# the aggregate build includes.
+#
+# rt_trap_test.c is intentionally NOT listed here: it is a unit-test
+# program with its own main() and is built explicitly together with the
+# library sources (see the build comment at the top of rt_trap_test.c).
+bootstrap/runtime/rt_trap/rt_trap.c
