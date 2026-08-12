@@ -1,11 +1,11 @@
-# AI-Co Language Specification v0.1.2 (Accepted)
+# AI-Co Language Specification v0.1.3 (Accepted)
 
 **Status:** Accepted
 **Owner:** Planner
 **Decision owner:** Main Designer (architecture); decisions recorded in ADR-004 are Human Sponsor approvals and are applied here as governing direction.
 **Approver:** Main Designer (architectural acceptance); Reviewer (independent conformance review); Marcel (Human Sponsor) for purpose-affecting questions.
-**Version:** 0.1.2
-**Date:** 2026-08-11
+**Version:** 0.1.3
+**Date:** 2026-08-12
 **Scope:** project AI-Co
 
 ## Authority
@@ -219,7 +219,7 @@ param_list     = param { "," param } ;
 param          = IDENT ":" type ;
 block          = "{" { statement } "}" ;
 
-global_var_decl   = "var" IDENT ":" type "=" const_expr ";" ;
+global_var_decl   = "var" IDENT ":" type [ "=" const_expr ] ";" ;
 global_const_decl = "const" IDENT ":" type "=" const_expr ";" ;
 
 statement      = block
@@ -227,7 +227,7 @@ statement      = block
                | if_stmt | while_stmt | for_stmt | switch_stmt
                | break_stmt | continue_stmt | return_stmt
                | expr_stmt | empty_stmt ;
-var_decl       = "var" IDENT ":" type "=" expr ";" ;
+var_decl       = "var" IDENT ":" type [ "=" expr ] ";" ;
 const_decl     = "const" IDENT ":" type "=" const_expr ";" ;
 if_stmt        = "if" "(" expr ")" block [ "else" ( block | if_stmt ) ] ;
 while_stmt     = "while" "(" expr ")" block ;
@@ -1246,6 +1246,7 @@ Self-checklist against the task acceptance criteria:
   - FIND-005 (diagnostic schema v1, code registry, compatibility): closed in `DIAGNOSTIC-CONTRACT.md` (schema version 1; Sections 5, 11.9, and 11.10 of that document).
   - FIND-G2-01..09 (gate-2 conformance review, 2026-08-08): corrected in the correction round below; closure confirmed by the gate-2 re-review round 1 (2026-08-08), with FIND-G2-08's residual RER-G2-01 closed in the entry below.
 - Changes from review will be recorded as new versions of this document; supersession is handled per organization governance.
+- **v0.1.3 (2026-08-12):** applied the Planner ambiguity ruling t_dcb5540e (escalation from WP-M0-13a2 t_b174081d, specialist evidence comment 744): made the initializer **syntactically optional** for `var` declarations in §5.2 — `var_decl = "var" IDENT ":" type [ "=" expr ] ";"` and `global_var_decl = "var" IDENT ":" type [ "=" const_expr ] ";"`. A `var` declaration without an initializer is a valid parse; the rejection is the semantic rule `AIC-E0403` (spec §8.2, DIAGNOSTIC-CONTRACT §11.5, corpus anchor `derived-semantic-missing-init`) — previously unreachable because the grammar required `=`. `const` forms are unchanged (initializer remains syntactically required; missing `=` stays `AIC-S0101`). Decision record: `docs/planning/AI-CO-PLANNER-RULING-E0403-MISSING-INIT-2026-08-12.md`. Authority: Planner per milestone plan §9 (spec/contract ambiguity → Planner); ambiguity ruling within accepted direction — no new architecture decision, no ADR/contract change, no Human Sponsor gate. Follow-up owners: senior_specialist (parser leniency fix, WP-M0-09 area; then WP-M0-13a2 E0403 enforcement), Reviewer (independent verification of this revision pending).
 - **v0.1.2 (2026-08-11):** applied the Main Designer-approved precision amendments recorded in t_5f69de3e comment 216 (2026-08-11): (1) §18.1 lexical example `var h: u64 = 0xFF_FF;` corrected to `0xFF_FFu64` (u64-suffixed literal) so the example conforms to the §4.3 literal-typing rule and the §11.1 Table 11.1 conversion whitelist (no i32→u64 implicit conversion exists); (2) §10.5 constant-expression enumeration now explicitly includes recursively constant composite literals (struct literals, array literals, and repetition-form array literals) whose element/field/count expressions are constant expressions; (3) §18 conventions paragraph now states that examples illustrate individual constructs and are not necessarily complete programs, and that a complete runnable program requires an entry module declaring `fn main() -> i32` or `fn main() -> void` per §15.3. The amendment text was applied exactly as accepted by the Main Designer; no semantic expansion, no §18.4 change, no diagnostic-contract or ADR change. Authority: Main Designer decision t_5f69de3e comment 216; Planner authored and applied this revision; independent Reviewer verification of this artifact is pending per the Planner follow-up task t_9410ebc6.
 - **v0.1.1 (2026-08-08):** applied the ADR-004 Human Sponsor resolutions (temporal baseline, wrapping baseline, Windows baseline), removed every reference to the deleted, never-committed Main Designer decision-note artifact, and corrected the grammar and contract defects identified by Main Designer inspection. This revision supersedes the v0.1.0 Proposed draft for review purposes.
 - **Planner self-review (2026-08-08):** Pass with one correction. The Planner self-review of the ADR-003/ADR-004-aligned v0.1.1 draft confirmed the three decisions (temporal baseline, wrapping baseline, Windows baseline) are requirements-complete, internally coherent, and implementation-ready; it added the ADR-004 §63 obligation that runtime-facing Windows calls be enumerated and documented against the pinned baseline (§14.3), which the v0.1.1 draft had not carried explicitly. No other corrections required; no new architecture decisions made.

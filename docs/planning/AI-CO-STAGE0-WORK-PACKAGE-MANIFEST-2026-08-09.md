@@ -34,6 +34,12 @@
 - Board-state scope: no board edits here. Future WP-M0-03 cards must respect the §2 carve-out; the WP-M0-03 owned area is `tests/negative/**` minus the four carved-out case directories.
 - Evidence: `git show --stat e688c6e` (four case dirs `input.ai`/`expected.json`/`meta.json` modified); parent task t_159df8e5 completion metadata; §2 matrix below.
 
+**Amendment (2026-08-12):** E0403 missing-initializer reachability ruling — grammar + parser leniency for `var` declarations. Spec §5.2 amended (v0.1.3): `var_decl`/`global_var_decl` initializer now syntactically optional; missing initializer is the semantic rule AIC-E0403 (spec §8.2, DIAGNOSTIC-CONTRACT §11.5, corpus anchor `derived-semantic-missing-init`); `const` forms unchanged (missing `=` stays AIC-S0101). A parser-leniency fix card (WP-M0-09-fix, senior_specialist) is added by the Planner from `docs/planning/AI-CO-PLANNER-RULING-E0403-MISSING-INIT-2026-08-12.md` §5 and is the serial prerequisite for WP-M0-13a2 (t_b174081d) resumption.
+- Source: WP-M0-13a2 specialist evidence t_b174081d comment 744 (AC2 unsatisfiable: accepted parser rejects missing initializer as AIC-S0101 and drops the declaration, making E0403 unreachable); watchdog escalation t_dcb5540e; independent verification by the Planner against spec/DIAGNOSTIC-CONTRACT/corpus/parse.c in the ruling.
+- Decision authority: Planner per milestone plan §9 (spec/contract ambiguity → Planner) and §7 downstream-gap re-planning/scope-amendment rule; ambiguity ruling within accepted direction — no new architecture decision, no ADR/contract/governance change, no Human Sponsor gate.
+- Board-state scope: new WP-M0-09-fix card created by the Planner (assignee senior_specialist; WP-M0-09 owned area `bootstrap/src/parse/**`); WP-M0-13a2 stays blocked until the fix card's review PASS; Coordinator creates/dispatches the card and gates 13a2 resumption per OM §6.1. No existing card bodies edited.
+- Evidence: `docs/planning/AI-CO-PLANNER-RULING-E0403-MISSING-INIT-2026-08-12.md`; spec v0.1.3 revision-log entry; commit(s) for this ruling.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
