@@ -18,15 +18,12 @@
  *     presence/absence of the value against the return type's void-ness).
  *
  * Corpus anchor note: tests/negative/cases/derived-semantic-return-value-
- * in-void/input.ai as committed lacks the mandatory `-> void` return type
- * (`fn noop() {`), which the grammar (spec sec. 5.2 fn_decl) rejects with
- * AIC-S0101 before any semantic stage runs - the committed input can
- * never reach E0415. This test therefore embeds the corrected spelling
- * (`fn noop() -> void {`) with identical line/col shape (the `return 5;`
- * stays on line 3, cols 3..12 - the whole return statement - matching
- * the corpus expected record's line/col); the corpus input defect is
- * disclosed in the handoff (tests/negative is WP-M0-03's area, not
- * modified here).
+ * in-void/input.ai as committed (commit 1953277) includes the mandatory
+ * `-> void` return type (`fn noop() -> void {`, spec sec. 5.2 fn_decl),
+ * so the case reaches the semantic stage and pins AIC-E0415 at line 3,
+ * cols 3..12 (byte offsets 35..44) - the whole `return 5;` statement -
+ * matching the corpus expected record's line/col/offset. The embedded
+ * spelling below matches that committed input.
  *
  * Build (from the repository root; MSVC example):
  *   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-sema-d1' \
@@ -278,10 +275,10 @@ static void test_returns_ok(void)
 
 /* ---------------------------------------------------------------------------
  * 2. E0415 corpus anchor: derived-semantic-return-value-in-void (value in
- *    a void function). The committed corpus input lacks `-> void` and
- *    cannot parse (see the header comment); this embeds the corrected
- *    spelling with the corpus record's line/col shape (line 3, cols
- *    3..12 = the whole `return 5;` statement).
+ *    a void function). The committed corpus input has `fn noop() -> void {`
+ *    (commit 1953277, see the header note); the embedded spelling below
+ *    matches it and pins the record at line 3, cols 3..12 (byte offsets
+ *    35..44) = the whole `return 5;` statement.
  * ------------------------------------------------------------------------- */
 
 static void test_e0415_value_in_void(void)
