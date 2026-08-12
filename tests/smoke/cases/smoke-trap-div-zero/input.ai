@@ -3,5 +3,5 @@ import rt.proc;
 
 pub fn main() -> void {
   var n: i32 = cast<i32>(len(rt.proc.args()));
-  var x: i32 = 1i32 / (n - 1i32);
+  var x: i32 = 1i32 / (n - n);
 }
