@@ -4,14 +4,16 @@
 **Owner:** Process Engineer
 **Affected-rule owner:** Main Designer (Operations Manual §6 amendment and watchdog implementation, COORDINATOR_PROFILE); Coordinator (card-creation and dispatch practice); Planner (manifest serial-discipline wording where it applies)
 **Approver:** Marcel, Human Sponsor (adoption of any Operations Manual amendment); Main Designer (coherence review and implementation of authorized changes)
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Date:** 2026-08-12
 **Supersedes:** None (amends the process governed by OM §6 W1–W4 v1.1.7 as adopted; does not change the normative W1–W4 rule text itself)
 **Review date:** 2026-09-11 (30 days from adoption) or on first recurrence of the covered hazard class, whichever comes first
 
+**Correction record (v0.1.1, 2026-08-12):** per reviewer2 MIN-1 on review t_997df7f5 (verdict PASS WITH MINOR FINDINGS on t_50708e5d), the S-1 citation was corrected: review card **t_9ac8e485 (comment 1279) is the sole S-1 source for this workspace-isolation hazard**; t_47cce3e7's S-1 (comment 1274) concerns ir_dump_verify invariant-12 test coverage — a different suggestion, not a source of this hazard. Corrected at §1, §2.1 evidence-table row, §2.4, and §6.
+
 ## 1. Problem and desired outcome
 
-Reviewer2's Suggestion S-1 (review cards t_9ac8e485 verdict comment 2026-08-12 20:19 and t_47cce3e7 comment 2026-08-12 20:09, routed via the Coordinator to the Process Engineer) identified an evidence-integrity hazard: sibling follow-up cards (MIN-1 t_171e3b7f and MIN-2 t_30ae127a, both children of WP-M0-16b1 t_19837659) share the same `dir` workspace (`E:\Hermes_Agent\projects\Sneedworks\projects\AI-Co`) and their execution/review windows overlapped while both cards were editing the same source files (`bootstrap/src/ir/ir_core.c`, `bootstrap/src/ir/ir_core_test.c`). During reviewer2's independent re-review of MIN-1, MIN-2's in-progress UNCOMMITTED edits appeared in the shared working tree (mtime 20:16 local). The verdict was unaffected only because the reviewer verified from an isolated clean worktree at edc8db7.
+Reviewer2's Suggestion S-1 (review card t_9ac8e485 verdict comment 2026-08-12 20:19 — the sole S-1 source for this hazard; routed via the Coordinator to the Process Engineer) identified an evidence-integrity hazard: sibling follow-up cards (MIN-1 t_171e3b7f and MIN-2 t_30ae127a, both children of WP-M0-16b1 t_19837659) share the same `dir` workspace (`E:\Hermes_Agent\projects\Sneedworks\projects\AI-Co`) and their execution/review windows overlapped while both cards were editing the same source files (`bootstrap/src/ir/ir_core.c`, `bootstrap/src/ir/ir_core_test.c`). During reviewer2's independent re-review of MIN-1, MIN-2's in-progress UNCOMMITTED edits appeared in the shared working tree (mtime 20:16 local). The verdict was unaffected only because the reviewer verified from an isolated clean worktree at edc8db7. (Note: review card t_47cce3e7's own S-1 concerns ir_dump_verify invariant-12 test coverage — a different suggestion, not this hazard.)
 
 Desired outcome: repo-backed sibling cards whose owned paths intersect must be structurally serialized or workspace-isolated at creation time, so that (a) one card's uncommitted edits cannot pollute another card's review/verification evidence in a shared working tree, and (b) the enforcement does not depend on reviewer discipline or on manual Coordinator diligence surviving normal operation.
 
@@ -31,7 +33,7 @@ All evidence was inspected read-only on 2026-08-12 from the shared kanban DB (`C
 | MIN-1 worker run | run 770: 19:49:22 → 19:57:24 (blocked for review) | task_runs |
 | MIN-2 worker run (overlaps MIN-1's review) | run 772: 19:58:23 → 20:21:47 (blocked for review) | task_runs |
 | MIN-1 independent re-review window | t_9ac8e485 run 774: 20:10:25 → 20:19:45 | task_runs |
-| MIN-2's uncommitted edits present in shared tree during MIN-1 review | reviewer2: "the MIN-2 specialist's in-progress uncommitted edits to `ir_core.c`/`ir_core_test.c` appeared in the shared working tree (mtime 20:16 local)"; reviewer2 verified from isolated clean worktree at edc8db7 | t_9ac8e485 comment; t_47cce3e7 S-1 |
+| MIN-2's uncommitted edits present in shared tree during MIN-1 review | reviewer2: "the MIN-2 specialist's in-progress uncommitted edits to `ir_core.c`/`ir_core_test.c` appeared in the shared working tree (mtime 20:16 local)"; reviewer2 verified from isolated clean worktree at edc8db7 | t_9ac8e485 comment 1279 (S-1) |
 | MIN-1 specialist's own re-verification may have read a tree already touched by MIN-2 | MIN-1 "fresh scripted verification" comment posted 19:59; MIN-2 run started 19:58:23 — the shared tree was the same path; no evidence the specialist used an isolated checkout | t_171e3b7f comment 19:59; task_runs |
 
 **Interpretation (measurement, not assertion):** MIN-2's worker run and MIN-1's independent review window overlapped by ~21 minutes (19:58:23–20:19:45) in the same working tree, while both cards owned the same two files. The reviewer's clean-worktree discipline prevented misattribution; the hazard is that the shared tree's state was not a trustworthy evidence surface during that window, and nothing in the automated system detected or prevented the overlap.
@@ -80,7 +82,7 @@ While this record was being written, the hazard was observed live in the very sh
 - OPERATIONS_MANUAL.md §6.1 blocked-review routing and watchdog mechanism; §18 Process improvement.
 - COORDINATOR_PROFILE.md v1.0.2 — pre-assignment verification (W1a, W2a) and W4 classification steps.
 - AI-CO-STAGE0-WORK-PACKAGE-MANIFEST-2026-08-09.md — serial-discipline and splitting rules.
-- Review verdicts t_9ac8e485 (PASS, S-1) and t_47cce3e7 (PASS WITH MINOR FINDINGS, S-1) — the routing source.
+- Review verdict t_9ac8e485 (PASS, 1 Suggestion S-1 — workspace isolation of sibling tasks, comment 1279) — the sole S-1 source for this hazard. (t_47cce3e7 is PASS WITH MINOR FINDINGS, but its S-1 concerns ir_dump_verify invariant-12 test coverage — a different suggestion, not a source for this hazard.)
 
 ### 2.5 Alternative explanations considered
 
@@ -150,7 +152,7 @@ No change is proposed to W1, W3, W4, review verdicts, acceptance criteria, the M
 
 ## 6. Confidence and limitations
 
-- Requirements confidence: High (explicit reviewer S-1 on two review cards; routed by Coordinator).
+- Requirements confidence: High (explicit reviewer S-1 on t_9ac8e485 — workspace isolation of sibling tasks — routed by Coordinator; t_47cce3e7's S-1 is a different suggestion, invariant-12 test coverage, and is not a source for this proposal).
 - Architecture confidence: High (process-control analysis; no product-architecture impact).
 - Verification confidence: High for the recurrence facts (DB queries, run windows, router grep, file stats); Medium for the causal attribution "manual enforcement failed because..." — supported by two independent recurrences and the confirmed absence of any automated probe.
 - Limitations: the live recurrence involves this analysis card itself (owned paths disjoint), so it is evidence of the *concurrency state* the probe should flag, not of file-collision damage; file-collision damage remains unobserved and is bounded as a risk, not asserted as an occurred harm.
