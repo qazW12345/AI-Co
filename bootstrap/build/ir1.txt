@@ -1,0 +1,18 @@
+# bootstrap/build/ir1.txt
+# WP-M0-16b1 IR node model and invariants (contract docs/contracts/
+# IR-CONTRACT-2026-08-12.md sec. 4-5, 10).
+# Area source list (owned by WP-M0-16b1). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level ir.txt entry per manifest
+# §5 (sub-split WP-M0-16b1/16b2).
+#
+# ir_core.c depends on the WP-M0-06 diag record/span model and the
+# diagnostic code registry (bootstrap/src/diag/diag.h, diag.c,
+# diag_codes.c, diag_emit.c), which are listed in the WP-M0-06-owned
+# fragment bootstrap/build/diag.txt, included by the aggregate build.
+#
+# ir_core_test.c is intentionally NOT listed here: it is a unit-test
+# program with its own main() and is built explicitly together with the
+# library sources (see the build comment at the top of ir_core_test.c).
+bootstrap/src/ir/ir_core.c
