@@ -40,6 +40,12 @@
 - Board-state scope: new WP-M0-09-fix card created by the Planner (assignee senior_specialist; WP-M0-09 owned area `bootstrap/src/parse/**`); WP-M0-13a2 stays blocked until the fix card's review PASS; Coordinator creates/dispatches the card and gates 13a2 resumption per OM §6.1. No existing card bodies edited.
 - Evidence: `docs/planning/AI-CO-PLANNER-RULING-E0403-MISSING-INIT-2026-08-12.md`; spec v0.1.3 revision-log entry; commit(s) for this ruling.
 
+**Amendment (2026-08-12):** F-1 scope-line citation correction in WP-M0-13d2 (Entry main and reserved names) — the reserved-name scope no longer cites `AIC-E0419` (that code is assignment-to-non-lvalue, DIAGNOSTIC-CONTRACT §11.5, owned by WP-M0-13a1; no E-class code is allocated for reserved-name declarations, so fn_main's documented defensive guard + boundary-test proof is the correct implementation — inventing a code would violate the read-only contract) and the entry-main citations (Scope, Dependencies, AC 1) now cite §15.3 (the normative entry-point contract, spec line 906) instead of §18.5 (the control-flow examples section). Comment/prose only; no behavioral, source, spec, or code change.
+- Source: Reviewer2 independent conformance review finding F-1 (review t_223b5a30, comment 958), verdict PASS WITH MINOR FINDINGS on WP-M0-13d2 (t_59c6bde6, commit d64de35), routed via Coordinator gate t_e1134f63 per OM §6.1 step 3 / ADR-004 §54-8; precedent: 13d1 MIN-2 (t_fc965c3b, commit 2b6d078).
+- Decision authority: Planner (planning-artifact amendment; scope-line citation correction within the accepted contract — no new architecture decision, no governance change; precedent t_fc965c3b / commit 2b6d078). No re-review required per manifest precedent for Planner-owned citation clarifications.
+- Board-state scope: no board edits here. Card t_59c6bde6 body keeps its existing text per §1 rule 9 (already-created/dispatched card); this amendment is the durable correction record.
+- Evidence: reviewer2 F-1 (t_223b5a30 comment 958); spec §4.5 (reserved built-in names), §15.3 line 906 (entry-point contract, E0418), §18.5 line 1120 (control-flow examples); DIAGNOSTIC-CONTRACT §11.5 (E0419 = assignment to non-lvalue); commit for this ruling.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -640,14 +646,14 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 ##### WP-M0-13d2 — Entry main and reserved names
 
 - **Objective:** implement entry `main` validation and reserved-name enforcement.
-- **Scope:** `main` validation (`AIC-E0418`); reserved-name enforcement (`AIC-E0419` where applicable, §4.5).
+- **Scope:** entry `main` validation (`AIC-E0418`, spec §15.3); reserved-name enforcement per spec §4.5 — defensive guard only: no E-class code is allocated for reserved-name declarations (`AIC-E0419` is assignment-to-non-lvalue, owned by WP-M0-13a1), so fn_main's documented defensive guard + boundary-test proof is the correct implementation (Planner clarification F-1, reviewer2 t_223b5a30).
 - **Exclusions:** return rules (13d1); statements (13c); IR lowering (WP-M0-16).
-- **Dependencies / inputs:** WP-M0-13d1; spec §4.5, §18.5.
+- **Dependencies / inputs:** WP-M0-13d1; spec §4.5, §15.3.
 - **Expected artifacts:** `bootstrap/src/sema/fn_main.*`, `bootstrap/build/sema_d2.txt`, main/reserved-name tests per §18.5.
 - **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Entry `main` validation per §18.5 (`AIC-E0418`); reserved-name enforcement per §4.5.
+  1. Entry `main` validation per §15.3 (`AIC-E0418`); reserved-name enforcement per §4.5.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
 - **Risks:** reserved-name edge cases. **Escalation:** semantic ambiguity → Planner.
 
