@@ -46,6 +46,14 @@
 - Board-state scope: no board edits here. Card t_59c6bde6 body keeps its existing text per §1 rule 9 (already-created/dispatched card); this amendment is the durable correction record.
 - Evidence: reviewer2 F-1 (t_223b5a30 comment 958); spec §4.5 (reserved built-in names), §15.3 line 906 (entry-point contract, E0418), §18.5 line 1120 (control-flow examples); DIAGNOSTIC-CONTRACT §11.5 (E0419 = assignment to non-lvalue); commit for this ruling.
 
+**Amendment (2026-08-12):** WP-M0-16c1 sub-split into bounded sub-packages (WP-M0-16c1a..16c1d) after two failed execution attempts; partial-artifact adoption; WP-M0-16c2 dependency re-pointing.
+- Source: Coordinator triage t_22a99eac (OM §6.1 watchdog escalation, 2026-08-12) — blocked card t_804b7d94 ([AI-Co][WP-M0-16c1] IR builder core mapping, senior_specialist): run 777 timed_out at the 150/150 iteration budget (package estimated 65–90 turns yet consumed the full senior lane budget without completion); run 780 crashed (pid not alive after ~71 min of heartbeats); lane health verified via sibling completions t_30ae127a / t_171e3b7f in the same window → execution/capacity failure, not spec/review defect. Watchdog could not auto-continue (no parseable owned-path spec per Rule W3 + crash cause). OM §13 (two failed attempts → escalation; retry without a materially different strategy is not recovery) and OM §6.1 watchdog guidance ("consider splitting the package / raising the turn budget") → routed to the Planner.
+- Partial artifact: `bootstrap/src/ir/ir_builder_core.h` (128 lines; IrBuilderStatus enum, ir_builder_build prototype, two-phase deterministic construction design notes, disclosed representable-surface gaps) exists UNTRACKED in the shared tree; mtime 2026-08-12T22:25:38 inside run 780's window (21:38:01→22:49:08) → owned by t_804b7d94 per Rule W4 provenance. WP-M0-16c1a adopts, reviews, and commits it (requirement 4 of the routing task). No ir_builder_core.c, no unit tests, no fragment, no commit were produced by the failed card.
+- Decision authority: Planner (work-package decomposition within accepted direction — PLANNER_PROFILE §3 independent decisions "decompose accepted outcomes into milestones, dependencies, deliverables, and bounded work packages"; milestone plan §7 downstream-gap re-planning/scope-amendment rule; precedent: E0403 amendment 2026-08-12). Routing decision authority: Coordinator (t_22a99eac). No new architecture decision, no spec/ADR/governance change, no Human Sponsor gate; if the Main Designer disagrees with this decomposition it may reject or revise this amendment (manifest is Planner-owned).
+- Evidence: t_22a99eac completion metadata; t_804b7d94 run/event history (runs 777/780) and Coordinator comment 1298; S-1 sibling-isolation analysis (t_50708e5d, commit b62a0d1); 16b1/16b2 actuals (commits 38a314c / 44cf12a); §1b 2026-08-12 calibration anchors below.
+- Board-state scope: no board edits here. Per §1 rule 9 and §5, when this amendment reaches the Coordinator it creates the four successor cards (WP-M0-16c1a..16c1d) per §3, supersedes t_804b7d94 (blocked origin, OM §5 closure), parents 16c1a on the pending 16b2 remediation children (W2 tree serialization), chains 16c1a→16c1b→16c1c→16c1d serially, and re-points t_07aacd82 (WP-M0-16c2) from t_804b7d94 to WP-M0-16c1d as a structural edge.
+- Fragment convention note: the 16c1a..16c1d sub-split uses letter suffixes (fragments `ir_builder1a.txt`..`ir_builder1d.txt` supersede `ir_builder1.txt`) because the existing 16c1/16c2 digit pattern leaves no unambiguous room for a second digit suffix; letter suffixes match the first-level convention (types_a..d.txt) and keep the §2 matrix disjoint.
+
 Companion: `docs/planning/AI-CO-STAGE0-MILESTONE-PLAN-2026-08-09.md` (milestone structure, build conventions, harness design, serial discipline). This manifest is the routing surface: every package below contains the fields required by Operations Manual §7 and the Coordinator profile so cards can be created structurally.
 
 ## 1. Routing rules (binding on the Coordinator)
@@ -113,6 +121,12 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 
 **Lesson for remaining packages.** Compiler-core packages are the risk class: conceptually small, but large raw effort (many tests, subtle spec rules). Remaining packages WP-M0-12b..19c below are re-estimated under the 2026-08-11 multiplier (3–5× LOC, 13–17 LOC/turn); every package whose realistic estimate exceeds the recomputed threshold (≈105 turns at the recommended budget) is pre-split into second-level cards (12b1/12b2 … 19c1/19c2). Estimates are stated as turn ranges with their LOC basis so the next calibration can compare.
 
+**Calibration anchors (recorded 2026-08-12, WP-M0-16b1/16b2 actuals + WP-M0-16c1 failure).** These are the most recent IR-package anchors and the direct basis for the 16c1a..16c1d split sizing below.
+- WP-M0-16b1 (IR node model + invariants): 1 implementation run (run 744, no budget hit), ~5,428 LOC total (ir_core.h 474 + ir_core.c 3,239 + ir_core_test.c 1,715), 14 test functions / 734 checks. Estimate was 60–85 turns / ~1,000–1,400 LOC → delivered 3.9–5.4× the LOC estimate; effective rate ≈ 36 LOC/turn.
+- WP-M0-16b2 (IR deterministic dump/verification): 1 effective run (run 769 after run 768 crashed mid-work), ~4,078 LOC total (ir_dump.h 124 + ir_dump.c 2,870 + ir_dump_test.c 1,084), 8 test functions / 477 checks. Estimate was 60–85 turns / ~1,000–1,400 LOC → delivered ~2.9–4.1×; effective rate ≈ 27 LOC/turn.
+- WP-M0-16c1 (IR builder core mapping): TWO FAILED RUNS — run 777 timed_out at 150/150 iterations with only the 128-line header delivered; run 780 crashed. Estimate was 65–90 turns / ~1,100–1,500 LOC; the §1b multiplier (3–5×, mean 4.4×) predicts the full builder at ~3,300–7,500 LOC delivered (≈4,500–7,000 for the split scope), i.e., 2–3+ single-lane runs at the observed 25–36 LOC/turn. The stale estimate repeated the naive-LOC trap the 2026-08-11 recalibration was designed to prevent and must not be reused.
+- Split sizing rule (adopted for WP-M0-16c1a..16c1d): estimate at 25–30 LOC/turn (conservative vs 27–36 observed on IR packages), target ≤ 70 turns per card (≈1,400–2,100 LOC delivered, ≤ 67% of the 150-turn lane budget, ≤ 105-turn §1b threshold with margin). 4 cards × 35–70 turns ≈ 175–240 total.
+
 ## 2. File-ownership matrix (disjoint areas)
 
 | Package | Owned repository area |
@@ -154,7 +168,10 @@ One machine-readable schema binds the corpora and the harness. The harness (WP-M
 | WP-M0-16a | `docs/contracts/IR-CONTRACT-*.md` (draft + acceptance record) |
 | WP-M0-16b1 | `bootstrap/src/ir/ir_core.*` (node model, invariants), `bootstrap/build/ir1.txt` |
 | WP-M0-16b2 | `bootstrap/src/ir/ir_dump.*` (deterministic dump/verification), `bootstrap/build/ir2.txt` |
-| WP-M0-16c1 | `bootstrap/src/ir/ir_builder_core.*` (typed AST → IR mapping), `bootstrap/build/ir_builder1.txt` |
+| WP-M0-16c1a | `bootstrap/src/ir/ir_builder_core.h` (adopted partial artifact from t_804b7d94), `bootstrap/src/ir/ir_builder_core.c` (entry/status/context/driver skeleton), `bootstrap/src/ir/ir_builder_core_test.c`, `bootstrap/build/ir_builder1a.txt` |
+| WP-M0-16c1b | `bootstrap/src/ir/ir_builder_decl.*` (module/import graph, declarations, storage model, type/const interning), `bootstrap/build/ir_builder1b.txt` |
+| WP-M0-16c1c | `bootstrap/src/ir/ir_builder_expr.*` (expression mapping, value categories, lowering rules), `bootstrap/build/ir_builder1c.txt` |
+| WP-M0-16c1d | `bootstrap/src/ir/ir_builder_stmt.*` (statement mapping, terminators, full builder integration), `bootstrap/src/ir/ir_builder_integration_test.c`, `bootstrap/build/ir_builder1d.txt` |
 | WP-M0-16c2 | `bootstrap/src/ir/ir_builder_cause.*` (span/cause preservation + determinism tests), `bootstrap/build/ir_builder2.txt` |
 | WP-M0-17a1 | `bootstrap/src/backend/isel_core.*` (instruction selection, deterministic output), `bootstrap/build/backend_a1.txt` |
 | WP-M0-17a2 | `bootstrap/src/backend/isel_x64.*` (x86-64+SSE2 coverage, AIC-B0601), `bootstrap/build/backend_a2.txt` |
@@ -877,30 +894,102 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 
 ---
 
-#### WP-M0-16c — IR builder (typed AST → IR) (sub-split: WP-M0-16c1..16c2)
+#### WP-M0-16c — IR builder (typed AST → IR) (sub-split: WP-M0-16c1a..16c1d, 16c2)
 
-- **Sizing estimate (whole):** ~130–180 senior turns (recalibrated 2026-08-11; was 50–60). Above threshold → sub-split below per §1b.
+- **Sizing estimate (whole):** ~175–240 senior turns for 16c1 (recalibrated 2026-08-12 after two failed runs; was 65–90) + ~65–90 for 16c2 = ~240–330 total (was 130–180). Basis: 2026-08-12 §1b calibration anchors (16b1/16b2 actuals, 16c1 failure).
 
-##### WP-M0-16c1 — IR builder core mapping
+##### WP-M0-16c1 — IR builder core mapping (sub-split: WP-M0-16c1a..16c1d)
 
-- **Objective:** implement the IR builder mapping typed/resolved AST → IR per the accepted contract.
-- **Scope:** builder over typed AST; AST→IR mapping tests.
-- **Exclusions:** span/cause preservation (16c2); IR core (16b); contract (16a); codegen (WP-M0-17).
-- **Dependencies / inputs:** WP-M0-16b; WP-M0-09, WP-M0-11, WP-M0-13; spec §14.1(6).
-- **Expected artifacts:** `bootstrap/src/ir/ir_builder_core.*`, `bootstrap/build/ir_builder1.txt`, IR builder unit tests.
-- **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~7 test functions, ~4 normative rules, moderate complexity. Within threshold (≈105).
+- **Sizing estimate (whole):** ~175–240 senior turns (recalibrated 2026-08-12; was 65–90). Above threshold → sub-split below per §1b. Basis: 16b1/16b2 actuals (5,428 / 4,078 LOC delivered at 27–36 LOC/turn) + the 16c1 failure (150-turn budget exhausted with only a header delivered); full builder ≈ 4,500–7,000 LOC delivered at ~25–30 LOC/turn conservative → 4 serial cards, each ≤ 70 turns.
+
+###### WP-M0-16c1a — Builder foundation: entry, status, context (adopts partial artifact)
+
+- **Objective:** adopt, review, and commit the t_804b7d94 partial artifact `bootstrap/src/ir/ir_builder_core.h` (untracked in the shared tree; owned per Rule W4 provenance; do NOT strand it). Implement the builder entry surface (`ir_builder_build`), status handling (IR_BUILDER_OK / UNSUPPORTED / OOM with correct ownership semantics), builder context/allocator, and the canonical-order two-phase construction driver skeleton per the header's design notes.
+- **Scope / Owned files (ONLY):**
+  - `bootstrap/src/ir/ir_builder_core.h`
+  - `bootstrap/src/ir/ir_builder_core.c`
+  - `bootstrap/src/ir/ir_builder_core_test.c`
+  - `bootstrap/build/ir_builder1a.txt`
+- **Exclusions:** module/import/declaration mapping, storage model, type/const interning (16c1b); expression mapping/lowering (16c1c); statement mapping/terminators/full integration (16c1d); span/cause preservation (16c2); `ir_core.*`/`ir_dump.*` modification (16b, read-only).
+- **Dependencies / inputs:** WP-M0-16b verified (incl. 16b2 MIN-1/MIN-2 committed; W2 tree-cleanliness gate); WP-M0-09 AST, WP-M0-10 names, WP-M0-11 types/layout, WP-M0-12 const (read-only inputs); IR contract §1.3, §4, §6, §12.1; spec §14.1(6). Serial prerequisite: 16b2 (and its MIN follow-ups) verified + shared tree clean.
+- **Expected artifacts:** the four owned files above; header adjusted to the split foundation scope with disclosed representable-surface gaps retained; entry/status unit tests.
+- **Sizing estimate:** 35–50 senior turns. Basis: ~700–1,200 LOC delivered incl. adopted header (~128) + entry/context source (~300–500) + tests (~400–600); 3–5 test functions; low-moderate complexity. Within threshold (≈105) with large margin.
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
 - **Acceptance criteria:**
-  1. Identical AST → identical IR (structural mapping per the contract).
+  1. `ir_builder_build` returns IR_BUILDER_OK with `*out_build` owned, or IR_BUILDER_UNSUPPORTED / IR_BUILDER_OOM with nothing owned, on entry-level malformed/unsupported input (no crash, no partial ownership).
+  2. Builder context supports the two-phase canonical-order driver skeleton (Phase A module/declaration order, Phase B body order) per the header design notes.
+  3. The adopted header is committed with ownership notes updated to the 16c1a..16c1d split; adoption recorded in the handoff comment.
 - **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
-- **Risks:** builder coverage gaps. **Escalation:** IR boundary conflict → Main Designer.
+- **Risks:** header-adoption edits drifting from the contract. **Escalation:** IR boundary conflict → Main Designer.
+
+###### WP-M0-16c1b — Module/declaration mapping, storage model, type/const interning
+
+- **Objective:** implement Phase A mapping per contract §4.1–4.5: module units in canonical order (entry first, then imports depth-first in import order), imports, top-level declarations in source order (struct with layout facts, enum with continuation values, global const without storage, global var with static slot + IRConst initializer, function with param slots and body placeholder), the deterministic storage model (§4.3: params first, locals in first-declaration order, temporaries), type interning (§4.4/§6.3), and constant mapping/dedup (§4.5/§6.4, EvalValue → IRConst incl. sizeof/alignof as IRConst_INT).
+- **Scope / Owned files (ONLY):**
+  - `bootstrap/src/ir/ir_builder_decl.h`
+  - `bootstrap/src/ir/ir_builder_decl.c`
+  - `bootstrap/src/ir/ir_builder_decl_test.c`
+  - `bootstrap/build/ir_builder1b.txt`
+- **Exclusions:** expression mapping/lowering (16c1c); statement mapping/terminators/integration (16c1d); entry/status (16c1a, read-only); span/cause preservation (16c2); `ir_core.*`/`ir_dump.*` modification.
+- **Dependencies / inputs:** WP-M0-16c1a; WP-M0-09 AST, WP-M0-10 names, WP-M0-11 types/layout, WP-M0-12 const (read-only); IR contract §4.1–4.5, §6; spec §14.1(6).
+- **Expected artifacts:** `ir_builder_decl.*` + tests; fragment `ir_builder1b.txt`.
+- **Sizing estimate:** 45–60 senior turns. Basis: ~1,200–1,800 LOC delivered, 5–7 test functions, moderate complexity (declaration walker + interning tables). Within threshold (≈105) with margin.
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Module graph + declarations map per §4.1–4.2: canonical module order, source-order declarations, struct layout facts (offsets/size/align), enum continuation values, const has no addressable storage, global var carries its IRConst initializer.
+  2. Storage model per §4.3: param slots first, locals first-declaration order, temporaries with deterministic ids; no uninitialized local state.
+  3. Type interning and const dedup per §6.3–6.4: identical types share one descriptor; identical constants share one IRConst; first-occurrence canonical order.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** declaration-surface gaps. **Escalation:** IR boundary conflict → Main Designer.
+
+###### WP-M0-16c1c — Expression mapping and lowering rules
+
+- **Objective:** implement Phase B expression lowering per contract §5.3–5.4 and the fixed lowering rules of §12.1: every value-producing node (constants, IR_LOCAL/IR_GLOBAL refs, FIELD_ADDR/INDEX_ADDR/DEREF/LOAD/STORE, arithmetic/bitwise/logical/comparison incl. SLICE_EQ, SELECT, CALL, LEN/PTR/SLICE, CAST/WRAP, PTR_ADD/SUB/DIFF, ZERO), value categories (§5.4 scalar direct vs composite address-resident, lvalue rules), evaluation order (§6.1 = spec §10.4), compound assignment lowered to dest-location + source + op + store, struct literals lowered to IR_ZERO + field stores, array literals lowered to IR_ZERO + element stores with the repetition form `[e; N]` evaluating e exactly once (IRC-N1, Main Designer interpretation; planner alignment record t_72c6d57b / commit c648380), and defensive IR_BUILDER_UNSUPPORTED on the disclosed representable-surface gaps (address-of a plain scalar local/param/global; slice-typed global initializer).
+- **Scope / Owned files (ONLY):**
+  - `bootstrap/src/ir/ir_builder_expr.h`
+  - `bootstrap/src/ir/ir_builder_expr.c`
+  - `bootstrap/src/ir/ir_builder_expr_test.c`
+  - `bootstrap/build/ir_builder1c.txt`
+- **Exclusions:** statement mapping/terminators/integration (16c1d); module/declaration/storage/interning (16c1b, read-only); entry/status (16c1a, read-only); span/cause chains (16c2); `ir_core.*`/`ir_dump.*` modification.
+- **Dependencies / inputs:** WP-M0-16c1a, WP-M0-16c1b; IR contract §5.3–5.4, §6, §12.1; spec §10.4, §11.1–11.6, §12.1–12.8; IRC-N1 alignment record (`docs/planning/AI-CO-PLANNER-ALIGNMENT-IRC-N1-REPETITION-EVAL-2026-08-12.md`).
+- **Expected artifacts:** `ir_builder_expr.*` + tests; fragment `ir_builder1c.txt`.
+- **Sizing estimate:** 45–60 senior turns. Basis: ~1,200–1,800 LOC delivered, 6–8 test functions, moderate-high complexity (largest single rule surface; lowering rules + value categories). Within threshold (≈105) with margin.
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Every §5.3 node lowered per contract: children, result type, evaluation order, trap/enforcement obligations carried on the node.
+  2. Value categories per §5.4: no non-lvalue store, no addressable const, composite values address-resident; str/slice indexing yields a value address, never an lvalue.
+  3. Fixed lowering per §12.1 incl. repetition-form `[e; N]` evaluate-exactly-once (IRC-N1); unsupported constructs return IR_BUILDER_UNSUPPORTED with nothing owned.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** lowering-rule drift; repetition-form semantics. **Escalation:** IR boundary conflict → Main Designer.
+
+###### WP-M0-16c1d — Statement mapping, terminators, and full builder integration
+
+- **Objective:** implement Phase B statement mapping per contract §5.2 (IR_BLOCK, IR_LOCAL_DECL, IR_IF, IR_WHILE, IR_FOR first-class with init/cond/step scoping, IR_SWITCH/IR_CASE/IR_DEFAULT, IR_BREAK/IR_CONTINUE with enclosing-stack target resolution, IR_RETURN, IR_EXPR_STMT, IR_EMPTY, IR_CALL_TERM for rt.proc.exit / rt.trap.report, IR_TRAP), terminator rules §5.6 (case/default bodies and non-void tails terminate; void fall-off; no fall-through), then wire the complete `ir_builder_build` two-phase construction (Phase A via 16c1b, Phase B statements + expressions via 16c1c) and prove the package-level acceptance criterion end to end.
+- **Scope / Owned files (ONLY):**
+  - `bootstrap/src/ir/ir_builder_stmt.h`
+  - `bootstrap/src/ir/ir_builder_stmt.c`
+  - `bootstrap/src/ir/ir_builder_stmt_test.c`
+  - `bootstrap/src/ir/ir_builder_integration_test.c`
+  - `bootstrap/build/ir_builder1d.txt`
+- **Exclusions:** expression node semantics (16c1c, read-only); module/declaration/storage/interning (16c1b, read-only); entry/status (16c1a, read-only); span/cause chains (16c2); codegen (WP-M0-17); `ir_core.*`/`ir_dump.*` modification.
+- **Dependencies / inputs:** WP-M0-16c1a, WP-M0-16c1b, WP-M0-16c1c; IR contract §5.2, §5.6, §6.1, §12.1; spec §13, §10.4, §14.1(6).
+- **Expected artifacts:** `ir_builder_stmt.*` + tests; integration test file; fragment `ir_builder1d.txt`.
+- **Sizing estimate:** 50–70 senior turns. Basis: ~1,400–2,000 LOC delivered, 6–8 test functions + integration fixtures, moderate-high complexity (terminator/target analysis + end-to-end wiring). Within threshold (≈105) with margin.
+- **Capability:** `senior_specialist`. **Host toolchain required:** yes.
+- **Acceptance criteria:**
+  1. Statements map per §5.2; terminator rules per §5.6 enforced (case/default bodies and non-void tails terminate; no statement after a terminator; void tail fall-off allowed).
+  2. Break/continue target resolution correct (enclosing switch/loop stack; continue inside a switch continues the loop).
+  3. Full `ir_builder_build` produces a complete IrBuild for representative accepted builds; identical AST → identical IR (structural mapping, the original 16c1 AC); produced graphs pass `ir_core_verify` with no AIC-I0501; dump/parse/re-dump byte-identical via `ir_dump` (read-only) on integration fixtures.
+  4. Disclosed representable-surface gaps return IR_BUILDER_UNSUPPORTED with nothing owned; no silent acceptance of an unmappable construct.
+- **Verification / review class:** self-review + Reviewer independent review (class: Reviewer).
+- **Risks:** integration coupling; invariant violations surfaced late. **Escalation:** IR boundary conflict → Main Designer.
 
 ##### WP-M0-16c2 — IR span/cause preservation
 
 - **Objective:** implement source-span and causal-chain preservation on the IR builder output.
 - **Scope:** span/cause preservation; determinism tests.
-- **Exclusions:** structural mapping (16c1); IR core (16b); codegen (WP-M0-17).
-- **Dependencies / inputs:** WP-M0-16c1; WP-M0-09/11/13; spec §14.1(6).
+- **Exclusions:** structural mapping (16c1a..16c1d); IR core (16b); codegen (WP-M0-17).
+- **Dependencies / inputs:** WP-M0-16c1d (final 16c1 sub-package; board parent edge re-pointed from t_804b7d94 per §5); WP-M0-09/11/13; spec §14.1(6).
 - **Expected artifacts:** `bootstrap/src/ir/ir_builder_cause.*`, `bootstrap/build/ir_builder2.txt`, span/cause tests.
 - **Sizing estimate:** 65–90 senior turns. Basis: ~1,100–1,500 LOC incl. tests, ~6 test functions, ~3 normative rules, moderate complexity. Within threshold (≈105).
 - **Capability:** `senior_specialist`. **Host toolchain required:** yes.
@@ -1233,3 +1322,5 @@ For each WP-M0 card, verify before dispatch: assignee profile Active and capabil
 **Task-sizing and supersession (binding, from the 2026-08-10 amendment):** for the remaining unrun packages (WP-M0-11..20), dispatch per the §3 split cards, not the original oversized packages. When the amended manifest reaches the Coordinator, create the new split cards per the manifest (each with its own owned area, acceptance criteria, review class, serial edges, and sizing estimate) and supersede the original oversized card for that package (supersession pattern already used for push cards). Existing already-created M0 cards keep their bodies — no board edits for cards already dispatched or in-flight. Each split card's body must carry its §1b sizing estimate; dispatch split siblings strictly serially (e.g., WP-M0-11a → 11b → 11c → 11d) and do not start a split group until the previous group's cards are verified.
 
 **Recalibration supersession (binding, from the 2026-08-11 amendment):** before dispatching any card from WP-M0-12b onward, the Coordinator must (1) execute or decline the recommended senior-lane budget change (§1b: `hermes -p senior_specialist config set agent.max_turns 150`), recording it on the board and verifying it takes effect — if declined, return over-threshold cards to the Planner for re-splitting rather than dispatching them over-threshold; and (2) supersede the first-level split cards (WP-M0-12b, 13a..13d, 14a..14b, 15a, 15c, 16b..16c, 17a..17c, 18a..18b, 19a..19c) with the §3 second-level sub-split cards (12b1/12b2 … 19c1/19c2), each with its own owned area (§2), acceptance criteria, review class, serial edges, and recalibrated §1b sizing estimate. Dispatch sub-split siblings strictly serially (e.g., 12b1 → 12b2, then 13a1 → 13a2 → 13b1 → 13b2 → …); do not start a split group until the previous group's cards are verified. WP-M0-15b, 16a, and 20 are dispatched as single cards with their revised estimates.
+
+**WP-M0-16c1 sub-split supersession (binding, from the 2026-08-12 amendment):** before dispatching any WP-M0-16c1 successor, the Coordinator must (1) verify the shared tree is clean per OM §6.1 W2 — all 16b2 remediation (t_95984b78, t_be99e361) committed and gated; untracked scratch files `bootstrap/src/ir/ir_dump_dbg.c` / `bootstrap/src/ir/ir_dump_orig.c` classified per W4 and cleaned (never swept into a successor commit); (2) create the four successor cards WP-M0-16c1a..16c1d per §3 — each card body MUST carry the parseable W3 owned-path spec exactly as written in §3 (heading `Owned files (ONLY)` / `SCOPE / OWNED FILES (ONLY)` followed by backticked path bullets; do NOT use prose like "Owned repository area (delivery destination):"), the §1b Sizing estimate, the review-required completion protocol (manifest §1 rule 8), and serial dependency edges: 16c1a parented on the still-pending 16b2 remediation children (t_95984b78, t_be99e361 — promotes only when both commit; W2 structural serialization; if those complete first, parent on t_4bf3940f as the last verified 16b2 state), 16c1b parent = 16c1a, 16c1c parent = 16c1b, 16c1d parent = 16c1c; (3) supersede t_804b7d94 (stays blocked as superseded origin per OM §5, same pattern as t_eeb8e27b; no retry of the old card); (4) re-point t_07aacd82 (WP-M0-16c2) from parent t_804b7d94 to WP-M0-16c1d as a structural edge (remove t_804b7d94→t_07aacd82, add 16c1d→t_07aacd82) so 16c2 promotes only after the last 16c1 sub-package is verified; if the runtime cannot remove the old edge, create a replacement 16c2 card parented on 16c1d with the same §3 body and supersede t_07aacd82, re-pointing its children (t_e66fb023) to the replacement. Dispatch sub-split siblings strictly serially (16c1a → 16c1b → 16c1c → 16c1d); do not start WP-M0-16c2 until 16c1d is verified; group WP-M0-17 starts only after 16c2 is verified (unchanged).
