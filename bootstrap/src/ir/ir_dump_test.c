@@ -967,6 +967,222 @@ static void test_dump_parse_malformed_str_const(void)
     }
 }
 
+/* ---------------------------------------------------------------------------
+ * MIN-1 remediation (reviewer2 t_47cce3e7): empty text fields in
+ * hand-crafted dumps must be rejected by ir_dump_parse, not silently
+ * misparsed. Two representations are covered: a zero-width field
+ * (consecutive separators, which the tokenizer would otherwise collapse
+ * into the adjacent field) and a token that decodes to a zero-length
+ * string (the dump-format escape '\x00').
+ * ------------------------------------------------------------------------- */
+
+/* Minimal well-formed prefix: header (1 module, the 13 base types,
+ * 0 consts, 1 node), the 13 base-type records, and the module order
+ * line. Callers append the N/K/P records of the single IR_MODULE
+ * node. */
+static void dump_minimal_prefix(char *buf, size_t cap)
+{
+    int n = snprintf(buf, cap,
+        "H 1 13 0 1\n"
+        "T 0 void 0 1\n"
+        "T 1 bool 1 1\n"
+        "T 2 i8 1 1\n"
+        "T 3 i16 2 2\n"
+        "T 4 i32 4 4\n"
+        "T 5 i64 8 8\n"
+        "T 6 u8 1 1\n"
+        "T 7 u16 2 2\n"
+        "T 8 u32 4 4\n"
+        "T 9 u64 8 8\n"
+        "T 10 isize 8 8\n"
+        "T 11 usize 8 8\n"
+        "T 12 str 16 8\n"
+        "M 0\n");
+    CHECK(n > 0 && (size_t)n < cap);
+}
+
+/* Assert ir_dump_parse rejects `text` with a deterministic reason and
+ * no owned build. */
+static void expect_malformed_dump(const char *text)
+{
+    IrBuild *r = NULL;
+    char errbuf[256];
+    IrDumpStatus st = ir_dump_parse(text, strlen(text), &r, errbuf,
+                                    sizeof(errbuf));
+    CHECK(st == IR_DUMP_MALFORMED);
+    CHECK(errbuf[0] != '\0');
+    CHECK(r == NULL);
+}
+
+/* Append the single IR_MODULE node records (span, one cause, payload)
+ * to a dump that already holds the minimal prefix. */
+static void append_module_dump(char *buf, size_t cap, const char *payload)
+{
+    size_t off = strlen(buf);
+    int n = snprintf(buf + off, cap - off,
+        "N 0 IR_MODULE -1 - a.ai 1 1 0 1 1 0 1\n"
+        "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+        "P %s\n",
+        payload);
+    CHECK(n > 0 && (size_t)n < cap - off);
+}
+
+static void test_dump_parse_empty_field_collapse(void)
+{
+    /* MIN-1: a zero-width text field (consecutive separators) must be
+     * rejected; without the check the tokenizer drops the empty token
+     * and the adjacent field is silently misread. Payload layout here:
+     * name, nimports, [imports], ndecl, [decls]; the intended dump
+     * 'name=<empty> nimp=1 import=0 ndecl=0' is misparsed as
+     * 'name="1" nimp=0 ndecl=0' and accepted. */
+    char dump[2048];
+    dump_minimal_prefix(dump, sizeof(dump));
+    append_module_dump(dump, sizeof(dump), "  1 0 0");   /* name empty */
+    expect_malformed_dump(dump);
+
+    /* same rule applies to non-payload records: the node header has an
+     * empty trap field (double space between the type ref and '-') */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 0 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1  - a.ai 1 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+
+    /* cleanup-path guard: a malformed span escape on an N header that
+     * declares ncauses=1 must be rejected without touching the cause
+     * arrays (they are allocated only after the primary span parse). */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 0 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - \\q 1 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+}
+
+static void test_dump_parse_empty_decoded_string(void)
+{
+    /* MIN-1: a text field that decodes to a zero-length string (the
+     * dump-format escape '\x00') is an empty required field and must
+     * be rejected. */
+    char dump[2048];
+    dump_minimal_prefix(dump, sizeof(dump));
+    append_module_dump(dump, sizeof(dump), "\\x00 0 0");  /* name empty */
+    expect_malformed_dump(dump);
+
+    /* span file path decodes to empty (node header) */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 0 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - \\x00 1 1 0 1 1 0 1\n"
+            "K AST_MODULE_DECL a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+
+    /* construct kind decodes to empty (cause record) */
+    {
+        int n = snprintf(dump, sizeof(dump),
+            "H 1 13 0 1\n"
+            "T 0 void 0 1\n"
+            "T 1 bool 1 1\n"
+            "T 2 i8 1 1\n"
+            "T 3 i16 2 2\n"
+            "T 4 i32 4 4\n"
+            "T 5 i64 8 8\n"
+            "T 6 u8 1 1\n"
+            "T 7 u16 2 2\n"
+            "T 8 u32 4 4\n"
+            "T 9 u64 8 8\n"
+            "T 10 isize 8 8\n"
+            "T 11 usize 8 8\n"
+            "T 12 str 16 8\n"
+            "M 0\n"
+            "N 0 IR_MODULE -1 - a.ai 1 1 0 1 1 0 1\n"
+            "K \\x00 a.ai 1 1 0 1 1 0 0 0 0\n"
+            "P m 0 0\n");
+        CHECK(n > 0 && (size_t)n < (int)sizeof(dump));
+        (void)n;
+    }
+    expect_malformed_dump(dump);
+}
+
+static void test_dump_parse_nonempty_text_field_ok(void)
+{
+    /* regression guard: a compliant hand-crafted dump with a non-empty
+     * name still parses (the empty-field rejection must not reject
+     * valid input). */
+    char dump[2048];
+    IrBuild *r = NULL;
+    char errbuf[256];
+    IrDumpStatus st;
+    dump_minimal_prefix(dump, sizeof(dump));
+    append_module_dump(dump, sizeof(dump), "m 0 0");
+    st = ir_dump_parse(dump, strlen(dump), &r, errbuf, sizeof(errbuf));
+    CHECK(st == IR_DUMP_OK);
+    if (st == IR_DUMP_OK) {
+        CHECK(r != NULL);
+        CHECK(r->nmodules == 1);
+        CHECK(r->modules[0]->kind == IR_MODULE);
+        CHECK(strcmp(r->modules[0]->u.module.name, "m") == 0);
+        ir_build_free(r);
+    } else {
+        fprintf(stderr, "  parse error: %s\n", errbuf);
+    }
+}
+
 static void test_dump_verify(void)
 {
     /* ir_dump_verify: IR_OK on a valid build; IR_VIOLATION with
@@ -1071,6 +1287,12 @@ int main(void)
     fprintf(stderr, "after test_dump_parse_malformed\n");
     test_dump_parse_malformed_str_const();
     fprintf(stderr, "after test_dump_parse_malformed_str_const\n");
+    test_dump_parse_empty_field_collapse();
+    fprintf(stderr, "after test_dump_parse_empty_field_collapse\n");
+    test_dump_parse_empty_decoded_string();
+    fprintf(stderr, "after test_dump_parse_empty_decoded_string\n");
+    test_dump_parse_nonempty_text_field_ok();
+    fprintf(stderr, "after test_dump_parse_nonempty_text_field_ok\n");
     test_dump_verify();
     fprintf(stderr, "after test_dump_verify\n");
 

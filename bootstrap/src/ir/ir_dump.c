@@ -36,7 +36,10 @@
  * (param/local/temp). Trap-code strings are resolved through the
  * diagnostic registry on parse (they are borrowed registry literals in
  * the node model; invariant 9 requires registry membership, so an
- * unregistered code in a dump is malformed input).
+ * unregistered code in a dump is malformed input). Empty text fields
+ * are rejected on parse (see ir_dump.h): a zero-width field (leading or
+ * consecutive separators) and a token that decodes to a zero-length
+ * string both produce a deterministic malformed-dump error.
  *
  * Ownership: ir_dump_parse returns an owned IrBuild on IR_DUMP_OK
  * (ir_build_free); on failure nothing is owned. ir_dump_verify returns
@@ -685,6 +688,8 @@ typedef struct DumpLine {
     size_t toks_cap;
     char *line;
     size_t line_cap;
+    bool empty_field;   /* a zero-width field (leading or consecutive
+                         * separators) was found on the current line */
 } DumpLine;
 
 typedef struct DumpReader {
@@ -757,11 +762,16 @@ static bool grow_toks(DumpLine *dl, size_t want)
 
 /* Split dl->line into whitespace-separated tokens (spaces and tabs).
  * Returns false on OOM. Tokens are pointers into dl->line; the line is
- * mutated (separator bytes become NUL). Empty tokens are skipped. */
+ * mutated (separator bytes become NUL). A zero-width field (a leading
+ * separator or consecutive separators) is recorded on dl->empty_field;
+ * the canonical dump never contains one, so the parse rejects the line
+ * (the empty text field would otherwise collapse into the adjacent
+ * field and be silently misparsed). Empty tokens are skipped. */
 static bool tokenize_line(DumpLine *dl)
 {
     char *s = dl->line;
     dl->ntoks = 0;
+    dl->empty_field = false;
     while (*s) {
         char *start = s;
         while (*s && *s != ' ' && *s != '\t') {
@@ -772,6 +782,8 @@ static bool tokenize_line(DumpLine *dl)
                 return false;
             }
             dl->toks[dl->ntoks++] = start;
+        } else {
+            dl->empty_field = true;
         }
         if (*s == ' ' || *s == '\t') {
             *s = '\0';
@@ -818,6 +830,24 @@ static int read_line(DumpReader *rd, DumpLine *dl)
         return 1;
     }
     return 0;
+}
+
+/* True when the line just read contains a zero-width field (a leading
+ * separator or consecutive separators). The canonical dump never emits
+ * one; a zero-width text field would otherwise collapse into the
+ * adjacent field and be silently misparsed, so the parse rejects the
+ * line. Fills errbuf with a deterministic reason. */
+static bool line_has_empty_field(const DumpLine *dl, char *errbuf,
+                                 size_t errbuf_size, size_t lineno)
+{
+    if (!dl->empty_field) {
+        return false;
+    }
+    if (errbuf != NULL) {
+        snprintf(errbuf, errbuf_size,
+                 "line %zu: empty field (consecutive separators)", lineno);
+    }
+    return true;
 }
 
 /* Parse a non-negative integer token; returns false if malformed. */
@@ -941,6 +971,13 @@ static bool tok_span(DumpLine *dl, size_t *idx, DiagSpan **out,
             if (errbuf != NULL) {
                 snprintf(errbuf, errbuf_size,
                          "line %zu: malformed escape in span file", lineno);
+            }
+            return false;
+        }
+        if (dec[0] == '\0') {
+            if (errbuf != NULL) {
+                snprintf(errbuf, errbuf_size,
+                         "line %zu: empty span file", lineno);
             }
             return false;
         }
@@ -1071,9 +1108,18 @@ static void free_node_rec(NodeRec *r)
 {
     size_t i;
     diag_span_free(r->span);
-    for (i = 0; i < r->ncauses; i++) {
-        free(r->cause_kinds[i]);
-        diag_span_free(r->cause_spans[i]);
+    /* The cause arrays are allocated together only after the primary
+     * span parse succeeds; a malformed-input rejection can reach this
+     * cleanup with r->ncauses > 0 but the arrays still NULL. */
+    if (r->cause_kinds != NULL) {
+        for (i = 0; i < r->ncauses; i++) {
+            free(r->cause_kinds[i]);
+        }
+    }
+    if (r->cause_spans != NULL) {
+        for (i = 0; i < r->ncauses; i++) {
+            diag_span_free(r->cause_spans[i]);
+        }
     }
     free(r->cause_kinds);
     free(r->cause_spans);
@@ -1128,7 +1174,10 @@ static bool pl_size(PayloadCursor *pc, size_t *out)
 }
 
 /* Required string: '-' is treated as an empty string (callers that need
- * NULL use the node ref path); returns the decoded pointer. */
+ * NULL use the node ref path); returns the decoded pointer. A text
+ * field that decodes to a zero-length string is an empty required field
+ * and is rejected (identifiers, construct kinds, and file paths are
+ * non-empty per the language facts; ir_dump_write never emits one). */
 static bool pl_string(PayloadCursor *pc, char **out)
 {
     if (pc->idx >= pc->rec->npayload) {
@@ -1143,6 +1192,14 @@ static bool pl_string(PayloadCursor *pc, char **out)
         *out = NULL;
     } else {
         *out = pc->rec->payload[pc->idx];
+        if (**out == '\0') {
+            if (pc->errbuf != NULL) {
+                snprintf(pc->errbuf, pc->errbuf_size,
+                         "malformed payload: empty string at field %zu",
+                         pc->idx);
+            }
+            return false;
+        }
     }
     pc->idx++;
     return true;
@@ -1230,6 +1287,12 @@ static bool pl_span(PayloadCursor *pc, DiagSpan **out)
     file = pc->rec->payload[i];
     if (strcmp(file, "-") == 0) {
         file = NULL;
+    } else if (file[0] == '\0') {
+        if (pc->errbuf != NULL) {
+            snprintf(pc->errbuf, pc->errbuf_size,
+                     "malformed payload: empty span file at field %zu", i);
+        }
+        return false;
     }
     if (!tok_int(pc->rec->payload[i + 1], &sl) ||
         !tok_int(pc->rec->payload[i + 2], &sc) ||
@@ -1809,6 +1872,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             result = IR_DUMP_MALFORMED;
             goto done;
         }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
+            goto done;
+        }
     }
     if (dl.ntoks < 1 || strcmp(dl.toks[0], "H") != 0 ||
         dl.ntoks != 5 ||
@@ -1851,6 +1918,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             } else {
                 result = IR_DUMP_MALFORMED;
             }
+            goto done;
+        }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
             goto done;
         }
         if (dl.ntoks < 1 || strcmp(dl.toks[0], "T") != 0 ||
@@ -1913,6 +1984,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             } else {
                 result = IR_DUMP_MALFORMED;
             }
+            goto done;
+        }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
             goto done;
         }
         if (dl.ntoks < 1 || strcmp(dl.toks[0], "C") != 0 ||
@@ -2048,6 +2123,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             result = IR_DUMP_MALFORMED;
             goto done;
         }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
+            goto done;
+        }
     }
     if (dl.ntoks < 1 || strcmp(dl.toks[0], "M") != 0 ||
         dl.ntoks != nmodules + 1) {
@@ -2095,6 +2174,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             } else {
                 result = IR_DUMP_MALFORMED;
             }
+            goto done;
+        }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
             goto done;
         }
         /* N <id> <kind> <type|-1> <trap|- > <file> <sl> <sc> <so> <el>
@@ -2179,6 +2262,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
                 }
                 goto done;
             }
+            if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+                result = IR_DUMP_MALFORMED;
+                goto done;
+            }
             /* K <construct_kind> <file> <sl> <sc> <so> <el> <ec> <eo>
              * <ref_decl> <ref_type> <ref_const>  (12 tokens) */
             if (dl.ntoks != 12 || strcmp(dl.toks[0], "K") != 0) {
@@ -2195,6 +2282,14 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             } else {
                 char *dec = decode_token(dl.toks[1]);
                 if (dec == NULL) {
+                    result = IR_DUMP_MALFORMED;
+                    goto done;
+                }
+                if (dec[0] == '\0') {
+                    if (errbuf != NULL) {
+                        snprintf(errbuf, errbuf_size,
+                                 "line %zu: empty construct kind", rd.lineno);
+                    }
                     result = IR_DUMP_MALFORMED;
                     goto done;
                 }
@@ -2227,6 +2322,10 @@ IrDumpStatus ir_dump_parse(const char *text, size_t len, IrBuild **out_build,
             } else {
                 result = IR_DUMP_MALFORMED;
             }
+            goto done;
+        }
+        if (line_has_empty_field(&dl, errbuf, errbuf_size, rd.lineno)) {
+            result = IR_DUMP_MALFORMED;
             goto done;
         }
         if (dl.ntoks < 1 || strcmp(dl.toks[0], "P") != 0) {

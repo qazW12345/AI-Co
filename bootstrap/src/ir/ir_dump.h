@@ -54,6 +54,14 @@
  * 's' 't' 'n' 'r' and '\xHH' for other bytes. NULL node refs are '-1';
  * NULL strings are '-'.
  *
+ * Empty text fields are malformed: ir_dump_parse rejects (a) a
+ * zero-width field (a leading separator or consecutive separators,
+ * which would otherwise collapse into the adjacent field and be
+ * silently misparsed) and (b) a text token that decodes to a
+ * zero-length string (e.g. the escape '\x00'). Identifiers, construct
+ * kinds, and file paths are non-empty per the language facts, and
+ * ir_dump_write never emits either form.
+ *
  * Scope (manifest WP-M0-16b2): the dump/verification support only.
  * Node model and invariants are WP-M0-16b1 (ir_core.*, read-only here);
  * the typed-AST -> IR builder is WP-M0-16c. This package depends only
