@@ -1,0 +1,12 @@
+# bootstrap/build/sema_c1.txt
+# WP-M0-13c1 statement rules and switch/break/continue
+# area source list (owned by WP-M0-13c1). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root.
+#
+# stmt_core_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with these library sources (see the build comment at the
+# top of stmt_core_test.c).
+bootstrap/src/sema/stmt_core.c
