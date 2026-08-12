@@ -1,0 +1,12 @@
+# bootstrap/build/sema_d2.txt
+# WP-M0-13d2 entry main and reserved names (AIC-E0418, spec sec. 4.5/15.3)
+# area source list (owned by WP-M0-13d2). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root.
+#
+# fn_main_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with these library sources (see the build comment at the
+# top of fn_main_test.c).
+bootstrap/src/sema/fn_main.c
