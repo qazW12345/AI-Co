@@ -209,6 +209,7 @@ User traps via `rt.trap.report(code: u32, message: str)` emit a record with `cod
 | `AIC-E0417` | unreachable statement | error | the statement |
 | `AIC-E0418` | entry `main` signature invalid / missing | error | the module / main decl |
 | `AIC-E0419` | assignment to non-lvalue | error | the assignment target |
+| `AIC-E0420` | duplicate switch default clause | error | the duplicate default clause |
 
 ### 11.6 IR / backend / object / link (`AIC-I`, `AIC-B`, `AIC-O`)
 
@@ -259,6 +260,7 @@ These classes are reserved for internal invariant and artifact failures. In v0.1
 - **Reserved ranges:** the numeric ranges within each class are allocated contiguously; gaps are reserved for future rules and may not be used out of sequence. User-defined trap codes never collide with `AIC-` codes: user codes are raw `u32` values carried in `trap_code`, outside the `AIC-` namespace.
 - **Registry updates:** any addition, deprecation, or schema change must be recorded in this document with a version note and reviewed; the registry is the durable record for `FIND-005` closure.
 - **v0.1.1 additions:** `AIC-N0207` and `AIC-N0208` were added for the reserved runtime-module rules of the language specification §6.5 (next unused codes in class `N`). `AIC-E0412`'s meaning text was narrowed to the brace-delimited case-body rule; the code, severity, and primary-span semantics are unchanged. In the gate-2 correction round, `AIC-N0209` (bare `import rt;`, language spec §6.5) and `AIC-R0816` (pointer arithmetic overflow, language spec §12.5) were added as the next unused codes in classes `N` and `R` respectively.
+- **2026-08-12 addition:** `AIC-E0420` (duplicate switch default clause, language spec §13.2) was added as the next unused code in class `E` per the Planner duplicate-default ruling (R-2, parent card t_4afe0ff3 comment 916; remediation t_2532c371, closing reviewer2 MIN-2 of review t_21ae48ed). Schema stays `"1"`; version stays 0.1.1.
 
 ### 11.10 Compatibility rules
 
@@ -308,3 +310,5 @@ Status: **Accepted** (2026-08-08). This contract was reviewed with the language 
 **v0.1.1 S-1 alignment (2026-08-11):** Section 11.4 primary-span prose for `AIC-T0305` was aligned to the accepted negative-corpus leftmost-operator pin (`tests/negative/cases/derived-type-chained-comparison`; documented in `bootstrap/src/types/optype.h`), closing Reviewer Suggestion S-1 (task t_0db758e5). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
 
 **v0.1.1 SUG-1 alignment (2026-08-12):** Section 11.5 primary-span prose for `AIC-E0402` and `AIC-E0404` was aligned to the accepted negative-corpus pins (`tests/negative/cases/derived-semantic-addr-of-const`: whole address-of expression node, span 5:17-19/83-85 for `&X`; `tests/negative/cases/derived-semantic-assign-to-const`: const declaration identifier, span 3:9-10/40-41 for `X` in `const X: i32 = 5;`), closing Reviewer Suggestion SUG-1 (review t_4ea1365e comment 730; gate t_e82dee76). Codes, severity, recovery, schema, and accepted executable behavior are unchanged.
+
+**v0.1.1 E0420 addition (2026-08-12):** allocated `AIC-E0420` (duplicate switch default clause, language spec §13.2) as the next unused code in class `E` per the Planner duplicate-default ruling R-2 (parent card t_4afe0ff3 comment 916; remediation t_2532c371, closing reviewer2 MIN-2 of review t_21ae48ed). The §11.5 row and §11.9 registry note were updated accordingly; schema stays `"1"` and version stays 0.1.1 (registry-update note convention). All other codes, severity, recovery, schema, and accepted executable behavior are unchanged.

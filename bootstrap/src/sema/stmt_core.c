@@ -11,6 +11,10 @@
  *     constant expressions of the selector's type; labels with equal
  *     evaluated values in one switch are rejected, the record pointing
  *     at the first occurrence's label;
+ *   - the duplicate-default rule (AIC-E0420): `default` is optional
+ *     and may appear at most once (spec sec. 13.2); each default
+ *     clause after the first is rejected, the record pointing at the
+ *     first default's keyword;
  *   - the break/continue placement rule (AIC-E0414): break is valid
  *     inside a loop or a switch; continue is valid only inside a loop.
  *
@@ -315,13 +319,15 @@ static bool stmt_walk_stmt(StmtCtx *c, const NameModule *module,
                            const AstNode *s, int loop_depth, int switch_depth);
 
 /* Check one switch: E0412 for every clause body, E0413 duplicate labels,
- * then walk the clause bodies (switch_depth + 1). */
+ * E0420 duplicate default clauses, then walk the clause bodies
+ * (switch_depth + 1). */
 static bool stmt_check_switch(StmtCtx *c, const NameModule *module,
                               const AstNode *sw, int loop_depth,
                               int switch_depth)
 {
     StmtSeenLabel *seen = NULL;
     size_t nseen = 0, seen_cap = 0, i;
+    const AstNode *first_default = NULL;
 
     for (i = 0; i < sw->u.switch_stmt.ncases; i++) {
         const AstNode *cl = sw->u.switch_stmt.cases[i];
@@ -333,6 +339,22 @@ static bool stmt_check_switch(StmtCtx *c, const NameModule *module,
         }
         stmt_check_case_terminator(c, module, cl, loop_depth);
         stmt_register_label(c, module, cl, &seen, &nseen, &seen_cap);
+        if (cl->kind == AST_DEFAULT_CLAUSE) {
+            if (first_default == NULL) {
+                first_default = cl;
+            } else {
+                /* duplicate default: emit at the FIRST default's
+                 * keyword (the 7-byte stmt_label_span convention),
+                 * mirroring the E0413 first-occurrence corpus pin */
+                DiagSpan *lspan = stmt_label_span(module, first_default);
+                DiagRecord *r = stmt_new_record(
+                    c, "AIC-E0420", "duplicate switch default clause",
+                    lspan ? lspan :
+                        (first_default->span ? first_default->span : NULL));
+                if (r) stmt_push_record(c, r);
+                diag_span_free(lspan);
+            }
+        }
         if (c->oom || c->ev.oom || c->unsupported) break;
     }
     free(seen);

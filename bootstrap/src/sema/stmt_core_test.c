@@ -2,10 +2,11 @@
  *
  * WP-M0-13c1 statement rules and switch/break/continue tests: the
  * switch no-fall-through rule (AIC-E0412), the duplicate-case-value
- * rule (AIC-E0413), and the break/continue placement rule
- * (AIC-E0414), per spec sec. 13.2-13.3 and the negative-corpus
- * anchors (18-5-semantic-case-no-terminate,
- * derived-semantic-duplicate-case, derived-semantic-break-outside-loop).
+ * rule (AIC-E0413), the duplicate-default rule (AIC-E0420), and the
+ * break/continue placement rule (AIC-E0414), per spec sec. 13.2-13.3
+ * and the negative-corpus anchors (18-5-semantic-case-no-terminate,
+ * derived-semantic-duplicate-case, derived-semantic-duplicate-default,
+ * derived-semantic-break-outside-loop).
  *
  * The tests run the full pipeline through load -> lex -> parse ->
  * name_resolve -> completeness -> layout -> convert -> optype ->
@@ -415,6 +416,93 @@ static void test_e0413_nonduplicate_and_enum(void)
 }
 
 /* ---------------------------------------------------------------------------
+ * 3.5. E0420: duplicate default clause (corpus anchor
+ *      derived-semantic-duplicate-default) and valid single-default
+ * ------------------------------------------------------------------------- */
+
+static void test_e0420_corpus(void)
+{
+    /* byte-identical to tests/negative/cases/derived-semantic-duplicate-default
+     * except a trailing EOF newline the corpus file lacks (spans
+     * unaffected) */
+    static const char src[] =
+        "module main;\n"
+        "fn main() -> i32 {\n"
+        "  var x: i32 = 10;\n"
+        "  switch (x) {\n"
+        "    case 0: { break; }\n"
+        "    default: { return 1; }\n"
+        "    default: { return 2; }\n"
+        "  }\n"
+        "  return 0;\n"
+        "}\n";
+    Pipeline p;
+
+    pipeline_run_mem(&p, src);
+    CHECK(p.st == NAME_OK);
+    if (p.st != NAME_OK) { pipeline_free(&p); return; }
+    CHECK(p.ssc == STMT_CORE_DIAG_ERROR);
+    CHECK(p.srn == 1);
+    if (p.srn != 1) { pipeline_free(&p); return; }
+    /* primary span = the FIRST default keyword (7 bytes; corpus pin) */
+    check_fail_span(p.srecs[0], src, "AIC-E0420", "default", 7);
+    check_message(p.srecs[0], "duplicate switch default clause");
+    /* no E0412: both default bodies terminate */
+    CHECK(strcmp(p.srecs[0]->code, "AIC-E0412") != 0);
+    pipeline_free(&p);
+}
+
+static void test_e0420_positive_and_three(void)
+{
+    /* exactly one default -> zero E0420 (and no other stmt_core
+     * record: the single case value 0 is not a duplicate) */
+    static const char src_one[] =
+        "module main;\n"
+        "fn f(x: i32) -> i32 {\n"
+        "  switch (x) {\n"
+        "    case 0: { break; }\n"
+        "    default: { break; }\n"
+        "  }\n"
+        "  return 0;\n"
+        "}\n"
+        "fn main() -> i32 { return 0; }\n";
+    /* three defaults -> two records, BOTH at the first default's
+     * keyword (one record per additional default; documented decision
+     * mirroring the E0413 first-occurrence pin) */
+    static const char src_three[] =
+        "module main;\n"
+        "fn g(x: i32) -> i32 {\n"
+        "  switch (x) {\n"
+        "    default: { break; }\n"
+        "    default: { break; }\n"
+        "    default: { break; }\n"
+        "  }\n"
+        "  return 0;\n"
+        "}\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+
+    pipeline_run_mem(&p, src_one);
+    CHECK(p.st == NAME_OK);
+    if (p.st != NAME_OK) { pipeline_free(&p); return; }
+    CHECK(p.ssc == STMT_CORE_OK);
+    CHECK(p.srn == 0);
+    pipeline_free(&p);
+
+    pipeline_run_mem(&p, src_three);
+    CHECK(p.st == NAME_OK);
+    if (p.st != NAME_OK) { pipeline_free(&p); return; }
+    CHECK(p.ssc == STMT_CORE_DIAG_ERROR);
+    CHECK(p.srn == 2);
+    if (p.srn != 2) { pipeline_free(&p); return; }
+    check_fail_span(p.srecs[0], src_three, "AIC-E0420", "default", 7);
+    check_message(p.srecs[0], "duplicate switch default clause");
+    check_fail_span(p.srecs[1], src_three, "AIC-E0420", "default", 7);
+    check_message(p.srecs[1], "duplicate switch default clause");
+    pipeline_free(&p);
+}
+
+/* ---------------------------------------------------------------------------
  * 4. E0414: break/continue placement (corpus anchor
  *    derived-semantic-break-outside-loop) and valid placements
  * ------------------------------------------------------------------------- */
@@ -724,6 +812,10 @@ int main(void)
     fprintf(stderr, "after test_e0413_corpus\n");
     test_e0413_nonduplicate_and_enum();
     fprintf(stderr, "after test_e0413_nonduplicate_and_enum\n");
+    test_e0420_corpus();
+    fprintf(stderr, "after test_e0420_corpus\n");
+    test_e0420_positive_and_three();
+    fprintf(stderr, "after test_e0420_positive_and_three\n");
     test_e0414_corpus();
     fprintf(stderr, "after test_e0414_corpus\n");
     test_e0414_continue_and_switch();

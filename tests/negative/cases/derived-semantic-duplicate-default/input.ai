@@ -1,0 +1,10 @@
+module main;
+fn main() -> i32 {
+  var x: i32 = 10;
+  switch (x) {
+    case 0: { break; }
+    default: { return 1; }
+    default: { return 2; }
+  }
+  return 0;
+}

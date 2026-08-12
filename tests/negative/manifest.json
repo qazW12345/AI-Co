@@ -50,6 +50,7 @@
     "derived-semantic-assign-to-const",
     "derived-semantic-missing-init",
     "derived-semantic-duplicate-case",
+    "derived-semantic-duplicate-default",
     "derived-semantic-break-outside-loop",
     "derived-semantic-return-value-in-void",
     "derived-semantic-main-missing",

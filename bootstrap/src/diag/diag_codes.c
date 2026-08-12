@@ -133,6 +133,8 @@ static const DiagCodeInfo kCodes[] = {
       "entry main signature invalid / missing" },
     { "AIC-E0419", DIAG_PHASE_SEMANTIC, DIAG_SEVERITY_ERROR,
       "assignment to non-lvalue" },
+    { "AIC-E0420", DIAG_PHASE_SEMANTIC, DIAG_SEVERITY_ERROR,
+      "duplicate switch default clause" },
 
     /* --- 11.6 IR / backend / object / link (AIC-I / AIC-B / AIC-O) --- */
     { "AIC-I0501", DIAG_PHASE_IR, DIAG_SEVERITY_ERROR,

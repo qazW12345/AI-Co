@@ -133,7 +133,7 @@ static const char *const kAllCodes[] = {
     "AIC-E0401", "AIC-E0402", "AIC-E0403", "AIC-E0404", "AIC-E0405",
     "AIC-E0406", "AIC-E0407", "AIC-E0408", "AIC-E0409", "AIC-E0410",
     "AIC-E0411", "AIC-E0412", "AIC-E0413", "AIC-E0414", "AIC-E0415",
-    "AIC-E0416", "AIC-E0417", "AIC-E0418", "AIC-E0419",
+    "AIC-E0416", "AIC-E0417", "AIC-E0418", "AIC-E0419", "AIC-E0420",
     /* 11.6 ir / backend / object / link */
     "AIC-I0501",
     "AIC-B0601",
@@ -203,7 +203,7 @@ static void test_registry(void)
     }
     /* next-unused / unknown codes are not in the registry */
     CHECK(diag_code_lookup("AIC-L0010") == NULL);
-    CHECK(diag_code_lookup("AIC-E0420") == NULL);
+    CHECK(diag_code_lookup("AIC-E0421") == NULL);
     CHECK(diag_code_lookup("AIC-R0817") == NULL);
     CHECK(diag_code_lookup("AIC-U0001") == NULL);
     CHECK(diag_code_lookup("AIC-X0001") == NULL);

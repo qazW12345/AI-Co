@@ -14,6 +14,9 @@
  *   - duplicate case values (AIC-E0413): case labels are constant
  *     expressions of the selector's type (sec. 13.2); two labels with
  *     equal evaluated values in the same switch are rejected;
+ *   - duplicate default clauses (AIC-E0420): `default` is optional
+ *     and may appear at most once (sec. 13.2); every default clause
+ *     after the first is rejected;
  *   - break/continue placement (AIC-E0414): break is valid inside a
  *     loop or a switch; continue is valid only inside a loop (sec.
  *     13.2: "continue inside a switch that is itself inside a loop
@@ -51,6 +54,16 @@
  *                later label that duplicates an earlier one, each
  *                pointing at the first occurrence's label (documented
  *                decision; the corpus pins the single-pair case).
+ *   - AIC-E0420  message "duplicate switch default clause" (corpus-
+ *                pinned by tests/negative/cases/derived-semantic-
+ *                duplicate-default); primary span = the first default
+ *                clause's `default` keyword (7 bytes, the stmt_label_span
+ *                default-clause convention), mirroring the E0413
+ *                first-occurrence pin. One record is emitted per
+ *                default clause after the first (N defaults -> N-1
+ *                records), each pointing at the first default's keyword
+ *                (documented decision; the corpus pins the two-default
+ *                single-pair case).
  *   - AIC-E0414  message "break outside loop or switch" (corpus-pinned
  *                by tests/negative/cases/derived-semantic-break-outside-
  *                loop) or "continue outside loop" (documented decision;
@@ -117,12 +130,13 @@
 #include <stdint.h>
 
 /* ---------------------------------------------------------------------------
- * Build-level statement-rule check (AIC-E0412 / AIC-E0413 / AIC-E0414)
+ * Build-level statement-rule check (AIC-E0412 / AIC-E0413 / AIC-E0414 /
+ * AIC-E0420)
  * ------------------------------------------------------------------------- */
 
 typedef enum StmtCoreStatus {
     STMT_CORE_OK = 0,        /* all owned statement rules checked; no records */
-    STMT_CORE_DIAG_ERROR,    /* AIC-E0412..E0414 records produced */
+    STMT_CORE_DIAG_ERROR,    /* AIC-E0412..E0414/E0420 records produced */
     STMT_CORE_UNSUPPORTED,   /* defensive: malformed input; nothing owned */
     STMT_CORE_OOM            /* allocation failure; nothing owned */
 } StmtCoreStatus;
@@ -130,8 +144,9 @@ typedef enum StmtCoreStatus {
 /* Walk every function body of the resolved build and emit one
  * authoritative record per owned violation: switch case/default body
  * without a terminating final statement (AIC-E0412), duplicate case
- * value (AIC-E0413), break/continue outside loop (or break outside
- * switch) (AIC-E0414). The check is purely syntactic on statement
+ * value (AIC-E0413), duplicate default clause (AIC-E0420),
+ * break/continue outside loop (or break outside switch) (AIC-E0414).
+ * The check is purely syntactic on statement
  * structure (plus loop/switch depth context and noreturn-call
  * resolution); no expression semantics are evaluated here.
  *
