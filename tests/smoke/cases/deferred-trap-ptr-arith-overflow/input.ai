@@ -1,0 +1,6 @@
+module main;
+
+pub fn main() -> void {
+  var p: u8* = cast<u8*>(0xFFFF_FFFF_FFFF_FFF0u64);
+  var q: u8* = p + 16u64;
+}

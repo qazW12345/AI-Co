@@ -1,0 +1,8 @@
+module main;
+
+pub fn main() -> void {
+  var a: u8[8] = [0u8; 8];
+  var p: u32* = cast<u32*>(&a[0]);
+  var q: u32* = cast<u32*>(&a[1]);
+  var d: isize = p - q;
+}

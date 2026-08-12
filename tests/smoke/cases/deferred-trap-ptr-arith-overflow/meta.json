@@ -1,1 +1,1 @@
-{"spec_ref":"§15.5","codes":["AIC-R0816"],"deferral_reason":"requires pointer arithmetic that overflows address space; not constructible without raw address values"}
+{"spec_ref":"§15.5","codes":["AIC-R0816"]}
