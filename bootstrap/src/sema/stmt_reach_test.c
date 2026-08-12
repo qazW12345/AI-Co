@@ -273,9 +273,11 @@ static void test_reach_ok(void)
 
 static void test_e0416_corpus(void)
 {
-    /* byte-identical to tests/negative/cases/18-5-semantic-fn-no-return
-     * except a trailing EOF newline the corpus file lacks (spans
-     * unaffected); E0412 does not fire (every case body terminates) */
+    /* identical to tests/negative/cases/18-5-semantic-fn-no-return modulo
+     * line-ending normalization (corpus input.ai is CRLF, embedded source
+     * is LF; spans unaffected because the loader normalizes CRLF->LF) and
+     * a trailing EOF newline the corpus file lacks; E0412 does not fire
+     * (every case body terminates) */
     static const char src_switch[] =
         "module main;\n"
         "fn bad(n: i32) -> i32 {\n"
