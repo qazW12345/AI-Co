@@ -626,7 +626,7 @@ Split packages own sub-area fragments (`<area>_<suffix>.txt`, e.g. `types_a.txt`
 ##### WP-M0-13d1 — Return rules
 
 - **Objective:** implement function-level return semantics per spec §8/§13.5.
-- **Scope:** return value mismatch (`AIC-E0415`); missing return on non-void path (`AIC-E0416`).
+- **Scope:** return value mismatch (`AIC-E0415`) only; `AIC-E0416` (missing return on non-void path) is delivered by WP-M0-13c2 (`stmt_reach`, §13.5), not re-implemented in fn_core — fn_core boundary-tests that it never emits E0416 (Planner clarification MIN-2, reviewer2 t_c40b3f35).
 - **Exclusions:** main validation/reserved names (13d2); statements (13c); IR lowering (WP-M0-16).
 - **Dependencies / inputs:** WP-M0-13a..c; spec §8, §13.5.
 - **Expected artifacts:** `bootstrap/src/sema/fn_core.*`, `bootstrap/build/sema_d1.txt`, return/function tests per §18.5.
