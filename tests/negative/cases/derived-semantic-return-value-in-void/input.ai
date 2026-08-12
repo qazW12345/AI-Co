@@ -1,5 +1,5 @@
 module main;
-fn noop() {
+fn noop() -> void {
   return 5;
 }
 fn main() -> i32 { return 0; }
