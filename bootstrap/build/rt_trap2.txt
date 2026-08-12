@@ -1,0 +1,21 @@
+# bootstrap/build/rt_trap2.txt
+# WP-M0-15c2 runtime Windows API baseline doc (spec sec. 15.1-15.8,
+# ADR-004). Area source list (owned by WP-M0-15c2). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level rt_trap.txt entry per
+# manifest §5 (sub-split WP-M0-15c1/15c2).
+#
+# WP-M0-15c2 owns documentation only: bootstrap/runtime/README.md (the
+# Windows API baseline enumeration against the ADR-004 Windows 10 22H2
+# x64 baseline) is not a compilable source and is therefore NOT listed
+# here. This fragment intentionally contributes no source paths to the
+# aggregate build; it exists to record the sub-split's fragment
+# ownership per the manifest §2 file-ownership matrix.
+#
+# The runtime trap source remains listed in the WP-M0-15c1-owned
+# fragment bootstrap/build/rt_trap1.txt (rt_trap.c), which the
+# aggregate build includes. No change to this fragment is permitted
+# from a later package (manifest rule 4); a package that needs a
+# compilable source here must first return to the Planner via the
+# Coordinator (downstream gap rule, milestone plan §7).
