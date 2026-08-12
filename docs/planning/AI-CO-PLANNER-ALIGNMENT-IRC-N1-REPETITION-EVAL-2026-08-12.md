@@ -52,7 +52,13 @@
 
 ## 4. Conformance-test impact
 
-- **No existing case changes.** `tests/conformance/cases/derived-array-literal/` (element-list form, spec_ref §7.2) is unaffected; no existing conformance/negative case exercises the repetition form (verified: no repetition-form case in `tests/conformance/cases/`).
+- **No existing case changes.** No conformance corpus edits are needed: the four existing cases that exercise the repetition form `[e; N]` are unaffected by the IRC-N1 decision (audit trail):
+  - `tests/conformance/cases/18-6-array-slice-ptr/input.ai:6` — `var buf: u8[16] = [0u8; 16];`
+  - `tests/negative/cases/18-6-type-array-literal-narrowing/input.ai:5` — `var badbuf: u8[16] = [0; 16];`
+  - `tests/negative/cases/18-6-type-array-slice-implicit/input.ai:5` — `var buf: u8[16] = [0u8; 16];`
+  - `tests/smoke/cases/deferred-trap-ptr-diff-div/input.ai:4` — `var a: u8[8] = [0u8; 8];`
+
+  All four element expressions are constants (`0u8` / `0`) with no side effects and no traps, so evaluate-exactly-once vs. N-times evaluation is unobservable in their expected outputs; the cases remain valid and require no modification. `tests/conformance/cases/derived-array-literal/` (element-list form, spec_ref §7.2) is likewise unaffected.
 - **New conformance cases (WP-M0-02 owned area; capability junior_specialist; spec_ref §12.1), authorable after adoption:**
   1. Repetition form, `N >= 2`, with a side-effecting element expression: observable stdout/exit that proves `e` ran exactly once (e.g., `e` increments a global and the program prints the counter after initialization).
   2. Repetition form, `N == 0`: proves `e` is still evaluated exactly once although no element is stored (empty array `T[0]` with a side-effecting `e`).
