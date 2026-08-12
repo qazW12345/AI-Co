@@ -571,7 +571,7 @@ static void test_records_valid_and_emit(void)
 
 /* ---------------------------------------------------------------------------
  * Missing-initializer leniency (Planner ruling t_dcb5540e; spec sec. 5.2
- * v0.1.3): `var` declarations may omit the initializer — the parse succeeds
+ * v0.1.3): `var` declarations may omit the initializer -- the parse succeeds
  * with init == NULL and no syntax record (the rejection is the semantic rule
  * AIC-E0403, spec sec. 8.2, later in the pipeline). `const` declarations
  * keep the strict required-initializer grammar.
@@ -587,7 +587,7 @@ static void test_var_decl_no_init_lenient(void)
         "  var x: i32;\n"
         "  return 0;\n"
         "}\n";
-    /* AC2: module-scope `var g: i32;` — AST_GLOBAL_VAR_DECL, init == NULL,
+    /* AC2: module-scope `var g: i32;` -- AST_GLOBAL_VAR_DECL, init == NULL,
      * full declaration span. */
     static const char *global =
         "module main;\n"

@@ -1754,7 +1754,7 @@ static AstNode *parse_local_var_decl(ParseCtx *c, bool is_const)
     type = parse_type(c);
     if (!type) { ast_node_free(node); return NULL; }
     node->u.local_decl.type = type;
-    /* var_decl: the initializer is optional — a missing one leaves
+    /* var_decl: the initializer is optional -- a missing one leaves
      * init == NULL with no syntax record, and the semantic stage rejects
      * it (AIC-E0403, spec sec. 8.2). const_decl keeps the strict grammar
      * (missing "=" is AIC-S0101 and the declaration is dropped by
@@ -2406,7 +2406,7 @@ static AstNode *parse_global_var(ParseCtx *c, bool is_pub, bool is_const)
     if (!expect_punct(c, PUNCT_COLON)) { ast_node_free(node); return NULL; }
     node->u.global_decl.type = parse_type(c);
     if (!node->u.global_decl.type) { ast_node_free(node); return NULL; }
-    /* global_var_decl: the initializer is optional — a missing one leaves
+    /* global_var_decl: the initializer is optional -- a missing one leaves
      * init == NULL with no syntax record, and the semantic stage rejects
      * it (AIC-E0403, spec sec. 8.2). global_const_decl keeps the strict
      * grammar (missing "=" is AIC-S0101 and the declaration is dropped by
