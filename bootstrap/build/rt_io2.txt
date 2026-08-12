@@ -1,0 +1,20 @@
+# bootstrap/build/rt_io2.txt
+# WP-M0-15a2 rt.io stdio and failure paths (spec sec. 15.2/15.5).
+# Area source list (owned by WP-M0-15a2). Consumed by
+# build-stage0-msvc.cmd / build-stage0-clang.cmd fragment aggregation
+# (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level rt_io.txt entry per
+# manifest §5 (sub-split WP-M0-15a1/15a2).
+#
+# rt_io_stdio.c depends on the WP-M0-15a1 core (rt_io_core.h,
+# listed in the WP-M0-15a1-owned fragment bootstrap/build/rt_io1.txt)
+# and on the WP-M0-06 diag record shape for the AIC-R0814 trap record
+# (bootstrap/src/diag/diag.h); the diag sources are listed in the
+# WP-M0-06-owned fragment bootstrap/build/diag.txt, which the aggregate
+# build includes.
+#
+# rt_io_stdio_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly
+# together with the library sources (see the build comment at the
+# top of rt_io_stdio_test.c).
+bootstrap/runtime/rt_io/rt_io_stdio.c
