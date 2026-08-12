@@ -1674,6 +1674,152 @@ static void test_store_lvalue(void)
     }
 }
 
+static void test_index_addr_base_lvalue(void)
+{
+    /* MIN-2 (reviewer2 t_87e1bf37): IR_INDEX_ADDR is an lvalue only when
+     * the base is a mutable array/slice lvalue (contract sec. 5.3); the
+     * base itself must be an lvalue. A store into an index whose base is
+     * an array-typed IR_CALL (a value, not an lvalue) is rejected. */
+    {
+        IrBuild *b = ir_build_new();
+        IrType *arr = ir_type_array(b, ir_type_i32(b), 4);
+        IrType *pi32 = ir_type_ptr(b, ir_type_i32(b));
+        IrNode *m = mk_module(b, "main", "a.ai");
+        IrNode *gv = mk(b, IR_GLOBAL_VAR, "a.ai", 2);
+        IrNode *callee = mk(b, IR_FUNCTION, "a.ai", 2);
+        IrNode *cbody = mk_block(b, "a.ai", 3);
+        IrNode *gref = mk(b, IR_GLOBAL, "a.ai", 3);
+        IrNode *cret = mk(b, IR_RETURN, "a.ai", 3);
+        IrNode *fn = mk(b, IR_FUNCTION, "a.ai", 2);
+        IrNode *body = mk_block(b, "a.ai", 3);
+        IrNode *call = mk(b, IR_CALL, "a.ai", 5);
+        IrNode *idx = mk(b, IR_INDEX_ADDR, "a.ai", 5);
+        IrNode *st = mk(b, IR_STORE, "a.ai", 6);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 6);
+        DiagRecord **r = NULL;
+        size_t n;
+        gv->u.global_var.name = strdup("g");
+        gv->u.global_var.type = arr;
+        gv->u.global_var.init = ir_const_array(b, arr, NULL, 0);
+        ir_module_add_decl(b, m, gv);
+        callee->u.function.name = strdup("mk_arr");
+        callee->u.function.ret_type = arr;
+        callee->u.function.body = cbody;
+        gref->type = arr;
+        gref->u.global.target = gv;
+        cret->u.return_stmt.value = gref;
+        ir_block_add_stmt(b, cbody, cret);
+        ir_module_add_decl(b, m, callee);
+        fn->u.function.name = strdup("f");
+        fn->u.function.ret_type = ir_type_void(b);
+        fn->u.function.body = body;
+        ir_module_add_decl(b, m, fn);
+        ir_build_add_module(b, m);
+        call->type = arr;
+        call->u.call.callee = callee;
+        call->u.call.nargs = 0;
+        idx->type = pi32;
+        idx->trap_code = "AIC-R0807";
+        idx->u.index_addr.base = call;   /* array-typed CALL: not an lvalue */
+        idx->u.index_addr.index = mk(b, IR_INT, "a.ai", 5);
+        idx->u.index_addr.index->type = ir_type_usize(b);
+        idx->u.index_addr.index->u.constant.value =
+            ir_const_int(b, ir_type_usize(b), 0);
+        st->u.store.dest = idx;
+        st->u.store.value = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        es->u.expr_stmt.expr = st;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_VIOLATION, &r);
+        CHECK(n >= 1);
+        CHECK(has_record_with_invariant(r, n, 10, "a.ai", 6));
+        CHECK(has_record_with_invariant(r, n, 4, "a.ai", 5));
+        ir_records_free(r, n);
+        ir_build_free(b);
+    }
+    /* compliant: IR_STORE into an index whose base is a mutable local
+     * array lvalue (IR_LOCAL of array type) still verifies clean. */
+    {
+        IrBuild *b = ir_build_new();
+        IrType *arr = ir_type_array(b, ir_type_i32(b), 4);
+        IrType *pi32 = ir_type_ptr(b, ir_type_i32(b));
+        IrNode *m = mk_module(b, "main", "a.ai");
+        IrNode *fn = mk(b, IR_FUNCTION, "a.ai", 2);
+        IrNode *body = mk_block(b, "a.ai", 3);
+        IrNode *loc = mk(b, IR_LOCAL, "a.ai", 5);
+        IrNode *idx = mk(b, IR_INDEX_ADDR, "a.ai", 5);
+        IrNode *st = mk(b, IR_STORE, "a.ai", 5);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        IrSlot *s = (IrSlot *)calloc(1, sizeof(IrSlot));
+        size_t n;
+        s->index = 0;
+        s->kind = IR_SLOT_LOCAL;
+        s->name = strdup("a");
+        s->type = arr;
+        s->span = mk_span("a.ai", 5, 4, 30);
+        fn->u.function.name = strdup("f");
+        fn->u.function.ret_type = ir_type_void(b);
+        fn->u.function.body = body;
+        fn->u.function.nslots = 1;
+        fn->u.function.slots = (IrSlot **)malloc(sizeof(IrSlot *));
+        fn->u.function.slots[0] = s;
+        ir_module_add_decl(b, m, fn);
+        ir_build_add_module(b, m);
+        loc->type = arr;
+        loc->u.local.slot_index = 0;
+        idx->type = pi32;
+        idx->trap_code = "AIC-R0807";
+        idx->u.index_addr.base = loc;   /* mutable array lvalue */
+        idx->u.index_addr.index = mk(b, IR_INT, "a.ai", 5);
+        idx->u.index_addr.index->type = ir_type_usize(b);
+        idx->u.index_addr.index->u.constant.value =
+            ir_const_int(b, ir_type_usize(b), 0);
+        st->u.store.dest = idx;
+        st->u.store.value = mk_int(b, "a.ai", ir_type_i32(b), 1);
+        es->u.expr_stmt.expr = st;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_OK, NULL);
+        CHECK(n == 0);
+        ir_build_free(b);
+    }
+    /* compliant: an IR_LOAD from a str element address (value address,
+     * never an lvalue) remains loadable (contract sec. 5.3 IR_INDEX_ADDR
+     * str row); is_lvalue is false, but the IR_LOAD str special case
+     * still applies. */
+    {
+        IrBuild *b = ir_build_new();
+        IrNode *m = mk_module(b, "main", "a.ai");
+        IrNode *fn = mk(b, IR_FUNCTION, "a.ai", 2);
+        IrNode *body = mk_block(b, "a.ai", 3);
+        IrNode *strv = mk(b, IR_STR, "a.ai", 5);
+        IrNode *idx = mk(b, IR_INDEX_ADDR, "a.ai", 5);
+        IrNode *ld = mk(b, IR_LOAD, "a.ai", 5);
+        IrNode *es = mk(b, IR_EXPR_STMT, "a.ai", 5);
+        size_t n;
+        fn->u.function.name = strdup("f");
+        fn->u.function.ret_type = ir_type_void(b);
+        fn->u.function.body = body;
+        ir_module_add_decl(b, m, fn);
+        ir_build_add_module(b, m);
+        strv->type = ir_type_str(b);
+        strv->u.constant.value = ir_const_str(b, (const uint8_t *)"hi", 2);
+        idx->type = ir_type_ptr(b, ir_type_u8(b));
+        idx->trap_code = "AIC-R0807";
+        idx->u.index_addr.base = strv;   /* str value base */
+        idx->u.index_addr.index = mk(b, IR_INT, "a.ai", 5);
+        idx->u.index_addr.index->type = ir_type_usize(b);
+        idx->u.index_addr.index->u.constant.value =
+            ir_const_int(b, ir_type_usize(b), 0);
+        ld->type = ir_type_u8(b);
+        ld->trap_code = NULL;   /* non-bool load: no trap obligation */
+        ld->u.load.lvalue = idx;
+        es->u.expr_stmt.expr = ld;
+        ir_block_add_stmt(b, body, es);
+        n = run_verify(b, IR_OK, NULL);
+        CHECK(n == 0);
+        ir_build_free(b);
+    }
+}
+
 static void test_eval_order(void)
 {
     /* binary node missing the right operand */
@@ -1824,6 +1970,8 @@ int main(void)
     fprintf(stderr, "after test_trap_codes\n");
     test_store_lvalue();
     fprintf(stderr, "after test_store_lvalue\n");
+    test_index_addr_base_lvalue();
+    fprintf(stderr, "after test_index_addr_base_lvalue\n");
     test_eval_order();
     fprintf(stderr, "after test_eval_order\n");
     test_valid_emit();

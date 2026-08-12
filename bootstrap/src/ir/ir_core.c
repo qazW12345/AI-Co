@@ -1008,9 +1008,12 @@ static bool is_lvalue(const IrNode *n)
     case IR_INDEX_ADDR:
         /* lvalue only when the base is a mutable array/slice lvalue; a
          * `str` index address is a value address, never an lvalue
-         * (contract sec. 5.3 IR_INDEX_ADDR). */
+         * (contract sec. 5.3 IR_INDEX_ADDR). The base itself must be an
+         * lvalue: an array-typed value (e.g. an IR_CALL result) has no
+         * storage location, so indexing it cannot produce an lvalue. */
         return n->u.index_addr.base != NULL &&
                n->u.index_addr.base->type != NULL &&
+               is_lvalue(n->u.index_addr.base) &&
                (n->u.index_addr.base->type->kind == IRT_ARRAY ||
                 n->u.index_addr.base->type->kind == IRT_SLICE);
     default:
@@ -2382,6 +2385,17 @@ static void verify_kind(IrVerify *v, const IrNode *node, Encl *encl)
                                  "IR_INDEX_ADDR id %lld base type is not "
                                  "array/slice/str", node->id);
         } else {
+            /* contract sec. 5.3: the operand is "array/slice lvalue or
+             * `str` value". An array/slice base must itself be a mutable
+             * lvalue; a `str` base is a value (its element address is a
+             * value address, never an lvalue). */
+            if ((btype->kind == IRT_ARRAY || btype->kind == IRT_SLICE) &&
+                !is_lvalue(node->u.index_addr.base)) {
+                verify_add_violation(v, node, 4, IR_INV_TYPING,
+                                     "IR_INDEX_ADDR id %lld base is not an "
+                                     "lvalue (array/slice base must be a "
+                                     "mutable lvalue)", node->id);
+            }
             if (btype->kind == IRT_ARRAY) {
                 elem = btype->u.array.elem;
             } else if (btype->kind == IRT_SLICE) {
