@@ -20,7 +20,6 @@
 
 #include "../diag/diag.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
