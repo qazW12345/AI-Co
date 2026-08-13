@@ -22,7 +22,11 @@
  *     (ir_builder_add_slot);
  *   - type interning (contract 4.4/6.3) and constant deduplication
  *     (contract 4.5/6.4, EvalValue -> IRConst, incl. sizeof/alignof as
- *     IRConst_INT of type usize).
+ *     IRConst_INT of type usize). Composite (struct/array-of-struct)
+ *     const references map by reusing the referenced const's IRConst
+ *     (AC3 dedup) or, for forward/cross-module references, by
+ *     recovering the field/element names from the referenced const's
+ *     own initializer AST (see ir_builder_const_from_eval).
  *
  * This package owns the Phase A mappers installed through the 16c1a seam
  * (ir_builder_set_module_mapper / ir_builder_set_decl_mapper). It also
@@ -61,6 +65,27 @@
  *     no slice constant kind (contract 4.5), so such a declaration is
  *     unmappable and the build returns IR_BUILDER_UNSUPPORTED with
  *     nothing owned. Inherited from the ir_builder_core.h gap list.
+ *
+ * Representation notes (documented conventions; no normalization here):
+ *   - MINOR-1 (reviewer2 t_e1758837): enum member values are stored in
+ *     IrEnumMember.value (int64_t, ir_core.h, 16b-owned) as the layout's
+ *     two's-complement bit pattern via (int64_t)(uint64_t)layout value.
+ *     For a u64 enum whose member value is >= 2^63 (big_unsigned) the
+ *     dump prints that member as a negative number (%lld) while the same
+ *     member's IRC_ENUM constant prints unsigned (%llu, uint64). The
+ *     round-trip is byte-identical (determinism preserved) and the
+ *     underlying u64 type is recorded on IR_ENUM_DECL.underlying, so a
+ *     correct consumer can reinterpret; the dual representation is a
+ *     documented wart. Normalization (e.g. a uint64 member value or an
+ *     underlying-type-aware dump) would require touching 16b-owned
+ *     ir_core.h / ir_dump.*, which are READ-ONLY for this package, so it
+ *     is deferred and routed for 16b awareness via the Coordinator.
+ *   - SUG-1 (reviewer2 t_e1758837, forward note): runtime function spans
+ *     are synthetic (file = fqn), deviating from contract 8.1 "spans are
+ *     never synthesized"; disclosed here and deterministic for
+ *     sourceless runtime built-ins (invariant 2 requires a non-null
+ *     span). Re-examine in WP-M0-16c2 when span/cause preservation is
+ *     implemented. No action on this package.
  *
  * Ownership:
  *   - The mappers allocate build-owned memory (node payloads, names,
@@ -134,6 +159,22 @@ IrType *ir_builder_type_from_type(BuilderCtx *ctx, const Type *type);
  *   literal field names so IRConst_STRUCT field values are emitted in
  *   declaration order (contract 4.5; spec 12.7 allows any literal
  *   order). May be NULL when `ev` contains no struct literals.
+ *
+ * Const references (spec 10.5: const names are constant expressions):
+ * when the value position is a reference to a module-scope const
+ * (AST_EXPR_IDENT or AST_EXPR_MEMBER), the referenced GLOBAL_CONST's
+ * already-interned IRConst is reused directly when it has been mapped
+ * (AC3 dedup: identical constants share one IRConst). This is what
+ * makes composite (struct/array-of-struct) const references
+ * representable: the composite branches need the literal AST at the
+ * position for field-name recovery (contract 4.5), which a bare
+ * reference does not provide. For a forward or cross-module reference
+ * whose referenced const has not been filled yet, the composite
+ * branches recover the field/element names from the referenced const's
+ * own initializer AST (a struct-init / array-literal in the referenced
+ * const's module; the EvalValue fields are in that literal's order, so
+ * the same name-based reordering applies). For scalar forms the reuse
+ * is equivalent to interning the per-kind branch would perform.
  *
  * Mapping summary: EVAL_VAL_INT -> IRConst_INT (bit pattern normalized
  * to the type's width) or IRConst_ENUM (enum type); EVAL_VAL_BOOL ->

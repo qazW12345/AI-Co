@@ -361,6 +361,46 @@ static uint64_t mask_to_width(uint64_t bits, int width)
     return bits & (((uint64_t)1 << width) - 1);
 }
 
+/* Follow a module-scope const-reference chain from the AST at a value
+ * position (`expr`, an IDENT or module-qualified MEMBER) to the
+ * terminal initializer AST. Returns the terminal initializer
+ * (AST_EXPR_STRUCT_INIT or AST_EXPR_ARRAY_LITERAL) and its owning
+ * module, or NULL when the chain does not reach a literal (defensive;
+ * accepted builds evaluate const references, so the chain always ends
+ * in the initializer the evaluator used). A small hop bound guards
+ * against malformed cycles (accepted builds cannot contain them: the
+ * const evaluator rejects cycles as EVAL_NOT_CONST). */
+static const AstNode *const_ref_terminal(const NameModule *module,
+                                         const AstNode *expr,
+                                         const NameModule **out_mod)
+{
+    const NameModule *m = module;
+    const AstNode *e = expr;
+    size_t hops = 0;
+    while (e != NULL &&
+           (e->kind == AST_EXPR_IDENT || e->kind == AST_EXPR_MEMBER)) {
+        const NameSymbol *ref = name_symbol_for_node(m, e);
+        const AstNode *init;
+        if (ref == NULL || ref->kind != NAME_SYM_GLOBAL_CONST ||
+            ref->decl == NULL ||
+            ref->decl->kind != AST_GLOBAL_CONST_DECL || ++hops > 64) {
+            return NULL;
+        }
+        init = ref->decl->u.global_decl.init;
+        if (init == NULL) {
+            return NULL;
+        }
+        if (init->kind == AST_EXPR_STRUCT_INIT ||
+            init->kind == AST_EXPR_ARRAY_LITERAL) {
+            *out_mod = (ref->module != NULL) ? ref->module : m;
+            return init;
+        }
+        m = (ref->module != NULL) ? ref->module : m;
+        e = init;
+    }
+    return NULL;
+}
+
 IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
                                     IrType *expected, const AstNode *expr,
                                     const EvalValue *ev, bool *out_supported)
@@ -371,6 +411,30 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
     }
     if (ev == NULL) {
         return NULL;
+    }
+    /* MAJOR-1 (reviewer2 t_e1758837): a module-scope const reference
+     * (spec 10.5 const names are constant expressions) whose referenced
+     * const is already mapped reuses that const's IRConst directly.
+     * This is AC3 dedup (identical constants share one IRConst) and is
+     * what makes composite (struct/array-of-struct) const references
+     * representable: the per-kind branches below need the literal AST
+     * at the position for field-name recovery (contract 4.5), which a
+     * reference (IDENT/MEMBER) does not provide. For scalar forms the
+     * reuse is consistent with interning the per-kind branch would do
+     * (the referenced const's IRConst IS the interned representative).
+     * Forward/cross-module references (const not yet filled) fall
+     * through to the per-kind branches, which recover the names from
+     * the referenced const's own initializer AST. */
+    if (expr != NULL &&
+        (expr->kind == AST_EXPR_IDENT || expr->kind == AST_EXPR_MEMBER)) {
+        const NameSymbol *ref = name_symbol_for_node(module, expr);
+        if (ref != NULL && ref->kind == NAME_SYM_GLOBAL_CONST) {
+            IrNode *ref_node = decl_state_find(ref);
+            if (ref_node != NULL && ref_node->kind == IR_GLOBAL_CONST &&
+                ref_node->u.global_const.value != NULL) {
+                return ref_node->u.global_const.value;
+            }
+        }
     }
     switch (ev->kind) {
 
@@ -452,6 +516,7 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
                                         : expected;
         const AstNode *alit = (expr != NULL && expr->kind == AST_EXPR_ARRAY_LITERAL)
                                   ? expr : NULL;
+        const NameModule *amod = module;
         IrConst **items;
         size_t n, i;
         bool repeat;
@@ -460,6 +525,21 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
                 *out_supported = false;
             }
             return NULL;
+        }
+        if (alit == NULL) {
+            /* MAJOR-1 (reviewer2 t_e1758837): a whole-array const
+             * reference (e.g. `const b: Point[2] = arr;` where arr is a
+             * Point[2] const) provides no array-literal AST here. The
+             * referenced const's own initializer is that literal; its
+             * element ASTs (and module) recover per-element names the
+             * same way. Forward/cross-module/chained references follow
+             * the const-reference chain to the terminal literal. */
+            const NameModule *tmod = NULL;
+            const AstNode *term = const_ref_terminal(module, expr, &tmod);
+            if (term != NULL && term->kind == AST_EXPR_ARRAY_LITERAL) {
+                alit = term;
+                amod = (tmod != NULL) ? tmod : module;
+            }
         }
         n = ev->u.array.nelems;
         if (n > 0) {
@@ -483,7 +563,7 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
                 }
             }
             items[i] = ir_builder_const_from_eval(
-                ctx, module, at->u.array.elem, ee, &ev->u.array.elems[i], &ok);
+                ctx, amod, at->u.array.elem, ee, &ev->u.array.elems[i], &ok);
             if (items[i] == NULL) {
                 if (!ok && out_supported != NULL) {
                     *out_supported = false;
@@ -498,19 +578,48 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
     case EVAL_VAL_STRUCT: {
         const AstNode *sinit = (expr != NULL && expr->kind == AST_EXPR_STRUCT_INIT)
                                    ? expr : NULL;
+        const NameModule *smod = module;
         const NameSymbol *ssym;
         IrType *st;
         IrConst **items;
         size_t nd, nl, j, k;
         if (sinit == NULL) {
-            /* Field names are needed to emit IRConst_STRUCT in declaration
-             * order (contract 4.5; spec 12.7 allows any literal order). */
-            if (out_supported != NULL) {
-                *out_supported = false;
+            /* MAJOR-1 (reviewer2 t_e1758837): a const reference at this
+             * position evaluates to a struct value but provides no
+             * struct-init AST to recover field names (contract 4.5).
+             * The referenced const's own initializer is that struct
+             * init (spec 10.5 const names are constant expressions);
+             * the EvalValue fields are in that literal's order, so the
+             * same name-based reordering works. Forward references
+             * (const declared later), cross-module references, and
+             * chains of references all resolve this way: follow the
+             * const-reference chain to the terminal struct-init, which
+             * lives in the referenced const's module. */
+            const NameModule *tmod = NULL;
+            const AstNode *term = const_ref_terminal(module, expr, &tmod);
+            if (term != NULL && term->kind == AST_EXPR_STRUCT_INIT) {
+                sinit = term;
+                smod = (tmod != NULL) ? tmod : module;
             }
-            return NULL;
+            if (sinit == NULL) {
+                /* Field names are needed to emit IRConst_STRUCT in
+                 * declaration order (contract 4.5; spec 12.7 allows any
+                 * literal order). */
+                if (out_supported != NULL) {
+                    *out_supported = false;
+                }
+                return NULL;
+            }
         }
-        ssym = name_symbol_for_node(module, sinit->u.struct_init.base);
+        /* The struct declaration symbol: the evaluated value carries it
+         * module-independently (also covers const-reference initializers
+         * from other modules); fall back to the struct-init base name. */
+        if (ev->type != NULL && ev->type->kind == TYPE_STRUCT &&
+            ev->type->u.sym != NULL) {
+            ssym = ev->type->u.sym;
+        } else {
+            ssym = name_symbol_for_node(smod, sinit->u.struct_init.base);
+        }
         if (ssym == NULL || ssym->kind != NAME_SYM_STRUCT) {
             if (out_supported != NULL) {
                 *out_supported = false;
@@ -573,8 +682,8 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
                 fval_ast = field->decl->u.named.type;
             }
             items[j] = ir_builder_const_from_eval(
-                ctx, module,
-                fval_ast != NULL ? decl_type_from_ast(ctx, module, fval_ast)
+                ctx, smod,
+                fval_ast != NULL ? decl_type_from_ast(ctx, smod, fval_ast)
                                  : NULL,
                 fval_expr, &ev->u.st.fields[k], &ok);
             if (items[j] == NULL) {

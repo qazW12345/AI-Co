@@ -6,7 +6,10 @@
  * IRConst initializer, function with param slots and body placeholder),
  * the deterministic storage model (ir_builder_add_slot), type interning
  * and constant deduplication (incl. sizeof/alignof as IRConst_INT, enum
- * and address constants, struct-literal declaration-order reordering),
+ * and address constants, struct-literal declaration-order reordering,
+ * and composite const references: a global const/var initializer that
+ * references another module-scope const of struct/array-of-struct type
+ * reuses the referenced const's IRConst, satisfying AC3 dedup),
  * runtime module mapping, and the defensive IR_BUILDER_UNSUPPORTED
  * surface (slice-typed global initializers).
  *
@@ -816,6 +819,209 @@ static void test_struct_literal_reorder(void)
     pipeline_free(&p);
 }
 
+/* MAJOR-1 remediation (reviewer2 t_e1758837): global const/var
+ * initializers that reference another module-scope const of composite
+ * type map by reusing the referenced const's IRConst (AC3 dedup), or,
+ * for forward references, by recovering field names from the referenced
+ * const's own initializer AST. Covers the three reproduced forms
+ * (`const b: Point = a;`, `var g: Point = a;`, `[a, a]` inside an array
+ * literal), a forward reference, and a whole-array const reference. */
+static void test_const_ref_composite(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "struct Point { x: i32; y: i32; }\n"
+        "const a: Point = Point { x: 1, y: 2 };\n"
+        "const b: Point = a;\n"
+        "var g: Point = a;\n"
+        "const ps: Point[2] = [a, a];\n"
+        "const fwd: Point = later;\n"
+        "const later: Point = Point { y: 4, x: 3 };\n"
+        "const pc: Point[2] = ps;\n"
+        "const c1: Point = c2;\n"
+        "const c2: Point = c3;\n"
+        "const c3: Point = Point { x: 7, y: 8 };\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    IrNode *an, *bn, *gn, *psn, *fwdn, *latn, *pcn, *c1n, *c2n, *c3n;
+    IrConst *av, *bv, *gv, *psv, *fwdv, *latv, *pcv, *c1v, *c2v, *c3v;
+    DiagRecord **recs = NULL;
+    size_t nrecs = 0;
+
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        an = find_decl(b, "main", "main.a");
+        bn = find_decl(b, "main", "main.b");
+        gn = find_decl(b, "main", "main.g");
+        psn = find_decl(b, "main", "main.ps");
+        fwdn = find_decl(b, "main", "main.fwd");
+        latn = find_decl(b, "main", "main.later");
+        pcn = find_decl(b, "main", "main.pc");
+        c1n = find_decl(b, "main", "main.c1");
+        c2n = find_decl(b, "main", "main.c2");
+        c3n = find_decl(b, "main", "main.c3");
+        CHECK(an != NULL && bn != NULL && gn != NULL && psn != NULL &&
+              fwdn != NULL && latn != NULL && pcn != NULL &&
+              c1n != NULL && c2n != NULL && c3n != NULL);
+        av = global_const_value(an);
+        bv = global_const_value(bn);
+        gv = global_var_init(gn);
+        psv = global_const_value(psn);
+        fwdv = global_const_value(fwdn);
+        latv = global_const_value(latn);
+        pcv = global_const_value(pcn);
+        c1v = global_const_value(c1n);
+        c2v = global_const_value(c2n);
+        c3v = global_const_value(c3n);
+        CHECK(av != NULL && bv != NULL && gv != NULL && psv != NULL &&
+              fwdv != NULL && latv != NULL && pcv != NULL &&
+              c1v != NULL && c2v != NULL && c3v != NULL);
+        if (av != NULL) {
+            CHECK(av->kind == IRC_STRUCT);
+            CHECK(av->u.strukt.count == 2);
+            if (av->u.strukt.count == 2) {
+                CHECK(av->u.strukt.items[0]->u.int_bits == 1);
+                CHECK(av->u.strukt.items[1]->u.int_bits == 2);
+            }
+        }
+        /* const ref to a struct const: b's IRConst IS a's (AC3 dedup) */
+        if (bv != NULL) {
+            CHECK(bv == av);
+        }
+        /* global var initialized from a struct const: same IRConst */
+        if (gv != NULL) {
+            CHECK(gv == av);
+        }
+        /* struct const refs inside an array literal dedup to a's const */
+        if (psv != NULL) {
+            CHECK(psv->kind == IRC_ARRAY);
+            CHECK(psv->u.arr.count == 2);
+            if (psv->u.arr.count == 2) {
+                CHECK(psv->u.arr.items[0] == av);
+                CHECK(psv->u.arr.items[1] == av);
+            }
+        }
+        /* forward reference (fwd declared before later): names recovered
+         * from later's initializer -> declaration order x=3, y=4; after
+         * the whole build interning dedups fwd's const to later's */
+        if (fwdv != NULL && latv != NULL) {
+            CHECK(fwdv == latv);
+            CHECK(fwdv->kind == IRC_STRUCT);
+            if (fwdv->kind == IRC_STRUCT && fwdv->u.strukt.count == 2) {
+                CHECK(fwdv->u.strukt.items[0]->u.int_bits == 3);
+                CHECK(fwdv->u.strukt.items[1]->u.int_bits == 4);
+            }
+        }
+        /* whole-array const reference: pc's array const IS ps's */
+        if (pcv != NULL && psv != NULL) {
+            CHECK(pcv == psv);
+        }
+        /* chained forward reference (c1 -> c2 -> c3, declared in
+         * reverse): all three dedup to the terminal struct's const */
+        if (c1v != NULL && c2v != NULL && c3v != NULL) {
+            CHECK(c1v == c3v);
+            CHECK(c2v == c3v);
+            CHECK(c1v->kind == IRC_STRUCT);
+            if (c1v->kind == IRC_STRUCT && c1v->u.strukt.count == 2) {
+                CHECK(c1v->u.strukt.items[0]->u.int_bits == 7);
+                CHECK(c1v->u.strukt.items[1]->u.int_bits == 8);
+            }
+        }
+        CHECK(verify_build(b, &recs, &nrecs) == IR_OK);
+        ir_records_free(recs, nrecs);
+        ir_build_free(b);
+    }
+    pipeline_free(&p);
+}
+
+/* MAJOR-1 remediation: cross-module composite const reference. The
+ * referenced const lives in an imported module whose declarations are
+ * filled after the entry module (canonical order: entry first, then
+ * imports), so the referenced const's IRConst is not yet mapped when
+ * the entry module's const/var is filled; the field/element names are
+ * recovered from the referenced const's own initializer AST in its
+ * module. */
+static void test_const_ref_composite_cross_module(void)
+{
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    IrNode *util_a, *main_b, *main_g, *main_pc;
+    IrConst *av, *bv, *gv, *pcv;
+    DiagRecord **recs = NULL;
+    size_t nrecs = 0;
+
+    fixture_cleanup_files();
+    fixture_mkdir();
+    fixture_write(FIXTURE_ROOT "/util.ai",
+                  "module util;\n"
+                  "pub struct Point { x: i32; y: i32; }\n"
+                  "pub const a: Point = Point { y: 2, x: 1 };\n"
+                  "pub const ps: Point[2] = [a, a];\n");
+    pipeline_run_ex(&p,
+                    "module main;\n"
+                    "import util;\n"
+                    "const b: util.Point = util.a;\n"
+                    "var g: util.Point = util.a;\n"
+                    "const pc: util.Point[2] = util.ps;\n",
+                    FIXTURE_ROOT);
+    CHECK(p.result != NULL && p.build != NULL);
+    if (p.result == NULL || p.build == NULL) {
+        pipeline_free(&p);
+        fixture_cleanup_files();
+        return;
+    }
+    bs = ir_builder_build(p.result, p.build, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        util_a = find_decl(b, "util", "util.a");
+        main_b = find_decl(b, "main", "main.b");
+        main_g = find_decl(b, "main", "main.g");
+        main_pc = find_decl(b, "main", "main.pc");
+        CHECK(util_a != NULL && main_b != NULL && main_g != NULL &&
+              main_pc != NULL);
+        av = global_const_value(util_a);
+        bv = global_const_value(main_b);
+        gv = global_var_init(main_g);
+        pcv = global_const_value(main_pc);
+        CHECK(av != NULL && bv != NULL && gv != NULL && pcv != NULL);
+        if (av != NULL) {
+            CHECK(av->kind == IRC_STRUCT);
+            CHECK(av->u.strukt.count == 2);
+            if (av->u.strukt.count == 2) {
+                /* declaration order despite literal y-first: x=1, y=2 */
+                CHECK(av->u.strukt.items[0]->u.int_bits == 1);
+                CHECK(av->u.strukt.items[1]->u.int_bits == 2);
+            }
+        }
+        /* entry-module const/var referencing an imported struct const
+         * dedup to the same IRConst */
+        if (bv != NULL) {
+            CHECK(bv == av);
+        }
+        if (gv != NULL) {
+            CHECK(gv == av);
+        }
+        if (pcv != NULL) {
+            CHECK(pcv->kind == IRC_ARRAY);
+            CHECK(pcv->u.arr.count == 2);
+            if (pcv->u.arr.count == 2) {
+                CHECK(pcv->u.arr.items[0] == av);
+                CHECK(pcv->u.arr.items[1] == av);
+            }
+        }
+        CHECK(verify_build(b, &recs, &nrecs) == IR_OK);
+        ir_records_free(recs, nrecs);
+        ir_build_free(b);
+    }
+    pipeline_free(&p);
+    fixture_cleanup_files();
+}
+
 /* Module graph edge: runtime modules (rt.*) are mapped as module units
  * with IR_FUNCTION declarations; the noreturn flag is set on
  * rt.proc.exit / rt.trap.report only (contract 4.2). */
@@ -1009,6 +1215,10 @@ int main(void)
     fprintf(stderr, "after test_const_dedup_and_forms\n");
     test_struct_literal_reorder();
     fprintf(stderr, "after test_struct_literal_reorder\n");
+    test_const_ref_composite();
+    fprintf(stderr, "after test_const_ref_composite\n");
+    test_const_ref_composite_cross_module();
+    fprintf(stderr, "after test_const_ref_composite_cross_module\n");
     test_runtime_modules();
     fprintf(stderr, "after test_runtime_modules\n");
     test_defensive_unsupported();
