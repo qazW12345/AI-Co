@@ -58,15 +58,15 @@
 # /W4 warning-free on both toolchains.
 #
 # ---------------------------------------------------------------------------
-# EXPECTED OUTPUT (S2a-IR features 1-5: cases C1d/C1a/C1b/C1c/C2a/C2b/C3a/
-# C4a/C4b/C4c/C5a/C5b)
+# EXPECTED OUTPUT (S2a-IR features 1-6: cases C1d/C1a/C1b/C1c/C2a/C2b/C3a/
+# C4a/C4b/C4c/C5a/C5b/C6a/C6b/C6c)
 # ---------------------------------------------------------------------------
 #
-#   ir_s2a_features_test: 108 checks, 0 failures
+#   ir_s2a_features_test: 135 checks, 0 failures
 #
 # exit code 0. Any FAIL line or non-zero exit is a defect (report per
 # package record sec. 9: REPORT, do not fix 16c-owned builder code).
 #
-# Later sub-cards (S2a-IR-B3/C) EXTEND this program with further
+# Later sub-cards (S2a-IR-C) EXTEND this program with further
 # features/cases and must update this fragment's expected check count
-# (the current 108 = 12 cases x 9 checks per verify_case) accordingly.
+# (the current 135 = 15 cases x 9 checks per verify_case) accordingly.
