@@ -139,12 +139,21 @@ static IrBuilderStatus builder_phase_a(BuilderCtx *ctx)
     const NameResult *r = ctx->result;
     size_t mi, di;
 
+    /* Defensive (MIN-1): a NULL module array with a nonzero count is
+     * malformed input; refuse before any dereference. Unreachable from
+     * the accepted pipeline (IR contract sec. 1.3). */
+    if (r->nmodules > 0 && r->modules == NULL) {
+        return IR_BUILDER_UNSUPPORTED;   /* malformed module array */
+    }
     for (mi = 0; mi < r->nmodules; mi++) {
         const NameModule *module = r->modules[mi];
         IrBuilderStatus st;
 
         if (module == NULL) {
             return IR_BUILDER_UNSUPPORTED;   /* malformed module list */
+        }
+        if (module->nmodule_scope > 0 && module->module_scope == NULL) {
+            return IR_BUILDER_UNSUPPORTED;   /* malformed scope array */
         }
         ctx->module_index = mi;
         st = ctx->map_module(ctx, module);
@@ -172,10 +181,17 @@ static IrBuilderStatus builder_phase_b(BuilderCtx *ctx)
     const NameResult *r = ctx->result;
     size_t mi, di;
 
+    /* Defensive (MIN-1): same NULL-array guards as Phase A. */
+    if (r->nmodules > 0 && r->modules == NULL) {
+        return IR_BUILDER_UNSUPPORTED;   /* malformed module array */
+    }
     for (mi = 0; mi < r->nmodules; mi++) {
         const NameModule *module = r->modules[mi];
         if (module == NULL) {
             return IR_BUILDER_UNSUPPORTED;   /* malformed module list */
+        }
+        if (module->nmodule_scope > 0 && module->module_scope == NULL) {
+            return IR_BUILDER_UNSUPPORTED;   /* malformed scope array */
         }
         ctx->module_index = mi;
         for (di = 0; di < module->nmodule_scope; di++) {

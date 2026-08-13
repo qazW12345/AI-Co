@@ -137,7 +137,11 @@ typedef struct BuilderCtx {
 } BuilderCtx;
 
 /* Allocate builder-scratch memory through the context; returns NULL and
- * sets ctx->oom on allocation failure (sticky, mirroring ir_core). */
+ * sets ctx->oom on allocation failure (sticky, mirroring ir_core).
+ * Ownership: the returned memory is owned by the allocating mapper and
+ * must be released with free() by that mapper (the 16c1b..16c1d seam);
+ * on build failure ir_builder_build frees only the IrBuild graph, never
+ * mapper scratch. */
 void *ir_builder_ctx_alloc(BuilderCtx *ctx, size_t size);
 
 /* ---------------------------------------------------------------------------
@@ -167,7 +171,10 @@ void ir_builder_set_body_mapper(
  * `result` must be the resolved build (WP-M0-10 output); `layout` the
  * struct/enum layout facts (WP-M0-11b output). Callers run the builder
  * only after the semantic pipeline produced no diagnostics (contract
- * sec. 1.3), as the driver does.
+ * sec. 1.3), as the driver does. Defensively, an array pointer that is
+ * NULL while its count is nonzero (NameResult.modules / NameModule.
+ * module_scope) is malformed input and returns IR_BUILDER_UNSUPPORTED
+ * with nothing owned; this is unreachable from the accepted pipeline.
  *
  * Returns IR_BUILDER_OK with *out_build set (owned by the caller), or
  * IR_BUILDER_UNSUPPORTED / IR_BUILDER_OOM with nothing owned. The

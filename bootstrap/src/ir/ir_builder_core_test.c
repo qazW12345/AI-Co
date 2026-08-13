@@ -192,6 +192,84 @@ static void test_entry_validation(void)
     }
 }
 
+/* MIN-1 (reviewer2 t_4258d6a7): NULL-array pointers with nonzero counts
+ * are malformed input -> IR_BUILDER_UNSUPPORTED, nothing owned, no crash.
+ * Unreachable from the accepted pipeline (name resolution always
+ * allocates these arrays when counts are nonzero; IR contract sec. 1.3),
+ * but the defensive contract (header "Malformed input that cannot be
+ * mapped returns IR_BUILDER_UNSUPPORTED with nothing owned") requires no
+ * crash. */
+static void test_null_array_guards(void)
+{
+    LayoutBuild lb;
+    IrBuild *out = NULL;
+    IrBuilderStatus st;
+
+    memset(&lb, 0, sizeof(lb));
+
+    /* NameResult{.modules=NULL, .nmodules>0}: refuse before any deref */
+    {
+        NameResult r;
+        memset(&r, 0, sizeof(r));
+        r.modules = NULL;
+        r.nmodules = 1;
+        out = NULL;
+        st = ir_builder_build(&r, &lb, &out);
+        CHECK(st == IR_BUILDER_UNSUPPORTED);
+        CHECK(out == NULL);   /* nothing owned */
+    }
+
+    /* the guard fires regardless of the count value */
+    {
+        NameResult r;
+        memset(&r, 0, sizeof(r));
+        r.modules = NULL;
+        r.nmodules = 2;
+        out = NULL;
+        st = ir_builder_build(&r, &lb, &out);
+        CHECK(st == IR_BUILDER_UNSUPPORTED);
+        CHECK(out == NULL);
+    }
+
+    /* NameModule{.module_scope=NULL, .nmodule_scope>0}: refuse before
+     * deref inside the module loop */
+    {
+        NameModule m = make_module("main", NULL, 1);
+        NameModule *mods[1] = { &m };
+        NameResult r = make_result(mods, 1);
+        out = NULL;
+        st = ir_builder_build(&r, &lb, &out);
+        CHECK(st == IR_BUILDER_UNSUPPORTED);
+        CHECK(out == NULL);
+    }
+
+    /* compliant case: non-NULL arrays with nonzero counts still map fine;
+     * the guards must not reject valid input. */
+    {
+        NameSymbol s1 = make_symbol(NAME_SYM_GLOBAL_VAR, "g");
+        NameSymbol *scope[1] = { &s1 };
+        NameModule m = make_module("main", scope, 1);
+        NameModule *mods[1] = { &m };
+        NameResult r = make_result(mods, 1);
+        out = NULL;
+        g_nvisits = 0;
+        ir_builder_set_module_mapper(rec_module);
+        ir_builder_set_decl_mapper(rec_decl);
+        ir_builder_set_body_mapper(rec_body);
+        st = ir_builder_build(&r, &lb, &out);
+        CHECK(st == IR_BUILDER_OK);
+        CHECK(out != NULL);
+        if (out != NULL) {
+            ir_build_free(out);   /* owned by the caller */
+        }
+        /* phase A: module + decl visits; phase B skips the non-fn symbol */
+        CHECK(g_nvisits == 2);
+        ir_builder_set_module_mapper(NULL);
+        ir_builder_set_decl_mapper(NULL);
+        ir_builder_set_body_mapper(NULL);
+    }
+}
+
 /* AC1: an accepted build with an empty surface -> IR_BUILDER_OK with
  * *out_build owned; the caller owns and frees the build. */
 static void test_empty_build_ok(void)
@@ -372,6 +450,8 @@ int main(void)
 {
     test_entry_validation();
     fprintf(stderr, "after test_entry_validation\n");
+    test_null_array_guards();
+    fprintf(stderr, "after test_null_array_guards\n");
     test_empty_build_ok();
     fprintf(stderr, "after test_empty_build_ok\n");
     test_unsupported_default_mappers();
