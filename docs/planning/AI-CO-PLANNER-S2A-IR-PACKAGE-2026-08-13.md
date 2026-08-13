@@ -1,6 +1,6 @@
 # Planner Work-Package Record — WP-M0-S2a-IR: pre-codegen IR-boundary feature micro-program tranche
 
-**Status:** Implementation-ready work package (Planner-sized; Main Designer adoption recorded in the design record §S2a-IR)
+**Status:** Implementation-ready work package (Planner-sized; Main Designer adoption recorded in the design record §S2a-IR) — **SUPERSEDED FOR EXECUTION 2026-08-13 by `docs/planning/AI-CO-PLANNER-S2A-IR-SPLIT-2026-08-13.md`** (routing task t_35739131): the single-package card t_afb33982 is blocked as superseded origin (2 failed runs: 150/150 budget exhaustion + crash); the package is split into serial sub-cards S2a-IR-A/B1/B2/B3/C per the split record. §6 sizing and §11 wiring below are historical.
 **Owner:** Planner
 **Date:** 2026-08-13
 **Card:** t_7a88311e (this sizing/spec task); implementation card created from this record (see §11)
