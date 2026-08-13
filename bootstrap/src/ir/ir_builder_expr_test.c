@@ -2169,6 +2169,300 @@ static void test_compound_dest_location_order(void)
     pipeline_free(&p);
 }
 
+/* AC1 (reviewer2 NEW MAJOR t_e1fc0c67): compound assignment whose
+ * destination location is a pure read of mutable global storage that
+ * the source can mutate must evaluate the destination location BEFORE
+ * the source (spec 10.4: destination location, then b). `*gp += bump()`
+ * with gp a global pointer and bump() reassigning gp: the pointer read
+ * (part of the location) is materialized into a temp AHEAD of the
+ * source, so the block order becomes
+ *   STORE(tmp_ptr, LOAD(GLOBAL gp)); STORE(tmp_src, CALL bump);
+ *   STORE(DEREF(LOAD(tmp_ptr)), ADD(LOAD(DEREF(LOAD(tmp_ptr))), LOAD(tmp_src)))
+ * Observable: with gp = &cell initially and bump() setting gp = &other,
+ * the spec order stores into cell (the location chosen before bump);
+ * the pre-fix order reads gp after bump and stores into other - the
+ * "wrong cell updated if the pointer choice depends on the side
+ * effect" aliasing case. */
+static void test_compound_dest_global_ptr_order(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "var cell: i32 = 5;\n"
+        "var other: i32 = 9;\n"
+        "var gp: i32* = &cell;\n"
+        "fn bump() -> i32 { gp = &other; return 1; }\n"
+        "fn f() -> void {\n"
+        "  *gp += bump();\n"
+        "}\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    BuilderCtx ctx;
+    IrNode *fn_node, *block;
+    IrExprResult r;
+    const NameSymbol *fn_sym;
+
+    memset(&r, 0, sizeof(r));
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs != IR_BUILDER_OK || b == NULL) {
+        pipeline_free(&p);
+        return;
+    }
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.result = p.result;
+    ctx.layout = p.build;
+    ctx.build = b;
+    fn_sym = find_fn_sym(&p, "f");
+    fn_node = find_decl(b, "main", "main.f");
+    CHECK(fn_sym != NULL && fn_node != NULL);
+    if (fn_sym == NULL || fn_node == NULL) {
+        ir_build_free(b);
+        pipeline_free(&p);
+        return;
+    }
+    block = fn_node->u.function.body;
+
+    {
+        const AstNode *e = stmt_expr(p.program, "f", 0);
+        IrNode *loc_store, *src_store, *final_stmt;
+        CHECK(e != NULL && e->kind == AST_EXPR_ASSIGN);
+        if (e != NULL) {
+            bs = ir_builder_expr_lower(&ctx, p.result->modules[0], fn_sym,
+                                       block, e, IR_EXPR_WANT_ANY, NULL,
+                                       &r);
+            CHECK(bs == IR_BUILDER_OK);
+            if (bs != IR_BUILDER_OK) {
+                ir_build_free(b);
+                pipeline_free(&p);
+                return;
+            }
+            CHECK(r.cat == IR_EXPR_EFFECT);
+            CHECK(r.node->kind == IR_STORE);
+            attach_expr(b, block, e->span, r.node);
+        }
+        /* block order (the block's statement order is the evaluation
+         * order, contract 6.1 = spec 10.4): the destination location's
+         * global-pointer read materializes FIRST (before the source),
+         * then the source, then the final store (reviewer2 NEW MAJOR
+         * alias-through-global) */
+        CHECK(block->u.block.nstmts == 3);
+        if (block->u.block.nstmts < 3) {
+            ir_build_free(b);
+            pipeline_free(&p);
+            return;
+        }
+        loc_store = block->u.block.stmts[0];
+        CHECK(loc_store->kind == IR_STORE);
+        CHECK(loc_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(loc_store->u.store.dest->type != NULL &&
+              loc_store->u.store.dest->type->kind == IRT_PTR);
+        CHECK(loc_store->u.store.value->kind == IR_LOAD);
+        CHECK(loc_store->u.store.value->u.load.lvalue->kind == IR_GLOBAL);
+        CHECK(loc_store->u.store.value->u.load.lvalue->u.global.target !=
+                  NULL &&
+              loc_store->u.store.value->u.load.lvalue->u.global.target->
+                  u.global_var.name != NULL &&
+              strcmp(loc_store->u.store.value->u.load.lvalue->
+                         u.global.target->u.global_var.name, "main.gp") == 0);
+        src_store = block->u.block.stmts[1];
+        CHECK(src_store->kind == IR_STORE);
+        CHECK(src_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(src_store->u.store.value->kind == IR_CALL);
+        CHECK(src_store->u.store.value->u.call.callee != NULL &&
+              src_store->u.store.value->u.call.callee->u.function.name !=
+                  NULL &&
+              strcmp(src_store->u.store.value->u.call.callee->
+                         u.function.name, "main.bump") == 0);
+        final_stmt = block->u.block.stmts[2];
+        CHECK(final_stmt->kind == IR_EXPR_STMT);
+        {
+            IrNode *final_store = final_stmt->u.expr_stmt.expr;
+            IrNode *op;
+            CHECK(final_store != NULL && final_store->kind == IR_STORE);
+            CHECK(final_store->u.store.dest->kind == IR_DEREF);
+            /* the destination location is DEREF(LOAD(tmp_ptr)): the
+             * pointer operand is the loaded materialized pointer, so
+             * the location (the gp read) was already evaluated at
+             * stmt 0 before bump() ran */
+            CHECK(final_store->u.store.dest->u.deref.ptr->kind == IR_LOAD);
+            CHECK(final_store->u.store.dest->u.deref.ptr->u.load.lvalue ==
+                  loc_store->u.store.dest);
+            op = final_store->u.store.value;
+            CHECK(op != NULL && op->kind == IR_ADD);
+            if (op != NULL && op->kind == IR_ADD) {
+                /* the destination read follows the location and the
+                 * source: op.left = LOAD(DEREF(LOAD(tmp_ptr))) (read of
+                 * the materialized location), op.right = LOAD(tmp_src) */
+                CHECK(op->u.binary.left->kind == IR_LOAD);
+                CHECK(op->u.binary.left->u.load.lvalue ==
+                      final_store->u.store.dest);
+                CHECK(op->u.binary.right->kind == IR_LOAD);
+                CHECK(op->u.binary.right->u.load.lvalue ==
+                      src_store->u.store.dest);
+                CHECK(final_store == r.node);
+            }
+        }
+    }
+    terminate_fn_body(b, find_decl(b, "main", "main.bump"));
+    verify_ok(b);
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
+/* AC1 (reviewer2 NEW MAJOR t_e1fc0c67): compound assignment whose
+ * destination location is a pure read of mutable global storage that
+ * the source can mutate - indexed form. `a[giu] += bump()` with giu a
+ * global usize and bump() mutating giu: the index read (part of the
+ * destination location per spec 10.4 indexing "evaluate a, then i")
+ * is materialized into a temp AHEAD of the source, so the block order
+ * becomes
+ *   STORE(tmp_idx, LOAD(GLOBAL giu)); STORE(tmp_src, CALL bump);
+ *   STORE(INDEX_ADDR(GLOBAL a, LOAD(tmp_idx)), ADD(...))
+ * Observable: with giu = 1 and bump() setting giu = 2, the spec order
+ * updates a[1]; the pre-fix order reads giu after bump and updates
+ * a[2]. */
+static void test_compound_dest_global_index_order(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "var g: i32 = 1;\n"
+        "var giu: usize = 1;\n"
+        "var a: i32[4] = [0, 0, 0, 0];\n"
+        "fn bump() -> i32 { giu = 2; g = 100; return 1; }\n"
+        "fn f() -> void {\n"
+        "  a[giu] += bump();\n"
+        "}\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    BuilderCtx ctx;
+    IrNode *fn_node, *block;
+    IrExprResult r;
+    const NameSymbol *fn_sym;
+
+    memset(&r, 0, sizeof(r));
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs != IR_BUILDER_OK || b == NULL) {
+        pipeline_free(&p);
+        return;
+    }
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.result = p.result;
+    ctx.layout = p.build;
+    ctx.build = b;
+    fn_sym = find_fn_sym(&p, "f");
+    fn_node = find_decl(b, "main", "main.f");
+    CHECK(fn_sym != NULL && fn_node != NULL);
+    if (fn_sym == NULL || fn_node == NULL) {
+        ir_build_free(b);
+        pipeline_free(&p);
+        return;
+    }
+    block = fn_node->u.function.body;
+
+    {
+        const AstNode *e = stmt_expr(p.program, "f", 0);
+        IrNode *loc_store, *src_store, *final_stmt;
+        CHECK(e != NULL && e->kind == AST_EXPR_ASSIGN);
+        if (e != NULL) {
+            bs = ir_builder_expr_lower(&ctx, p.result->modules[0], fn_sym,
+                                       block, e, IR_EXPR_WANT_ANY, NULL,
+                                       &r);
+            CHECK(bs == IR_BUILDER_OK);
+            if (bs != IR_BUILDER_OK) {
+                ir_build_free(b);
+                pipeline_free(&p);
+                return;
+            }
+            CHECK(r.cat == IR_EXPR_EFFECT);
+            CHECK(r.node->kind == IR_STORE);
+            attach_expr(b, block, e->span, r.node);
+        }
+        /* block order (the block's statement order is the evaluation
+         * order, contract 6.1 = spec 10.4): the destination location's
+         * global-index read materializes FIRST (before the source),
+         * then the source, then the final store (reviewer2 NEW MAJOR
+         * alias-through-global) */
+        CHECK(block->u.block.nstmts == 3);
+        if (block->u.block.nstmts < 3) {
+            ir_build_free(b);
+            pipeline_free(&p);
+            return;
+        }
+        loc_store = block->u.block.stmts[0];
+        CHECK(loc_store->kind == IR_STORE);
+        CHECK(loc_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(loc_store->u.store.dest->type != NULL &&
+              loc_store->u.store.dest->type->kind == IRT_USIZE);
+        CHECK(loc_store->u.store.value->kind == IR_LOAD);
+        CHECK(loc_store->u.store.value->u.load.lvalue->kind == IR_GLOBAL);
+        CHECK(loc_store->u.store.value->u.load.lvalue->u.global.target !=
+                  NULL &&
+              loc_store->u.store.value->u.load.lvalue->u.global.target->
+                  u.global_var.name != NULL &&
+              strcmp(loc_store->u.store.value->u.load.lvalue->
+                         u.global.target->u.global_var.name, "main.giu") == 0);
+        src_store = block->u.block.stmts[1];
+        CHECK(src_store->kind == IR_STORE);
+        CHECK(src_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(src_store->u.store.value->kind == IR_CALL);
+        CHECK(src_store->u.store.value->u.call.callee != NULL &&
+              src_store->u.store.value->u.call.callee->u.function.name !=
+                  NULL &&
+              strcmp(src_store->u.store.value->u.call.callee->
+                         u.function.name, "main.bump") == 0);
+        final_stmt = block->u.block.stmts[2];
+        CHECK(final_stmt->kind == IR_EXPR_STMT);
+        {
+            IrNode *final_store = final_stmt->u.expr_stmt.expr;
+            IrNode *op;
+            CHECK(final_store != NULL && final_store->kind == IR_STORE);
+            CHECK(final_store->u.store.dest->kind == IR_INDEX_ADDR);
+            /* the destination location is INDEX_ADDR(GLOBAL a,
+             * LOAD(tmp_idx)): the base is the array's global ref and
+             * the index operand is the loaded materialized index, so
+             * the location (the giu read) was already evaluated at
+             * stmt 0 before bump() ran */
+            CHECK(final_store->u.store.dest->u.index_addr.base->kind ==
+                  IR_GLOBAL);
+            CHECK(final_store->u.store.dest->u.index_addr.base->
+                      u.global.target != NULL &&
+                  final_store->u.store.dest->u.index_addr.base->
+                      u.global.target->u.global_var.name != NULL &&
+                  strcmp(final_store->u.store.dest->u.index_addr.base->
+                             u.global.target->u.global_var.name,
+                         "main.a") == 0);
+            CHECK(final_store->u.store.dest->u.index_addr.index->kind ==
+                  IR_LOAD);
+            CHECK(final_store->u.store.dest->u.index_addr.index->
+                      u.load.lvalue == loc_store->u.store.dest);
+            op = final_store->u.store.value;
+            CHECK(op != NULL && op->kind == IR_ADD);
+            if (op != NULL && op->kind == IR_ADD) {
+                /* the destination read follows the location and the
+                 * source: op.left = LOAD(INDEX_ADDR(GLOBAL a,
+                 * LOAD(tmp_idx))) (read of the materialized location),
+                 * op.right = LOAD(tmp_src) */
+                CHECK(op->u.binary.left->kind == IR_LOAD);
+                CHECK(op->u.binary.left->u.load.lvalue ==
+                      final_store->u.store.dest);
+                CHECK(op->u.binary.right->kind == IR_LOAD);
+                CHECK(op->u.binary.right->u.load.lvalue ==
+                      src_store->u.store.dest);
+                CHECK(final_store == r.node);
+            }
+        }
+    }
+    terminate_fn_body(b, find_decl(b, "main", "main.bump"));
+    verify_ok(b);
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
 /* AC1: ternary, cast/wrap, sizeof/alignof - IR_SELECT (bool condition,
  * same-typed branches), IR_CAST (R0801) / IR_WRAP, sizeof/alignof as
  * IR_INT(usize) constants. */
@@ -2542,6 +2836,10 @@ int main(void)
     fprintf(stderr, "after test_compound_eval_order\n");
     test_compound_dest_location_order();
     fprintf(stderr, "after test_compound_dest_location_order\n");
+    test_compound_dest_global_ptr_order();
+    fprintf(stderr, "after test_compound_dest_global_ptr_order\n");
+    test_compound_dest_global_index_order();
+    fprintf(stderr, "after test_compound_dest_global_index_order\n");
     test_ternary_cast_sizeof();
     fprintf(stderr, "after test_ternary_cast_sizeof\n");
     test_defensive_unsupported();

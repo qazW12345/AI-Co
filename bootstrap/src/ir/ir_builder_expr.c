@@ -1459,7 +1459,9 @@ static IrBuilderStatus materialize_scalar_temp(BuilderCtx *ctx,
  * by materialize_dest_effects to decide whether a compound-assignment
  * destination location's operand must be hoisted before the source
  * (spec 10.4: evaluate destination location, then b; reviewer2 NEW
- * MAJOR t_9002530a). */
+ * MAJOR t_9002530a). Complements node_reads_global_storage: a pure
+ * read of mutable global storage is not a side effect but is equally
+ * hoisted (reviewer2 NEW MAJOR t_e1fc0c67). */
 static bool node_has_side_effect(const IrNode *n)
 {
     if (n == NULL) {
@@ -1509,21 +1511,143 @@ static bool node_has_side_effect(const IrNode *n)
     }
 }
 
-/* Materialize the destination location's side-effecting operand(s) into
- * compiler temporaries IN PLACE, so the location evaluates BEFORE the
- * source (spec 10.4: for `a op= b`, evaluate destination location, then
- * `b`, then read the destination, apply `op`, then store). The source is
- * materialized into a preceding statement (round-1 MAJOR-1 fix), which
- * would otherwise put the location's evaluation (embedded in the final
- * STORE's dest node) AFTER the source - the inverse of the spec order
- * (reviewer2 NEW MAJOR t_9002530a). Example: for `*getp() += bump()`,
- * dest is DEREF(CALL getp); this function appends STORE(tmp_ptr, CALL
- * getp) to the block (so getp() runs first) and rewrites the lvalue to
- * DEREF(LOAD(tmp_ptr)); the caller then materializes the source, and the
- * final store is STORE(DEREF(LOAD(tmp_ptr)), ADD(LOAD(DEREF(LOAD(tmp_ptr))),
- * LOAD(tmp_src))). The lvalue node is mutated in place (never replaced),
- * so every node stays reachable (invariant 1). Pure locations (IR_LOCAL /
- * IR_GLOBAL and operands without side effects) are left untouched. */
+/* Return true when the subtree rooted at n contains an IR_GLOBAL
+ * reference (an address chain rooted at a mutable global variable).
+ * IR_CALL is treated as opaque: the callee is a function declaration,
+ * never a storage reference, and call side effects are detected by
+ * node_has_side_effect. Used by node_reads_global_storage. */
+static bool node_contains_global(const IrNode *n)
+{
+    if (n == NULL) {
+        return false;
+    }
+    switch (n->kind) {
+    case IR_GLOBAL:
+        return true;
+    case IR_LOCAL: case IR_INT: case IR_BOOL:
+    case IR_NULL: case IR_STR: case IR_ENUM_VAL:
+        return false;
+    case IR_FIELD_ADDR:
+        return node_contains_global(n->u.field_addr.base);
+    case IR_INDEX_ADDR:
+        return node_contains_global(n->u.index_addr.base) ||
+               node_contains_global(n->u.index_addr.index);
+    case IR_DEREF:
+        return node_contains_global(n->u.deref.ptr);
+    case IR_LOAD:
+        return node_contains_global(n->u.load.lvalue);
+    case IR_STORE:
+        return node_contains_global(n->u.store.dest) ||
+               node_contains_global(n->u.store.value);
+    case IR_CALL:
+        return false;
+    case IR_ADD: case IR_SUB: case IR_MUL: case IR_DIV: case IR_MOD:
+    case IR_SHL: case IR_SHR: case IR_BAND: case IR_BOR: case IR_BXOR:
+    case IR_LAND: case IR_LOR:
+    case IR_EQ: case IR_NE: case IR_LT: case IR_LE: case IR_GT: case IR_GE:
+    case IR_SLICE_EQ: case IR_PTR_DIFF:
+        return node_contains_global(n->u.binary.left) ||
+               node_contains_global(n->u.binary.right);
+    case IR_NEG: case IR_BNOT: case IR_LNOT:
+    case IR_LEN: case IR_PTR: case IR_CAST: case IR_WRAP: case IR_ZERO:
+        return node_contains_global(n->u.unary.operand);
+    case IR_SELECT:
+        return node_contains_global(n->u.select.cond) ||
+               node_contains_global(n->u.select.then_value) ||
+               node_contains_global(n->u.select.else_value);
+    case IR_SLICE:
+        return node_contains_global(n->u.slice.base) ||
+               node_contains_global(n->u.slice.start) ||
+               node_contains_global(n->u.slice.end);
+    case IR_PTR_ADD: case IR_PTR_SUB:
+        return node_contains_global(n->u.ptr_arith.ptr) ||
+               node_contains_global(n->u.ptr_arith.offset);
+    default:
+        return false;
+    }
+}
+
+/* Return true when evaluating the value-expression subtree rooted at n
+ * performs a pure read of mutable global storage: the subtree contains
+ * an IR_LOAD whose lvalue address chain references an IR_GLOBAL (e.g.
+ * LOAD(GLOBAL gp), or LOAD(DEREF(LOAD(GLOBAL pp))) for a double
+ * indirection). IR_CALL is not treated as a read here (its side effect
+ * is detected by node_has_side_effect); a bare IR_GLOBAL is an address
+ * reference, not a read. Used by materialize_dest_effects to hoist a
+ * compound-assignment destination-location operand whose value the
+ * source could mutate (reviewer2 NEW MAJOR t_e1fc0c67). */
+static bool node_reads_global_storage(const IrNode *n)
+{
+    if (n == NULL) {
+        return false;
+    }
+    switch (n->kind) {
+    case IR_LOAD:
+        return node_contains_global(n->u.load.lvalue);
+    case IR_GLOBAL:
+    case IR_LOCAL: case IR_INT: case IR_BOOL:
+    case IR_NULL: case IR_STR: case IR_ENUM_VAL:
+        return false;
+    case IR_FIELD_ADDR:
+        return node_reads_global_storage(n->u.field_addr.base);
+    case IR_INDEX_ADDR:
+        return node_reads_global_storage(n->u.index_addr.base) ||
+               node_reads_global_storage(n->u.index_addr.index);
+    case IR_DEREF:
+        return node_reads_global_storage(n->u.deref.ptr);
+    case IR_STORE:
+        return node_reads_global_storage(n->u.store.dest) ||
+               node_reads_global_storage(n->u.store.value);
+    case IR_CALL:
+        return false;
+    case IR_ADD: case IR_SUB: case IR_MUL: case IR_DIV: case IR_MOD:
+    case IR_SHL: case IR_SHR: case IR_BAND: case IR_BOR: case IR_BXOR:
+    case IR_LAND: case IR_LOR:
+    case IR_EQ: case IR_NE: case IR_LT: case IR_LE: case IR_GT: case IR_GE:
+    case IR_SLICE_EQ: case IR_PTR_DIFF:
+        return node_reads_global_storage(n->u.binary.left) ||
+               node_reads_global_storage(n->u.binary.right);
+    case IR_NEG: case IR_BNOT: case IR_LNOT:
+    case IR_LEN: case IR_PTR: case IR_CAST: case IR_WRAP: case IR_ZERO:
+        return node_reads_global_storage(n->u.unary.operand);
+    case IR_SELECT:
+        return node_reads_global_storage(n->u.select.cond) ||
+               node_reads_global_storage(n->u.select.then_value) ||
+               node_reads_global_storage(n->u.select.else_value);
+    case IR_SLICE:
+        return node_reads_global_storage(n->u.slice.base) ||
+               node_reads_global_storage(n->u.slice.start) ||
+               node_reads_global_storage(n->u.slice.end);
+    case IR_PTR_ADD: case IR_PTR_SUB:
+        return node_reads_global_storage(n->u.ptr_arith.ptr) ||
+               node_reads_global_storage(n->u.ptr_arith.offset);
+    default:
+        return false;
+    }
+}
+
+/* Materialize the destination location's observably-ordered operand(s)
+ * into compiler temporaries IN PLACE, so the location evaluates BEFORE
+ * the source (spec 10.4: for `a op= b`, evaluate destination location,
+ * then `b`, then read the destination, apply `op`, then store). The
+ * source is materialized into a preceding statement (round-1 MAJOR-1
+ * fix), which would otherwise put the location's evaluation (embedded
+ * in the final STORE's dest node) AFTER the source - the inverse of
+ * the spec order (reviewer2 NEW MAJOR t_9002530a). An operand is
+ * hoisted when evaluating it is observably ordered with the source:
+ * either it has side effects (contains IR_CALL - e.g. `*getp()`) or it
+ * is a pure read of mutable global storage the source could mutate
+ * (contains IR_LOAD over IR_GLOBAL - e.g. `*gp` with gp a global
+ * pointer, `a[giu]` with giu a global index; reviewer2 NEW MAJOR
+ * t_e1fc0c67). Example: for `*getp() += bump()`, dest is DEREF(CALL
+ * getp); this function appends STORE(tmp_ptr, CALL getp) to the block
+ * (so getp() runs first) and rewrites the lvalue to DEREF(LOAD(tmp_ptr));
+ * the caller then materializes the source, and the final store is
+ * STORE(DEREF(LOAD(tmp_ptr)), ADD(LOAD(DEREF(LOAD(tmp_ptr))),
+ * LOAD(tmp_src))). The lvalue node is mutated in place (never
+ * replaced), so every node stays reachable (invariant 1). Pure
+ * locations (IR_LOCAL / IR_GLOBAL leaves and operands that neither
+ * call nor read global storage) are left untouched. */
 static IrBuilderStatus materialize_dest_effects(BuilderCtx *ctx,
                                                 const NameSymbol *fn_sym,
                                                 IrNode *block,
@@ -1541,11 +1665,15 @@ static IrBuilderStatus materialize_dest_effects(BuilderCtx *ctx,
         /* leaf: no sub-expressions; nothing to hoist */
         return IR_BUILDER_OK;
     case IR_DEREF:
-        /* the location's address expression is the pointer operand; if it
-         * has side effects (e.g. `*getp()`), materialize the pointer value
-         * into a temp so the location evaluates before the source */
+        /* the location's address expression is the pointer operand; if
+         * it has side effects (e.g. `*getp()`) or is a pure read of
+         * mutable global storage the source could mutate (e.g. `*gp`
+         * with gp a global pointer that bump() reassigns), materialize
+         * the pointer value into a temp so the location evaluates
+         * before the source */
         if (dest->u.deref.ptr != NULL &&
-            node_has_side_effect(dest->u.deref.ptr)) {
+            (node_has_side_effect(dest->u.deref.ptr) ||
+             node_reads_global_storage(dest->u.deref.ptr))) {
             IrNode *tmp_load = NULL;
             st = materialize_scalar_temp(ctx, fn_sym, block, span, ck,
                                          dest->u.deref.ptr, &tmp_load);
@@ -1565,7 +1693,8 @@ static IrBuilderStatus materialize_dest_effects(BuilderCtx *ctx,
             }
         }
         if (dest->u.index_addr.index != NULL &&
-            node_has_side_effect(dest->u.index_addr.index)) {
+            (node_has_side_effect(dest->u.index_addr.index) ||
+             node_reads_global_storage(dest->u.index_addr.index))) {
             IrNode *tmp_load = NULL;
             st = materialize_scalar_temp(ctx, fn_sym, block, span, ck,
                                          dest->u.index_addr.index,
@@ -1577,8 +1706,10 @@ static IrBuilderStatus materialize_dest_effects(BuilderCtx *ctx,
         }
         return IR_BUILDER_OK;
     case IR_FIELD_ADDR:
-        /* the base may itself be a side-effecting lvalue (arrow: p->f
-         * lowers to FIELD_ADDR(DEREF(CALL p), f)) */
+        /* the base may itself be an observably-ordered lvalue (arrow:
+         * p->f lowers to FIELD_ADDR(DEREF(CALL p), f); with p a global
+         * pointer, the base is DEREF(LOAD(GLOBAL p)) and the DEREF arm
+         * above hoists the pointer read) */
         if (dest->u.field_addr.base != NULL) {
             st = materialize_dest_effects(ctx, fn_sym, block, span, ck,
                                           dest->u.field_addr.base);
