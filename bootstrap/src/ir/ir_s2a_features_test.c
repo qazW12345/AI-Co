@@ -2855,6 +2855,518 @@ static void test_c4c_runtime_addr_ptr_diff(void)
                 kC4cSrc, kC4cOracle, sizeof(kC4cOracle) - 1);
 }
 
+/* ---------------------------------------------------------------------------
+ * Case C5a - Feature 5 (struct/array literal lowering, contract 5.3/12.7):
+ * struct literal with a padding-prone layout and a NESTED COMPOSITE field.
+ *
+ *   module main;
+ *   struct Inner { x: i32; y: i64; }
+ *   struct S { a: i32; b: Inner; c: i32; }
+ *   fn f() -> void {
+ *     var s: S = S { a: 7, b: Inner { x: 1, y: 9223372036854775807 }, c: 3 };
+ *   }
+ *   fn main() -> i32 { return 0; }
+ *
+ * Layout (spec 7.4, initial-target fixed facts): Inner x@0, pad@4-7, y@8,
+ * size 16 align 8; S a@0, pad@4-7, b@8, c@24, tail pad@28-31, size 32
+ * align 8. The IR proves padding zeroing structurally: IR_ZERO on the
+ * temp images (contract 5.3 IR_ZERO: "struct/array padding zeroing") runs
+ * before any field store, so every padding byte is deterministically
+ * zeroed. Lowered shape in f()'s block (contract 5.3/12.7, spec 10.4
+ * literal-order evaluation):
+ *   IR_LOCAL(temp1 S); IR_ZERO(temp1);
+ *   IR_FIELD_ADDR(temp1,0) -> IR_INT 7 -> IR_STORE;         (a, literal order)
+ *   IR_FIELD_ADDR(temp1,1);                                  (b: nested composite)
+ *     IR_LOCAL(temp2 Inner); IR_ZERO(temp2);
+ *     IR_FIELD_ADDR(temp2,0) -> IR_INT 1 -> IR_STORE;        (x)
+ *     IR_FIELD_ADDR(temp2,1) -> IR_INT i64max -> IR_STORE;   (y)
+ *     IR_STORE(FIELD_ADDR(temp1,1), temp2);                  (address-resident
+ *                                                             composite copy,
+ *                                                             5.4/9.1)
+ *   IR_FIELD_ADDR(temp1,2) -> IR_INT 3 -> IR_STORE;          (c)
+ *   IR_LOCAL_DECL(s slot 0, init = temp1 image).
+ * The composite field store's value operand is the inner temp IR_LOCAL
+ * (an lvalue / object image), proving composite initializers are
+ * address-resident per contract 5.4; the outer STORE copies the complete
+ * object representation (fields + padding, contract 5.3 IR_STORE).
+ * Boundary values: i64 max 9223372036854775807 (field y), edge values
+ * 1 and 3, plus the padding-prone i32/i64 mixed layout (8 bytes of
+ * padding in S). (The i32 max boundary 2147483647 is exercised by the
+ * sibling array-literal case C5b.)
+ *
+ * Oracle provenance: hand-computed from IR-CONTRACT-2026-08-12 (5.3
+ * ZERO/FIELD_ADDR/STORE rows, 5.4 address-resident composites, 12.7
+ * literal-order lowering, 6.1 construction order, 8 cause chains, 11 dump
+ * form); spans from loader position_at math on the embedded source
+ * (validated against the accepted C2a oracle); never copied from builder
+ * output.
+ * ------------------------------------------------------------------------- */
+static const char kC5aSrc[] =
+"module main;\n"
+"struct Inner { x: i32; y: i64; }\n"
+"struct S { a: i32; b: Inner; c: i32; }\n"
+"fn f() -> void {\n"
+"  var s: S = S { a: 7, b: Inner { x: 1, y: 9223372036854775807 }, c: 3 };\n"
+"}\n"
+"fn main() -> i32 { return 0; }\n";
+
+static const char kC5aOracle[] =
+    "# AI-Co IR deterministic dump v1\n"
+    "H 1 18 5 28\n"
+    "T 0 void 0 1\n"
+    "T 1 bool 1 1\n"
+    "T 2 i8 1 1\n"
+    "T 3 i16 2 2\n"
+    "T 4 i32 4 4\n"
+    "T 5 i64 8 8\n"
+    "T 6 u8 1 1\n"
+    "T 7 u16 2 2\n"
+    "T 8 u32 4 4\n"
+    "T 9 u64 8 8\n"
+    "T 10 isize 8 8\n"
+    "T 11 usize 8 8\n"
+    "T 12 str 16 8\n"
+    "T 13 struct 16 8 1\n"
+    "T 14 struct 32 8 2\n"
+    "T 15 ptr 8 8 4\n"
+    "T 16 ptr 8 8 13\n"
+    "T 17 ptr 8 8 5\n"
+    "C 0 int 4 7\n"
+    "C 1 int 4 1\n"
+    "C 2 int 5 9223372036854775807\n"
+    "C 3 int 4 3\n"
+    "C 4 int 4 0\n"
+    "M 0\n"
+    "N 0 IR_MODULE -1 - input.ai 1 1 0 1 13 12 2\n"
+    "K AST_MODULE_DECL input.ai 1 1 0 1 13 12 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P main 0 4 1 2 3 4\n"
+    "N 1 IR_STRUCT_DECL -1 - input.ai 2 1 13 2 33 45 2\n"
+    "K AST_STRUCT_DECL input.ai 2 1 13 2 33 45 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P main.Inner 16 8 2 x 4 input.ai 2 16 28 2 23 35 0 y 5 input.ai 2 24 36 2 31 43 8\n"
+    "N 2 IR_STRUCT_DECL -1 - input.ai 3 1 46 3 39 84 2\n"
+    "K AST_STRUCT_DECL input.ai 3 1 46 3 39 84 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P main.S 32 8 3 a 4 input.ai 3 12 57 3 19 64 0 b 13 input.ai 3 20 65 3 29 74 8 c 4 input.ai 3 30 75 3 37 82 24\n"
+    "N 3 IR_FUNCTION -1 - input.ai 4 1 85 6 2 177 2\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P main.f 0 0 0 3 0 1 s 14 input.ai 5 3 104 5 74 175 1 2 - 14 input.ai 5 14 115 5 73 174 2 2 - 13 input.ai 5 27 128 5 65 166 5\n"
+    "N 4 IR_FUNCTION -1 - input.ai 7 1 178 7 31 208 2\n"
+    "K AST_FN_DECL input.ai 7 1 178 7 31 208 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P main.main 4 0 0 0 6\n"
+    "N 5 IR_BLOCK -1 - input.ai 4 16 100 6 2 177 3\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 8 8 11 14 17 20 21 24 25\n"
+    "N 6 IR_BLOCK -1 - input.ai 7 18 195 7 31 208 3\n"
+    "K AST_BLOCK input.ai 7 18 195 7 31 208 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 7 1 178 7 31 208 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 1 27\n"
+    "N 7 IR_LOCAL 14 - input.ai 5 14 115 5 73 174 5\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 1\n"
+    "N 8 IR_ZERO -1 - input.ai 5 14 115 5 73 174 5\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 7\n"
+    "N 9 IR_FIELD_ADDR 15 - input.ai 5 18 119 5 22 123 6\n"
+    "K AST_FIELD_INIT input.ai 5 18 119 5 22 123 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 7 0\n"
+    "N 10 IR_INT 4 - input.ai 5 21 122 5 22 123 7\n"
+    "K AST_EXPR_INT_LITERAL input.ai 5 21 122 5 22 123 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 18 119 5 22 123 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 0\n"
+    "N 11 IR_STORE -1 - input.ai 5 18 119 5 22 123 6\n"
+    "K AST_FIELD_INIT input.ai 5 18 119 5 22 123 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 9 10\n"
+    "N 12 IR_FIELD_ADDR 16 - input.ai 5 24 125 5 65 166 6\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 7 1\n"
+    "N 13 IR_LOCAL 13 - input.ai 5 27 128 5 65 166 7\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 2\n"
+    "N 14 IR_ZERO -1 - input.ai 5 27 128 5 65 166 7\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 13\n"
+    "N 15 IR_FIELD_ADDR 15 - input.ai 5 35 136 5 39 140 8\n"
+    "K AST_FIELD_INIT input.ai 5 35 136 5 39 140 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 13 0\n"
+    "N 16 IR_INT 4 - input.ai 5 38 139 5 39 140 9\n"
+    "K AST_EXPR_INT_LITERAL input.ai 5 38 139 5 39 140 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 35 136 5 39 140 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 1\n"
+    "N 17 IR_STORE -1 - input.ai 5 35 136 5 39 140 8\n"
+    "K AST_FIELD_INIT input.ai 5 35 136 5 39 140 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 15 16\n"
+    "N 18 IR_FIELD_ADDR 17 - input.ai 5 41 142 5 63 164 8\n"
+    "K AST_FIELD_INIT input.ai 5 41 142 5 63 164 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 13 1\n"
+    "N 19 IR_INT 5 - input.ai 5 44 145 5 63 164 9\n"
+    "K AST_EXPR_INT_LITERAL input.ai 5 44 145 5 63 164 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 41 142 5 63 164 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 2\n"
+    "N 20 IR_STORE -1 - input.ai 5 41 142 5 63 164 8\n"
+    "K AST_FIELD_INIT input.ai 5 41 142 5 63 164 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 27 128 5 65 166 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 18 19\n"
+    "N 21 IR_STORE -1 - input.ai 5 24 125 5 65 166 6\n"
+    "K AST_FIELD_INIT input.ai 5 24 125 5 65 166 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 12 13\n"
+    "N 22 IR_FIELD_ADDR 15 - input.ai 5 67 168 5 71 172 6\n"
+    "K AST_FIELD_INIT input.ai 5 67 168 5 71 172 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 7 2\n"
+    "N 23 IR_INT 4 - input.ai 5 70 171 5 71 172 7\n"
+    "K AST_EXPR_INT_LITERAL input.ai 5 70 171 5 71 172 -1 -1 -1\n"
+    "K AST_FIELD_INIT input.ai 5 67 168 5 71 172 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 3\n"
+    "N 24 IR_STORE -1 - input.ai 5 67 168 5 71 172 6\n"
+    "K AST_FIELD_INIT input.ai 5 67 168 5 71 172 -1 -1 -1\n"
+    "K AST_EXPR_STRUCT_INIT input.ai 5 14 115 5 73 174 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 22 23\n"
+    "N 25 IR_LOCAL_DECL -1 - input.ai 5 3 104 5 74 175 4\n"
+    "K AST_VAR_DECL input.ai 5 3 104 5 74 175 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 4 16 100 6 2 177 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 4 1 85 6 2 177 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 0 7\n"
+    "N 26 IR_INT 4 - input.ai 7 27 204 7 28 205 5\n"
+    "K AST_EXPR_INT_LITERAL input.ai 7 27 204 7 28 205 -1 -1 -1\n"
+    "K AST_RETURN input.ai 7 20 197 7 29 206 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 7 18 195 7 31 208 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 7 1 178 7 31 208 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 4\n"
+    "N 27 IR_RETURN -1 - input.ai 7 20 197 7 29 206 4\n"
+    "K AST_RETURN input.ai 7 20 197 7 29 206 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 7 18 195 7 31 208 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 7 1 178 7 31 208 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 8 1 209 -1 -1 -1\n"
+    "P 26\n";
+
+static void test_c5a_struct_literal(void)
+{
+    verify_case("C5a",
+                kC5aSrc, kC5aOracle, sizeof(kC5aOracle) - 1);
+}
+
+/* ---------------------------------------------------------------------------
+ * Case C5b - Feature 5 (struct/array literal lowering, contract 5.3/12.1):
+ * array literal ELEMENT-LIST form at runtime scope with boundary values.
+ *
+ *   module main;
+ *   fn f() -> void {
+ *     var a: i32[3] = [0, 1, 2147483647];
+ *   }
+ *   fn main() -> i32 { return 0; }
+ *
+ * Contrast with C2a/C2b (repetition form [e; N], IRC-N1) and C4b/C4c
+ * (global array constants folded to IRConst_ARRAY): this case lowers the
+ * element-list form of a local composite initializer to
+ *   IR_LOCAL(temp i32[3]); IR_ZERO(temp);
+ *   per element: IR_INT <value>; IR_INT <usize index>; IR_INDEX_ADDR
+ *                (AIC-R0807); IR_STORE(INDEX_ADDR, value)
+ *   IR_LOCAL_DECL(a slot 0, init = temp image).
+ * IR_ZERO zeroes the whole image first (padding-zeroing obligation,
+ * contract 5.3), then each element store overwrites its element - the
+ * canonical list-form lowering (contract 9.8: "array literals lowered to
+ * IR_ZERO + element stores (list form)"). Boundary values: 0 (edge),
+ * 1 (typical), INT32_MAX 2147483647 (i32 max) with element count 3
+ * (small/edge count); each element's IR_INT value carries its own span,
+ * each index IR_INT is a usize constant with the literal's span (the
+ * index is builder-introduced, contract 8: lowering-introduced nodes
+ * carry the span of the construct they serve).
+ *
+ * Oracle provenance: hand-computed from IR-CONTRACT-2026-08-12 (5.3
+ * ZERO/INDEX_ADDR/STORE rows, 12.1 list form, 6.1 construction order,
+ * 8 cause chains, 11 dump form); spans from loader position_at math on
+ * the embedded source (validated against the accepted C2a oracle); never
+ * copied from builder output.
+ * ------------------------------------------------------------------------- */
+static const char kC5bSrc[] =
+"module main;\n"
+"fn f() -> void {\n"
+"  var a: i32[3] = [0, 1, 2147483647];\n"
+"}\n"
+"fn main() -> i32 { return 0; }\n";
+
+static const char kC5bOracle[] =
+    "# AI-Co IR deterministic dump v1\n"
+    "H 1 15 6 22\n"
+    "T 0 void 0 1\n"
+    "T 1 bool 1 1\n"
+    "T 2 i8 1 1\n"
+    "T 3 i16 2 2\n"
+    "T 4 i32 4 4\n"
+    "T 5 i64 8 8\n"
+    "T 6 u8 1 1\n"
+    "T 7 u16 2 2\n"
+    "T 8 u32 4 4\n"
+    "T 9 u64 8 8\n"
+    "T 10 isize 8 8\n"
+    "T 11 usize 8 8\n"
+    "T 12 str 16 8\n"
+    "T 13 array 12 4 4 3\n"
+    "T 14 ptr 8 8 4\n"
+    "C 0 int 4 0\n"
+    "C 1 int 11 0\n"
+    "C 2 int 4 1\n"
+    "C 3 int 11 1\n"
+    "C 4 int 4 2147483647\n"
+    "C 5 int 11 2\n"
+    "M 0\n"
+    "N 0 IR_MODULE -1 - input.ai 1 1 0 1 13 12 2\n"
+    "K AST_MODULE_DECL input.ai 1 1 0 1 13 12 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P main 0 2 1 2\n"
+    "N 1 IR_FUNCTION -1 - input.ai 2 1 13 4 2 69 2\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P main.f 0 0 0 2 0 1 a 13 input.ai 3 3 32 3 38 67 1 2 - 13 input.ai 3 19 48 3 37 66 3\n"
+    "N 2 IR_FUNCTION -1 - input.ai 5 1 70 5 31 100 2\n"
+    "K AST_FN_DECL input.ai 5 1 70 5 31 100 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P main.main 4 0 0 0 4\n"
+    "N 3 IR_BLOCK -1 - input.ai 2 16 28 4 2 69 3\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5 6 10 14 18 19\n"
+    "N 4 IR_BLOCK -1 - input.ai 5 18 87 5 31 100 3\n"
+    "K AST_BLOCK input.ai 5 18 87 5 31 100 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 5 1 70 5 31 100 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 1 21\n"
+    "N 5 IR_LOCAL 13 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 1\n"
+    "N 6 IR_ZERO -1 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5\n"
+    "N 7 IR_INT 4 - input.ai 3 20 49 3 21 50 6\n"
+    "K AST_EXPR_INT_LITERAL input.ai 3 20 49 3 21 50 -1 -1 -1\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 0\n"
+    "N 8 IR_INT 11 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 1\n"
+    "N 9 IR_INDEX_ADDR 14 AIC-R0807 input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5 8\n"
+    "N 10 IR_STORE -1 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 9 7\n"
+    "N 11 IR_INT 4 - input.ai 3 23 52 3 24 53 6\n"
+    "K AST_EXPR_INT_LITERAL input.ai 3 23 52 3 24 53 -1 -1 -1\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 2\n"
+    "N 12 IR_INT 11 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 3\n"
+    "N 13 IR_INDEX_ADDR 14 AIC-R0807 input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5 12\n"
+    "N 14 IR_STORE -1 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 13 11\n"
+    "N 15 IR_INT 4 - input.ai 3 26 55 3 36 65 6\n"
+    "K AST_EXPR_INT_LITERAL input.ai 3 26 55 3 36 65 -1 -1 -1\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 4\n"
+    "N 16 IR_INT 11 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5\n"
+    "N 17 IR_INDEX_ADDR 14 AIC-R0807 input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 5 16\n"
+    "N 18 IR_STORE -1 - input.ai 3 19 48 3 37 66 5\n"
+    "K AST_EXPR_ARRAY_LITERAL input.ai 3 19 48 3 37 66 -1 -1 -1\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 17 15\n"
+    "N 19 IR_LOCAL_DECL -1 - input.ai 3 3 32 3 38 67 4\n"
+    "K AST_VAR_DECL input.ai 3 3 32 3 38 67 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 2 16 28 4 2 69 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 2 1 13 4 2 69 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 0 5\n"
+    "N 20 IR_INT 4 - input.ai 5 27 96 5 28 97 5\n"
+    "K AST_EXPR_INT_LITERAL input.ai 5 27 96 5 28 97 -1 -1 -1\n"
+    "K AST_RETURN input.ai 5 20 89 5 29 98 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 5 18 87 5 31 100 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 5 1 70 5 31 100 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 0\n"
+    "N 21 IR_RETURN -1 - input.ai 5 20 89 5 29 98 4\n"
+    "K AST_RETURN input.ai 5 20 89 5 29 98 -1 -1 -1\n"
+    "K AST_BLOCK input.ai 5 18 87 5 31 100 -1 -1 -1\n"
+    "K AST_FN_DECL input.ai 5 1 70 5 31 100 -1 -1 -1\n"
+    "K AST_PROGRAM input.ai 1 1 0 6 1 101 -1 -1 -1\n"
+    "P 20\n";
+
+static void test_c5b_array_literal(void)
+{
+    verify_case("C5b",
+                kC5bSrc, kC5bOracle, sizeof(kC5bOracle) - 1);
+}
+
 int main(void)
 {
     test_c1d_plain_compound();
@@ -2867,6 +3379,8 @@ int main(void)
     test_c4a_ptr_arith_boundaries();
     test_c4b_value_categories();
     test_c4c_runtime_addr_ptr_diff();
+    test_c5a_struct_literal();
+    test_c5b_array_literal();
 
     if (g_failures) {
         fprintf(stderr, "ir_s2a_features_test: %d checks, "
