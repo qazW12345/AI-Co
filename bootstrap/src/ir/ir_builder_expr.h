@@ -23,7 +23,11 @@
  *     materialization copies) are appended to the current block so the
  *     block's statement order is the evaluation order;
  *   - compound assignment lowered to destination-location + source +
- *     operation + store (contract 9.7 / 12.1);
+ *     operation + store (contract 9.7 / 12.1) in the spec 10.4 order:
+ *     the source is materialized into a temporary (a preceding
+ *     IR_STORE statement) so the destination read (LOAD) executes
+ *     AFTER the source evaluation - the IR's fixed per-node child
+ *     order cannot express that ordering inside one STORE tree;
  *   - struct literals lowered to IR_ZERO + field stores; array literals
  *     lowered to IR_ZERO + element stores, with the repetition form
  *     `[e; N]` evaluating e exactly once (IRC-N1, Main Designer
@@ -134,7 +138,8 @@
  *   The expression lowerer appends intermediate nodes that must execute
  *   before the produced value is consumed (IR_ZERO and field/element
  *   IR_STORE for struct/array literal images, materialization IR_STORE
- *   for composite values used where an lvalue is required, and the
+ *   for composite values used where an lvalue is required, the
+ *   compound-assignment source-materialization IR_STORE, and the
  *   single evaluated element of a repetition-form array literal when
  *   N == 0) directly to `block`'s statement list via ir_block_add_stmt.
  *   IR_STORE/IR_ZERO/IR_CALL and other expression-kind nodes are valid

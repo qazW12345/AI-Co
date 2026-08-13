@@ -1403,6 +1403,112 @@ static void test_runtime_call_signatures(void)
     pipeline_free(&p);
 }
 
+/* AC1 (reviewer2 MAJOR-3 t_a0d93e6d): 0-argument non-void runtime
+ * functions (rt.io.stdin/stdout/stderr -> usize per spec 15.2,
+ * rt.proc.args -> u8[][] per spec 15.3) must carry their spec return
+ * type on the patched IR_FUNCTION and on the IR_CALL node (contract
+ * 5.3: IR_CALL result type = callee return type). The 16c1b
+ * placeholder has 0 params and void return, so a param-count match
+ * (0 == 0) alone must NOT skip the ret_type patch; the invariant-5
+ * unreachable IR_TRAP tail is appended with the patch. */
+static void test_runtime_signatures_zero_arg(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "import rt.io;\n"
+        "import rt.proc;\n"
+        "fn f() -> void {\n"
+        "  var h: usize = rt.io.stdin();\n"
+        "  var o: usize = rt.io.stdout();\n"
+        "  var e: usize = rt.io.stderr();\n"
+        "  var a: u8[][] = rt.proc.args();\n"
+        "}\n";
+    static const struct {
+        const char *var;
+        const char *module_fqn;
+        const char *fn_fqn;
+        IrTypeKind expect_kind;
+    } cases[] = {
+        { "h", "rt.io", "rt.io.stdin", IRT_USIZE },
+        { "o", "rt.io", "rt.io.stdout", IRT_USIZE },
+        { "e", "rt.io", "rt.io.stderr", IRT_USIZE },
+        { "a", "rt.proc", "rt.proc.args", IRT_SLICE },
+    };
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    BuilderCtx ctx;
+    IrNode *fn_node, *block;
+    IrExprResult r;
+    const NameSymbol *fn_sym;
+    size_t ci;
+
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs != IR_BUILDER_OK || b == NULL) {
+        pipeline_free(&p);
+        return;
+    }
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.result = p.result;
+    ctx.layout = p.build;
+    ctx.build = b;
+    fn_sym = find_fn_sym(&p, "f");
+    fn_node = find_decl(b, "main", "main.f");
+    CHECK(fn_sym != NULL && fn_node != NULL);
+    if (fn_sym == NULL || fn_node == NULL) {
+        ir_build_free(b);
+        pipeline_free(&p);
+        return;
+    }
+    block = fn_node->u.function.body;
+
+    for (ci = 0; ci < sizeof(cases) / sizeof(cases[0]); ci++) {
+        const AstNode *e = var_init_expr(p.program, "f", cases[ci].var);
+        IrNode *callee = find_decl(b, cases[ci].module_fqn,
+                                   cases[ci].fn_fqn);
+        CHECK(e != NULL && e->kind == AST_EXPR_CALL);
+        CHECK(callee != NULL);
+        if (e != NULL) {
+            bs = ir_builder_expr_lower(&ctx, p.result->modules[0], fn_sym,
+                                       block, e, IR_EXPR_WANT_VALUE, NULL,
+                                       &r);
+            CHECK(bs == IR_BUILDER_OK);
+            if (bs == IR_BUILDER_OK) {
+                CHECK(r.cat == IR_EXPR_SCALAR ||
+                      r.cat == IR_EXPR_COMPOSITE);
+                CHECK(r.node->kind == IR_CALL);
+                CHECK(r.node->type != NULL &&
+                      r.node->type->kind == cases[ci].expect_kind);
+                CHECK(r.node->u.call.callee == callee);
+                attach_expr(b, block, e->span, r.node);
+            }
+        }
+        if (callee != NULL) {
+            /* the 0-arg signature patch must set ret_type even though
+             * nparams already matches (0 == 0) */
+            CHECK(callee->u.function.nparams == 0);
+            CHECK(callee->u.function.ret_type != NULL &&
+                  callee->u.function.ret_type->kind ==
+                      cases[ci].expect_kind);
+            /* invariant-5 trap tail appended with the ret_type patch */
+            CHECK(callee->u.function.body != NULL &&
+                  callee->u.function.body->kind == IR_BLOCK);
+            if (callee->u.function.body != NULL &&
+                callee->u.function.body->kind == IR_BLOCK) {
+                CHECK(callee->u.function.body->u.block.nstmts == 1);
+                CHECK(callee->u.function.body->u.block.nstmts > 0 &&
+                      callee->u.function.body->u.block.stmts[0]->kind ==
+                          IR_TRAP);
+            }
+        }
+    }
+    verify_ok(b);
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
 /* AC1/AC3: struct and array literals - IR_ZERO + field/element stores
  * into a temporary image; literal-order field evaluation. */
 static void test_struct_and_array_literals(void)
@@ -1684,7 +1790,9 @@ static void test_assign_compound(void)
             CHECK(bs == IR_BUILDER_UNSUPPORTED);
         }
     }
-    /* a += 2 -> STORE(dest, IR_ADD(IR_LOAD(dest), IR_INT)) with R0802 */
+    /* a += 2 -> STORE(dest, IR_ADD(IR_LOAD(dest), temp)) with R0802:
+     * the source is materialized into a temp so it evaluates before
+     * the destination read (spec 10.4; reviewer2 MAJOR-1) */
     {
         const AstNode *e = stmt_expr(p.program, "f", 1);
         if (e != NULL) {
@@ -1702,9 +1810,34 @@ static void test_assign_compound(void)
                       IR_LOAD);
                 CHECK(r.node->u.store.value->u.binary.left->
                           u.load.lvalue == r.node->u.store.dest);
+                /* spec 10.4: the source is evaluated before the
+                 * destination read - it is materialized into a temp (the
+                 * op's right operand is a temp LOAD, not the source
+                 * directly) whose store statement precedes the final
+                 * store (reviewer2 MAJOR-1) */
                 CHECK(r.node->u.store.value->u.binary.right->kind ==
-                      IR_INT);
+                      IR_LOAD);
+                CHECK(r.node->u.store.value->u.binary.right->
+                          u.load.lvalue->kind == IR_LOCAL);
                 attach_expr(b, block, e->span, r.node);
+                {
+                    IrNode *tmp_store = NULL;
+                    size_t si;
+                    for (si = 0; si < block->u.block.nstmts; si++) {
+                        IrNode *s = block->u.block.stmts[si];
+                        if (s->kind == IR_STORE) {
+                            tmp_store = s;
+                            break;
+                        }
+                    }
+                    CHECK(tmp_store != NULL);
+                    if (tmp_store != NULL) {
+                        CHECK(tmp_store->u.store.dest ==
+                              r.node->u.store.value->u.binary.right->
+                                  u.load.lvalue);
+                        CHECK(tmp_store->u.store.value->kind == IR_INT);
+                    }
+                }
             }
         }
     }
@@ -1726,7 +1859,11 @@ static void test_assign_compound(void)
             }
         }
     }
-    /* p += 1 -> STORE(dest, PTR_ADD(dest, 1)) with R0816 */
+    /* p += 1 -> STORE(dest, PTR_ADD(LOAD(dest), temp)) with R0816:
+     * the pointer operand is the loaded destination pointer VALUE
+     * (contract 5.3/5.4; reviewer2 MAJOR-2), and the offset source is
+     * materialized into a temp so the source evaluates before the
+     * destination read (spec 10.4; reviewer2 MAJOR-1) */
     {
         const AstNode *e = stmt_expr(p.program, "f", 3);
         if (e != NULL) {
@@ -1740,13 +1877,135 @@ static void test_assign_compound(void)
                 CHECK(r.node->u.store.value->trap_code != NULL &&
                       strcmp(r.node->u.store.value->trap_code,
                              "AIC-R0816") == 0);
-                CHECK(r.node->u.store.value->u.ptr_arith.ptr ==
-                      r.node->u.store.dest);
+                CHECK(r.node->u.store.value->u.ptr_arith.ptr->kind ==
+                      IR_LOAD);
+                CHECK(r.node->u.store.value->u.ptr_arith.ptr->
+                          u.load.lvalue == r.node->u.store.dest);
+                CHECK(r.node->u.store.value->u.ptr_arith.ptr->type !=
+                          NULL &&
+                      r.node->u.store.value->u.ptr_arith.ptr->type->kind ==
+                          IRT_PTR);
+                CHECK(r.node->u.store.value->u.ptr_arith.offset->kind ==
+                      IR_LOAD);
+                CHECK(r.node->u.store.value->u.ptr_arith.offset->
+                          u.load.lvalue->kind == IR_LOCAL);
                 attach_expr(b, block, e->span, r.node);
             }
         }
     }
     (void)idx;
+    verify_ok(b);
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
+/* AC1/AC3 (reviewer2 MAJOR-1 t_a0d93e6d): compound assignment must
+ * evaluate the source BEFORE the destination read (spec 10.4:
+ * destination location, then b, then read the destination, apply op,
+ * then store). The IR's fixed per-node child order (IR_STORE:
+ * destination then value; the binary op: left then right) cannot
+ * express that inside a single STORE tree, so the source is
+ * materialized into a temporary: block order becomes
+ *   STORE(tmp, src); STORE(dest, OP(LOAD(dest), LOAD(tmp))).
+ * With a side-effecting source this is observable: `g += bump()` where
+ * bump() sets g = 100 and returns 1 must compute 100 + 1 == 101
+ * (destination read AFTER the source), not 1 + 1 == 2. */
+static void test_compound_eval_order(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "var g: i32 = 1;\n"
+        "fn bump() -> i32 { g = 100; return 1; }\n"
+        "fn f() -> void {\n"
+        "  g += bump();\n"
+        "}\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    BuilderCtx ctx;
+    IrNode *fn_node, *block;
+    IrExprResult r;
+    const NameSymbol *fn_sym;
+
+    memset(&r, 0, sizeof(r));
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs != IR_BUILDER_OK || b == NULL) {
+        pipeline_free(&p);
+        return;
+    }
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.result = p.result;
+    ctx.layout = p.build;
+    ctx.build = b;
+    fn_sym = find_fn_sym(&p, "f");
+    fn_node = find_decl(b, "main", "main.f");
+    CHECK(fn_sym != NULL && fn_node != NULL);
+    if (fn_sym == NULL || fn_node == NULL) {
+        ir_build_free(b);
+        pipeline_free(&p);
+        return;
+    }
+    block = fn_node->u.function.body;
+
+    {
+        const AstNode *e = stmt_expr(p.program, "f", 0);
+        IrNode *tmp_store, *final_store, *op;
+        CHECK(e != NULL && e->kind == AST_EXPR_ASSIGN);
+        if (e != NULL) {
+            bs = ir_builder_expr_lower(&ctx, p.result->modules[0], fn_sym,
+                                       block, e, IR_EXPR_WANT_ANY, NULL,
+                                       &r);
+            CHECK(bs == IR_BUILDER_OK);
+            if (bs != IR_BUILDER_OK) {
+                ir_build_free(b);
+                pipeline_free(&p);
+                return;
+            }
+            CHECK(r.cat == IR_EXPR_EFFECT);
+            CHECK(r.node->kind == IR_STORE);
+            attach_expr(b, block, e->span, r.node);
+        }
+        /* block order: the source-materialization store runs first,
+         * then the final store (the block's statement order is the
+         * evaluation order, contract 6.1 = spec 10.4) */
+        CHECK(block->u.block.nstmts == 2);
+        if (block->u.block.nstmts < 2) {
+            ir_build_free(b);
+            pipeline_free(&p);
+            return;
+        }
+        tmp_store = block->u.block.stmts[0];
+        CHECK(tmp_store->kind == IR_STORE);
+        CHECK(tmp_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(tmp_store->u.store.value->kind == IR_CALL);
+        CHECK(tmp_store->u.store.value->u.call.callee != NULL &&
+              tmp_store->u.store.value->u.call.callee->u.function.name !=
+                  NULL &&
+              strcmp(tmp_store->u.store.value->u.call.callee->
+                         u.function.name, "main.bump") == 0);
+        CHECK(block->u.block.stmts[1]->kind == IR_EXPR_STMT);
+        final_store = block->u.block.stmts[1]->u.expr_stmt.expr;
+        CHECK(final_store != NULL && final_store->kind == IR_STORE);
+        CHECK(final_store->u.store.dest->kind == IR_GLOBAL);
+        op = final_store->u.store.value;
+        CHECK(op != NULL && op->kind == IR_ADD);
+        if (op != NULL && op->kind == IR_ADD && r.node != NULL) {
+            /* the destination read follows the source evaluation: the
+             * op's left (destination read) is a LOAD of the final
+             * store's dest; the op's right is a LOAD of the temp that
+             * holds the already-evaluated source */
+            CHECK(op->u.binary.left->kind == IR_LOAD);
+            CHECK(op->u.binary.left->u.load.lvalue ==
+                  final_store->u.store.dest);
+            CHECK(op->u.binary.right->kind == IR_LOAD);
+            CHECK(op->u.binary.right->u.load.lvalue ==
+                  tmp_store->u.store.dest);
+            CHECK(final_store == r.node);
+        }
+    }
+    terminate_fn_body(b, find_decl(b, "main", "main.bump"));
     verify_ok(b);
     ir_build_free(b);
     pipeline_free(&p);
@@ -2113,12 +2372,16 @@ int main(void)
     fprintf(stderr, "after test_call_and_pointer_arith\n");
     test_runtime_call_signatures();
     fprintf(stderr, "after test_runtime_call_signatures\n");
+    test_runtime_signatures_zero_arg();
+    fprintf(stderr, "after test_runtime_signatures_zero_arg\n");
     test_struct_and_array_literals();
     fprintf(stderr, "after test_struct_and_array_literals\n");
     test_repetition_eval_once();
     fprintf(stderr, "after test_repetition_eval_once\n");
     test_assign_compound();
     fprintf(stderr, "after test_assign_compound\n");
+    test_compound_eval_order();
+    fprintf(stderr, "after test_compound_eval_order\n");
     test_ternary_cast_sizeof();
     fprintf(stderr, "after test_ternary_cast_sizeof\n");
     test_defensive_unsupported();

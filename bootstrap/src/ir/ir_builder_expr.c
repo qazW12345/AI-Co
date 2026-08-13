@@ -1055,13 +1055,11 @@ static IrBuilderStatus ensure_runtime_signature(BuilderCtx *ctx,
     if (sig == NULL) {
         return IR_BUILDER_UNSUPPORTED;   /* unknown runtime function */
     }
-    if (fn_node->u.function.nparams == sig->nparams) {
-        return IR_BUILDER_OK;            /* already patched (or no-op) */
-    }
-    if (fn_node->u.function.nparams != 0) {
+    if (fn_node->u.function.nparams != 0 &&
+        fn_node->u.function.nparams != sig->nparams) {
         return IR_BUILDER_UNSUPPORTED;   /* defensive: conflicting state */
     }
-    if (sig->nparams > 0) {
+    if (fn_node->u.function.nparams == 0 && sig->nparams > 0) {
         params = (IrParam *)build_alloc(ctx, sig->nparams, sizeof(*params));
         if (params == NULL) {
             return IR_BUILDER_OOM;
@@ -1090,31 +1088,45 @@ static IrBuilderStatus ensure_runtime_signature(BuilderCtx *ctx,
             }
         }
     }
+    /* Return type: the 16c1b placeholder is void, so a param-count
+     * match alone is NOT sufficient - non-void 0-argument runtime
+     * functions (rt.io.stdin/stdout/stderr, rt.proc.args) must still
+     * have their spec ret_type patched (reviewer2 MAJOR-3; contract
+     * 5.3: the IR_CALL result type is the callee return type).
+     * Idempotent: patch only when the current type is not already the
+     * spec type (the trap tail is appended with the first patch). */
     if (rt_is_void_ret(fn_node->u.function.name)) {
-        fn_node->u.function.ret_type = ir_type_void(b);
+        if (fn_node->u.function.ret_type == NULL ||
+            fn_node->u.function.ret_type->kind != IRT_VOID) {
+            fn_node->u.function.ret_type = ir_type_void(b);
+        }
     } else {
         IrType *rt = rt_kind_type(ctx, sig->ret);
         if (rt == NULL) {
             return IR_BUILDER_OOM;
         }
-        fn_node->u.function.ret_type = rt;
-        /* A patched non-void runtime function has no source body (the
-         * 16c1b placeholder IR_BLOCK is empty), so invariant 5 (non-void
-         * function tails terminate) would reject the build. Append an
-         * unreachable IR_TRAP terminator: the runtime implementation is
-         * external and the IR body is never executed, so the tail is a
-         * trap placeholder. Idempotent: runs only on the first patch. */
-        if (fn_node->u.function.body != NULL &&
-            fn_node->u.function.body->kind == IR_BLOCK) {
-            IrNode *trap = mk_node(ctx, IR_TRAP, fn_node->span,
-                                   "RUNTIME_FUNCTION");
-            if (trap == NULL) {
-                return IR_BUILDER_OOM;
+        if (fn_node->u.function.ret_type == NULL ||
+            !ir_type_identical(fn_node->u.function.ret_type, rt)) {
+            fn_node->u.function.ret_type = rt;
+            /* A patched non-void runtime function has no source body
+             * (the 16c1b placeholder IR_BLOCK is empty), so invariant 5
+             * (non-void function tails terminate) would reject the
+             * build. Append an unreachable IR_TRAP terminator: the
+             * runtime implementation is external and the IR body is
+             * never executed, so the tail is a trap placeholder.
+             * Idempotent: runs only on the first patch. */
+            if (fn_node->u.function.body != NULL &&
+                fn_node->u.function.body->kind == IR_BLOCK) {
+                IrNode *trap = mk_node(ctx, IR_TRAP, fn_node->span,
+                                       "RUNTIME_FUNCTION");
+                if (trap == NULL) {
+                    return IR_BUILDER_OOM;
+                }
+                trap->u.trap.code = NULL;
+                trap->u.trap.has_user_code = true;
+                trap->u.trap.user_code = 0;
+                ir_block_add_stmt(b, fn_node->u.function.body, trap);
             }
-            trap->u.trap.code = NULL;
-            trap->u.trap.has_user_code = true;
-            trap->u.trap.user_code = 0;
-            ir_block_add_stmt(b, fn_node->u.function.body, trap);
         }
     }
     return IR_BUILDER_OK;
@@ -1378,6 +1390,65 @@ static IrBuilderStatus materialize(BuilderCtx *ctx,
         return IR_BUILDER_OOM;
     }
     *out_image = loc;
+    return IR_BUILDER_OK;
+}
+
+/* Materialize a scalar value into a temporary slot and return an
+ * IR_LOAD of the temp. The appended IR_STORE(tmp, value) makes the
+ * value's evaluation happen at that statement's position (block
+ * statement order = evaluation order, contract 6.1). Compound
+ * assignment uses this so the source executes BEFORE the destination
+ * read (spec 10.4): the fixed per-node child order of one IR_STORE
+ * tree cannot express that ordering structurally, but a preceding
+ * statement can (see lower_assign). */
+static IrBuilderStatus materialize_scalar_temp(BuilderCtx *ctx,
+                                               const NameSymbol *fn_sym,
+                                               IrNode *block,
+                                               const DiagSpan *span,
+                                               const char *ck,
+                                               IrNode *value,
+                                               IrNode **out_load)
+{
+    IrBuild *b = ctx->build;
+    IrNode *fn_node;
+    IrSlot *slot;
+    IrNode *loc;
+    IrNode *store;
+    IrNode *load;
+
+    if (value == NULL || value->type == NULL || out_load == NULL) {
+        return IR_BUILDER_UNSUPPORTED;
+    }
+    fn_node = find_fn_node(ctx, fn_sym);
+    if (fn_node == NULL) {
+        return IR_BUILDER_UNSUPPORTED;
+    }
+    slot = ir_builder_add_slot(b, fn_node, IR_SLOT_TEMP, NULL,
+                               value->type, span);
+    if (slot == NULL) {
+        return IR_BUILDER_OOM;
+    }
+    loc = mk_value_node(ctx, IR_LOCAL, span, ck, value->type);
+    if (loc == NULL) {
+        return IR_BUILDER_OOM;
+    }
+    loc->u.local.slot_index = slot->index;
+    store = mk_trap_node(ctx, IR_STORE, span, ck, NULL, NULL);
+    if (store == NULL) {
+        return IR_BUILDER_OOM;
+    }
+    store->u.store.dest = loc;
+    store->u.store.value = value;
+    ir_block_add_stmt(b, block, store);
+    if (b->oom) {
+        return IR_BUILDER_OOM;
+    }
+    load = mk_trap_node(ctx, IR_LOAD, span, ck, value->type, NULL);
+    if (load == NULL) {
+        return IR_BUILDER_OOM;
+    }
+    load->u.load.lvalue = loc;
+    *out_load = load;
     return IR_BUILDER_OK;
 }
 
@@ -3009,15 +3080,20 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
         store->u.store.value = val;
     } else {
         /* compound: dest-location + source + op + store (contract 9.7).
-         * The IR's fixed per-node child order (IR_STORE: destination
-         * then value; the binary op: left then right) evaluates the
-         * destination read before the source expression; the source is
-         * lowered first in construction order. See the ordering note in
-         * the completion report / header gap note. */
+         * Spec 10.4 requires the source `b` to be evaluated before the
+         * destination is read. The IR's fixed per-node child order
+         * (IR_STORE: destination then value; the binary op: left then
+         * right) would execute the destination read before the source
+         * inside a single STORE tree, so the source is materialized
+         * into a temporary: the block order becomes
+         *   STORE(tmp, src); STORE(dest, OP(LOAD(dest), LOAD(tmp)))
+         * and the block's statement order is the evaluation order
+         * (contract 6.1 = spec 10.4; reviewer2 MAJOR-1). */
         BinOpSpec spec;
         AstBinaryOp bop;
         IrNode *src = NULL;
         IrNode *loaded = NULL;
+        IrNode *tmp_load = NULL;
         IrNode *op_node;
         switch (expr->u.assign.op) {
         case AST_ASGN_ADD: bop = AST_BIN_ADD; break;
@@ -3043,11 +3119,26 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
         if (src == NULL || src->type == NULL) {
             return IR_BUILDER_UNSUPPORTED;
         }
+        /* evaluate the source first (spec 10.4): materialize it into a
+         * temporary so the op's operand is a value that is already
+         * computed when the destination is read */
+        st = materialize_scalar_temp(ctx, fn_sym, block, expr->span, ck,
+                                     src, &tmp_load);
+        if (st != IR_BUILDER_OK) {
+            return st;
+        }
         if (dt->kind == IRT_PTR) {
-            /* pointer += / -= (spec 12.5): the offset is any integer */
+            /* pointer += / -= (spec 12.5): p += i reads the destination
+             * pointer VALUE (IR_LOAD, contract 5.3/5.4), scales, stores
+             * back; the offset is any integer (reviewer2 MAJOR-2) */
             if (!ir_type_is_int(src->type)) {
                 return IR_BUILDER_UNSUPPORTED;
             }
+            loaded = mk_trap_node(ctx, IR_LOAD, expr->span, ck, dt, NULL);
+            if (loaded == NULL) {
+                return IR_BUILDER_OOM;
+            }
+            loaded->u.load.lvalue = dest;
             op_node = mk_trap_node(ctx,
                                    bop == AST_BIN_ADD ? IR_PTR_ADD
                                                       : IR_PTR_SUB,
@@ -3055,8 +3146,8 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
             if (op_node == NULL) {
                 return IR_BUILDER_OOM;
             }
-            op_node->u.ptr_arith.ptr = dest;
-            op_node->u.ptr_arith.offset = src;
+            op_node->u.ptr_arith.ptr = loaded;
+            op_node->u.ptr_arith.offset = tmp_load;
         } else {
             IrType *lt = (IrType *)value_at_type(dest);
             IrType *ct;
@@ -3084,7 +3175,7 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
                 return IR_BUILDER_OOM;
             }
             op_node->u.binary.left = loaded;
-            op_node->u.binary.right = src;
+            op_node->u.binary.right = tmp_load;
         }
         store = mk_trap_node(ctx, IR_STORE, expr->span, ck, NULL, NULL);
         if (store == NULL) {
