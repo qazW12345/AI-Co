@@ -133,6 +133,32 @@ normal Planner/design process when adopted.
   yet; if adopted it becomes a work package via the normal Planner/design
   process.
 
+### S2a-IR — Pre-codegen stopgap: feature-scoped micro-programs at the IR boundary (early adoption, 2026-08-13)
+
+- **Status:** ADOPTED as an early, bounded verification stopgap by Main Designer decision
+  2026-08-13, per Marcel's direction ("if you believe doing S2a style checks now ... will pay
+  off, please delegate doing them"). This is NOT the full post-M0 S2a corpus; it is a first
+  tranche targeted at the IR builder (WP-M0-16) before codegen (WP-M0-17) consumes the IR.
+- **Rationale:** the 16c1c review cycle (compound-assignment destination-location ordering,
+  alias-through-global) proved the wrong-but-consistent (G2) risk is real in builder lowering.
+  Review samples; differential checks exhaust. The cheapest intervention point is while the IR
+  builder is still the only consumer of the IR — before 17 bakes a wrong lowering into machine
+  code and the bootstrap chain. At WP-M0-20 the same bug would be a cascade.
+- **Trigger:** WP-M0-16c2 (t_07aacd82) done — the earliest moment the IR surface is final
+  (end-to-end `ir_builder_build` exists only after 16c1d; 16c2 adds span/cause fields, so
+  expected dumps authored earlier would churn) and the shared tree is quiescent (W2a).
+- **Scope (IR-boundary, not behavioral):** minimal AI-Co programs, one feature each, focused
+  on the trickiest lowerings: compound assignment (destination-location order,
+  alias-through-global), repetition form `[e; N]` (IRC-N1 evaluate-exactly-once), cast/wrap
+  matrix, pointer arithmetic / value categories, struct/array literal lowering, trap
+  obligations. Oracle = hand-computed expected IR per IR-CONTRACT-2026-08-12 +
+  `ir_core_verify` (AIC-I0501) + `ir_dump` round-trip byte-identity (16b2 machinery).
+  Behavioral dual-reference (R1) remains post-M0, when executables exist.
+- **Placement:** structural gate between WP-M0-16 and WP-M0-17 (parent of 17a1), and a parent
+  of the 16-section push wave so origin receives validated code.
+- **Delegation:** Main Designer decision recorded here; Planner sizes the work package and
+  creates the specialist implementation card; normal review/gate flow applies.
+
 
 ### S3 — Differential fuzzing (post-M0, higher effort)
 
@@ -176,6 +202,10 @@ normal Planner/design process when adopted.
 
 ## 5. Sequencing recommendation (informative)
 
+0. **Pre-codegen stopgap (adopted 2026-08-13, see §S2a-IR):** at WP-M0-16c2 completion, run
+   the S2a-IR IR-boundary micro-program tranche on the finished IR builder — before codegen
+   (WP-M0-17) consumes the IR. This inserts the first true semantic verification at the
+   cheapest possible point (builder is still the only consumer) and gates WP-M0-17.
 1. **At M0 completion:** run the corpus against the real compiler (`--compiler`)
    — this is the first true behavior gate; fix whatever it surfaces.
 2. **First post-M0 package:** S2a (feature-scoped differential micro-programs)
