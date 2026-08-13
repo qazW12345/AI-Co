@@ -1,0 +1,13 @@
+# bootstrap/build/ir_builder2.txt
+# WP-M0-16c2 IR span/cause preservation area source list (owned by
+# WP-M0-16c2). Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd
+# fragment aggregation (CONVENTIONS.md sec. 3). One source path per line,
+# lexicographically sorted; tests are built explicitly and are NOT listed.
+#
+# ir_builder_cause.c implements the full preservation chains (IR contract
+# sec. 8) over the completed builder output. It depends on the IR core
+# (bootstrap/build/ir1.txt), the builder core (bootstrap/build/
+# ir_builder1a.txt), the name result (bootstrap/build/name.txt), the AST
+# package (bootstrap/build/ast.txt), and the diag span model
+# (bootstrap/build/diag.txt); all are included by the aggregate build.
+bootstrap/src/ir/ir_builder_cause.c
