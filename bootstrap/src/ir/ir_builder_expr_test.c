@@ -2011,6 +2011,164 @@ static void test_compound_eval_order(void)
     pipeline_free(&p);
 }
 
+/* AC1 (reviewer2 NEW MAJOR t_9002530a): compound assignment with a
+ * side-effecting DESTINATION LOCATION must evaluate the destination
+ * location BEFORE the source (spec 10.4: destination location, then b,
+ * then read the destination, apply op, then store). `*getp() += bump()`
+ * where getp() is a call: the location's pointer operand is materialized
+ * into a temp AHEAD of the source, so the block order becomes
+ *   STORE(tmp_ptr, CALL getp); STORE(tmp_src, CALL bump);
+ *   STORE(DEREF(LOAD(tmp_ptr)), ADD(LOAD(DEREF(LOAD(tmp_ptr))), LOAD(tmp_src)))
+ * Observable: with getp() setting g = 200 and bump() setting g = 100,
+ * the spec order (getp() first) leaves g = 200; the pre-fix order
+ * (bump() first) leaves g = 100. */
+static void test_compound_dest_location_order(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "var g: i32 = 1;\n"
+        "var cell: i32 = 5;\n"
+        "fn bump() -> i32 { g = 100; return 1; }\n"
+        "fn getp() -> i32* { g = 200; return null; }\n"
+        "fn f() -> void {\n"
+        "  *getp() += bump();\n"
+        "}\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    BuilderCtx ctx;
+    IrNode *fn_node, *block;
+    IrExprResult r;
+    const NameSymbol *fn_sym;
+
+    memset(&r, 0, sizeof(r));
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs != IR_BUILDER_OK || b == NULL) {
+        pipeline_free(&p);
+        return;
+    }
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.result = p.result;
+    ctx.layout = p.build;
+    ctx.build = b;
+    fn_sym = find_fn_sym(&p, "f");
+    fn_node = find_decl(b, "main", "main.f");
+    CHECK(fn_sym != NULL && fn_node != NULL);
+    if (fn_sym == NULL || fn_node == NULL) {
+        ir_build_free(b);
+        pipeline_free(&p);
+        return;
+    }
+    block = fn_node->u.function.body;
+
+    {
+        const AstNode *e = stmt_expr(p.program, "f", 0);
+        IrNode *loc_store, *src_store, *final_stmt;
+        CHECK(e != NULL && e->kind == AST_EXPR_ASSIGN);
+        if (e != NULL) {
+            bs = ir_builder_expr_lower(&ctx, p.result->modules[0], fn_sym,
+                                       block, e, IR_EXPR_WANT_ANY, NULL,
+                                       &r);
+            CHECK(bs == IR_BUILDER_OK);
+            if (bs != IR_BUILDER_OK) {
+                ir_build_free(b);
+                pipeline_free(&p);
+                return;
+            }
+            CHECK(r.cat == IR_EXPR_EFFECT);
+            CHECK(r.node->kind == IR_STORE);
+            attach_expr(b, block, e->span, r.node);
+        }
+        /* block order (the block's statement order is the evaluation
+         * order, contract 6.1 = spec 10.4): the destination location's
+         * side-effecting pointer operand materializes FIRST, then the
+         * source, then the final store (reviewer2 NEW MAJOR) */
+        CHECK(block->u.block.nstmts == 3);
+        if (block->u.block.nstmts < 3) {
+            ir_build_free(b);
+            pipeline_free(&p);
+            return;
+        }
+        loc_store = block->u.block.stmts[0];
+        CHECK(loc_store->kind == IR_STORE);
+        CHECK(loc_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(loc_store->u.store.dest->type != NULL &&
+              loc_store->u.store.dest->type->kind == IRT_PTR);
+        CHECK(loc_store->u.store.value->kind == IR_CALL);
+        CHECK(loc_store->u.store.value->u.call.callee != NULL &&
+              loc_store->u.store.value->u.call.callee->u.function.name !=
+                  NULL &&
+              strcmp(loc_store->u.store.value->u.call.callee->
+                         u.function.name, "main.getp") == 0);
+        src_store = block->u.block.stmts[1];
+        CHECK(src_store->kind == IR_STORE);
+        CHECK(src_store->u.store.dest->kind == IR_LOCAL);
+        CHECK(src_store->u.store.value->kind == IR_CALL);
+        CHECK(src_store->u.store.value->u.call.callee != NULL &&
+              src_store->u.store.value->u.call.callee->u.function.name !=
+                  NULL &&
+              strcmp(src_store->u.store.value->u.call.callee->
+                         u.function.name, "main.bump") == 0);
+        final_stmt = block->u.block.stmts[2];
+        CHECK(final_stmt->kind == IR_EXPR_STMT);
+        {
+            IrNode *final_store = final_stmt->u.expr_stmt.expr;
+            IrNode *op;
+            CHECK(final_store != NULL && final_store->kind == IR_STORE);
+            CHECK(final_store->u.store.dest->kind == IR_DEREF);
+            /* the destination location is DEREF(LOAD(tmp_ptr)): the
+             * pointer operand is the loaded materialized pointer, so the
+             * location was already evaluated at stmt 0 (getp() runs
+             * before bump()) */
+            CHECK(final_store->u.store.dest->u.deref.ptr->kind == IR_LOAD);
+            CHECK(final_store->u.store.dest->u.deref.ptr->u.load.lvalue ==
+                  loc_store->u.store.dest);
+            op = final_store->u.store.value;
+            CHECK(op != NULL && op->kind == IR_ADD);
+            if (op != NULL && op->kind == IR_ADD) {
+                /* the destination read follows the location and the
+                 * source: op.left = LOAD(DEREF(LOAD(tmp_ptr))) (read of
+                 * the materialized location), op.right = LOAD(tmp_src) */
+                CHECK(op->u.binary.left->kind == IR_LOAD);
+                CHECK(op->u.binary.left->u.load.lvalue ==
+                      final_store->u.store.dest);
+                CHECK(op->u.binary.right->kind == IR_LOAD);
+                CHECK(op->u.binary.right->u.load.lvalue ==
+                      src_store->u.store.dest);
+                CHECK(final_store == r.node);
+            }
+        }
+    }
+    terminate_fn_body(b, find_decl(b, "main", "main.bump"));
+    /* getp returns i32*: the shared terminate_fn_body appends IR_INT 0
+     * (valid only for integer returns), so terminate it with an IR_NULL
+     * pointer return instead */
+    {
+        IrNode *gfn = find_decl(b, "main", "main.getp");
+        if (gfn != NULL && gfn->u.function.body != NULL) {
+            IrNode *val = ir_node_new(b, IR_NULL, gfn->span);
+            IrNode *ret;
+            if (val != NULL) {
+                val->type = gfn->u.function.ret_type;
+                ir_node_add_cause(b, val, "AST_EXPR_NULL", gfn->span,
+                                  -1, -1, -1);
+                ret = ir_node_new(b, IR_RETURN, gfn->span);
+                if (ret != NULL) {
+                    ret->u.return_stmt.value = val;
+                    ir_node_add_cause(b, ret, "AST_RETURN", gfn->span,
+                                      -1, -1, -1);
+                    ir_block_add_stmt(b, gfn->u.function.body, ret);
+                }
+            }
+        }
+    }
+    verify_ok(b);
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
 /* AC1: ternary, cast/wrap, sizeof/alignof - IR_SELECT (bool condition,
  * same-typed branches), IR_CAST (R0801) / IR_WRAP, sizeof/alignof as
  * IR_INT(usize) constants. */
@@ -2382,6 +2540,8 @@ int main(void)
     fprintf(stderr, "after test_assign_compound\n");
     test_compound_eval_order();
     fprintf(stderr, "after test_compound_eval_order\n");
+    test_compound_dest_location_order();
+    fprintf(stderr, "after test_compound_dest_location_order\n");
     test_ternary_cast_sizeof();
     fprintf(stderr, "after test_ternary_cast_sizeof\n");
     test_defensive_unsupported();

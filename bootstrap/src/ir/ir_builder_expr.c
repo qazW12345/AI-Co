@@ -1452,6 +1452,146 @@ static IrBuilderStatus materialize_scalar_temp(BuilderCtx *ctx,
     return IR_BUILDER_OK;
 }
 
+/* Return true when the expression subtree rooted at n contains a
+ * side-effecting node (IR_CALL - the only side-effecting value node in
+ * the closed IR; IR_STORE cannot appear inside an lvalue subtree
+ * because assignment in a value position is a disclosed gap 3). Used
+ * by materialize_dest_effects to decide whether a compound-assignment
+ * destination location's operand must be hoisted before the source
+ * (spec 10.4: evaluate destination location, then b; reviewer2 NEW
+ * MAJOR t_9002530a). */
+static bool node_has_side_effect(const IrNode *n)
+{
+    if (n == NULL) {
+        return false;
+    }
+    switch (n->kind) {
+    case IR_CALL:
+        return true;
+    case IR_LOCAL: case IR_GLOBAL: case IR_INT: case IR_BOOL:
+    case IR_NULL: case IR_STR: case IR_ENUM_VAL:
+        return false;
+    case IR_FIELD_ADDR:
+        return node_has_side_effect(n->u.field_addr.base);
+    case IR_INDEX_ADDR:
+        return node_has_side_effect(n->u.index_addr.base) ||
+               node_has_side_effect(n->u.index_addr.index);
+    case IR_DEREF:
+        return node_has_side_effect(n->u.deref.ptr);
+    case IR_LOAD:
+        return node_has_side_effect(n->u.load.lvalue);
+    case IR_STORE:
+        return node_has_side_effect(n->u.store.dest) ||
+               node_has_side_effect(n->u.store.value);
+    case IR_ADD: case IR_SUB: case IR_MUL: case IR_DIV: case IR_MOD:
+    case IR_SHL: case IR_SHR: case IR_BAND: case IR_BOR: case IR_BXOR:
+    case IR_LAND: case IR_LOR:
+    case IR_EQ: case IR_NE: case IR_LT: case IR_LE: case IR_GT: case IR_GE:
+    case IR_SLICE_EQ: case IR_PTR_DIFF:
+        return node_has_side_effect(n->u.binary.left) ||
+               node_has_side_effect(n->u.binary.right);
+    case IR_NEG: case IR_BNOT: case IR_LNOT:
+    case IR_LEN: case IR_PTR: case IR_CAST: case IR_WRAP: case IR_ZERO:
+        return node_has_side_effect(n->u.unary.operand);
+    case IR_SELECT:
+        return node_has_side_effect(n->u.select.cond) ||
+               node_has_side_effect(n->u.select.then_value) ||
+               node_has_side_effect(n->u.select.else_value);
+    case IR_SLICE:
+        return node_has_side_effect(n->u.slice.base) ||
+               node_has_side_effect(n->u.slice.start) ||
+               node_has_side_effect(n->u.slice.end);
+    case IR_PTR_ADD: case IR_PTR_SUB:
+        return node_has_side_effect(n->u.ptr_arith.ptr) ||
+               node_has_side_effect(n->u.ptr_arith.offset);
+    default:
+        return false;
+    }
+}
+
+/* Materialize the destination location's side-effecting operand(s) into
+ * compiler temporaries IN PLACE, so the location evaluates BEFORE the
+ * source (spec 10.4: for `a op= b`, evaluate destination location, then
+ * `b`, then read the destination, apply `op`, then store). The source is
+ * materialized into a preceding statement (round-1 MAJOR-1 fix), which
+ * would otherwise put the location's evaluation (embedded in the final
+ * STORE's dest node) AFTER the source - the inverse of the spec order
+ * (reviewer2 NEW MAJOR t_9002530a). Example: for `*getp() += bump()`,
+ * dest is DEREF(CALL getp); this function appends STORE(tmp_ptr, CALL
+ * getp) to the block (so getp() runs first) and rewrites the lvalue to
+ * DEREF(LOAD(tmp_ptr)); the caller then materializes the source, and the
+ * final store is STORE(DEREF(LOAD(tmp_ptr)), ADD(LOAD(DEREF(LOAD(tmp_ptr))),
+ * LOAD(tmp_src))). The lvalue node is mutated in place (never replaced),
+ * so every node stays reachable (invariant 1). Pure locations (IR_LOCAL /
+ * IR_GLOBAL and operands without side effects) are left untouched. */
+static IrBuilderStatus materialize_dest_effects(BuilderCtx *ctx,
+                                                const NameSymbol *fn_sym,
+                                                IrNode *block,
+                                                const DiagSpan *span,
+                                                const char *ck,
+                                                IrNode *dest)
+{
+    IrBuilderStatus st;
+    if (dest == NULL) {
+        return IR_BUILDER_UNSUPPORTED;
+    }
+    switch (dest->kind) {
+    case IR_LOCAL:
+    case IR_GLOBAL:
+        /* leaf: no sub-expressions; nothing to hoist */
+        return IR_BUILDER_OK;
+    case IR_DEREF:
+        /* the location's address expression is the pointer operand; if it
+         * has side effects (e.g. `*getp()`), materialize the pointer value
+         * into a temp so the location evaluates before the source */
+        if (dest->u.deref.ptr != NULL &&
+            node_has_side_effect(dest->u.deref.ptr)) {
+            IrNode *tmp_load = NULL;
+            st = materialize_scalar_temp(ctx, fn_sym, block, span, ck,
+                                         dest->u.deref.ptr, &tmp_load);
+            if (st != IR_BUILDER_OK) {
+                return st;
+            }
+            dest->u.deref.ptr = tmp_load;
+        }
+        return IR_BUILDER_OK;
+    case IR_INDEX_ADDR:
+        /* base first, then index (contract 5.3; spec 10.4 a[i]) */
+        if (dest->u.index_addr.base != NULL) {
+            st = materialize_dest_effects(ctx, fn_sym, block, span, ck,
+                                          dest->u.index_addr.base);
+            if (st != IR_BUILDER_OK) {
+                return st;
+            }
+        }
+        if (dest->u.index_addr.index != NULL &&
+            node_has_side_effect(dest->u.index_addr.index)) {
+            IrNode *tmp_load = NULL;
+            st = materialize_scalar_temp(ctx, fn_sym, block, span, ck,
+                                         dest->u.index_addr.index,
+                                         &tmp_load);
+            if (st != IR_BUILDER_OK) {
+                return st;
+            }
+            dest->u.index_addr.index = tmp_load;
+        }
+        return IR_BUILDER_OK;
+    case IR_FIELD_ADDR:
+        /* the base may itself be a side-effecting lvalue (arrow: p->f
+         * lowers to FIELD_ADDR(DEREF(CALL p), f)) */
+        if (dest->u.field_addr.base != NULL) {
+            st = materialize_dest_effects(ctx, fn_sym, block, span, ck,
+                                          dest->u.field_addr.base);
+            if (st != IR_BUILDER_OK) {
+                return st;
+            }
+        }
+        return IR_BUILDER_OK;
+    default:
+        return IR_BUILDER_UNSUPPORTED;   /* not an lvalue shape */
+    }
+}
+
 /* ---------------------------------------------------------------------------
  * Lowering core
  * ------------------------------------------------------------------------- */
@@ -3080,15 +3220,25 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
         store->u.store.value = val;
     } else {
         /* compound: dest-location + source + op + store (contract 9.7).
-         * Spec 10.4 requires the source `b` to be evaluated before the
-         * destination is read. The IR's fixed per-node child order
-         * (IR_STORE: destination then value; the binary op: left then
-         * right) would execute the destination read before the source
-         * inside a single STORE tree, so the source is materialized
-         * into a temporary: the block order becomes
+         * Spec 10.4 requires the destination location to be evaluated
+         * BEFORE the source `b` (and the source before the destination
+         * read). The IR's fixed per-node child order (IR_STORE:
+         * destination then value; the binary op: left then right) would
+         * execute the destination read before the source inside a single
+         * STORE tree, so the source is materialized into a temporary:
+         * the block order becomes
          *   STORE(tmp, src); STORE(dest, OP(LOAD(dest), LOAD(tmp)))
          * and the block's statement order is the evaluation order
-         * (contract 6.1 = spec 10.4; reviewer2 MAJOR-1). */
+         * (contract 6.1 = spec 10.4; reviewer2 MAJOR-1). A destination
+         * location whose own sub-expressions have side effects (e.g.
+         * `*getp()` where getp() is a call) must additionally be hoisted
+         * BEFORE the source: its side-effecting operand(s) are
+         * materialized into temps here (ahead of the source), so the
+         * block order becomes
+         *   STORE(tmp_ptr, <location operand>); STORE(tmp_src, src);
+         *   STORE(<rebuilt location>, OP(LOAD(<rebuilt location>), LOAD(tmp_src)))
+         * i.e. location, then b, then read, op, store (spec 10.4;
+         * reviewer2 NEW MAJOR t_9002530a). */
         BinOpSpec spec;
         AstBinaryOp bop;
         IrNode *src = NULL;
@@ -3110,6 +3260,14 @@ static IrBuilderStatus lower_assign(BuilderCtx *ctx,
         }
         if (!binary_op_spec(bop, &spec)) {
             return IR_BUILDER_UNSUPPORTED;
+        }
+        /* destination location first (spec 10.4): hoist the location's
+         * side-effecting operand(s) into temps BEFORE the source is
+         * lowered/materialized (reviewer2 NEW MAJOR t_9002530a) */
+        st = materialize_dest_effects(ctx, fn_sym, block, expr->span, ck,
+                                      dest);
+        if (st != IR_BUILDER_OK) {
+            return st;
         }
         st = ir_builder_expr_to_value(ctx, module, fn_sym, block,
                                       expr->u.assign.value, NULL, &src);

@@ -27,7 +27,13 @@
  *     the source is materialized into a temporary (a preceding
  *     IR_STORE statement) so the destination read (LOAD) executes
  *     AFTER the source evaluation - the IR's fixed per-node child
- *     order cannot express that ordering inside one STORE tree;
+ *     order cannot express that ordering inside one STORE tree; a
+ *     destination location whose own sub-expressions have side effects
+ *     (e.g. `*getp()` where getp() is a call, `a[f()]`, `p->f` where p
+ *     is a call result) is hoisted BEFORE the source: the location's
+ *     side-effecting operand(s) are materialized into temps ahead of
+ *     the source, so the block order is location, then b, then read,
+ *     op, store (spec 10.4; reviewer2 NEW MAJOR t_9002530a);
  *   - struct literals lowered to IR_ZERO + field stores; array literals
  *     lowered to IR_ZERO + element stores, with the repetition form
  *     `[e; N]` evaluating e exactly once (IRC-N1, Main Designer
