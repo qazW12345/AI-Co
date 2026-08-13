@@ -164,10 +164,11 @@ IrType *ir_builder_type_from_type(BuilderCtx *ctx, const Type *type);
  * when the value position is a reference to a module-scope const
  * (AST_EXPR_IDENT or AST_EXPR_MEMBER), the referenced GLOBAL_CONST's
  * already-interned IRConst is reused directly when it has been mapped
- * (AC3 dedup: identical constants share one IRConst). This is what
- * makes composite (struct/array-of-struct) const references
- * representable: the composite branches need the literal AST at the
- * position for field-name recovery (contract 4.5), which a bare
+ * AND its type is identical to the declared type at the position (AC3
+ * dedup: identical constants share one IRConst; MAJOR-2 type-aware
+ * reuse). This is what makes composite (struct/array-of-struct) const
+ * references representable: the composite branches need the literal AST
+ * at the position for field-name recovery (contract 4.5), which a bare
  * reference does not provide. For a forward or cross-module reference
  * whose referenced const has not been filled yet, the composite
  * branches recover the field/element names from the referenced const's
@@ -175,6 +176,18 @@ IrType *ir_builder_type_from_type(BuilderCtx *ctx, const Type *type);
  * const's module; the EvalValue fields are in that literal's order, so
  * the same name-based reordering applies). For scalar forms the reuse
  * is equivalent to interning the per-kind branch would perform.
+ *
+ * Accepted cross-type const references (convert phase accepts the
+ * integer widening, spec 11.6 Table 11.1; e.g. `const b: i64 = a;`
+ * where a: i32, or an i32 const ref inside an i64[2] array literal) do
+ * NOT reuse the referenced IRConst: the per-kind branch maps the value
+ * to the declared type instead (MAJOR-2, reviewer2 t_0234b81a), so the
+ * produced IR is type-consistent (the IRConst type always equals the
+ * declared type at the position). For EVAL_VAL_INT the declared scalar
+ * type is authoritative: the int64 EvalValue's bit pattern is masked to
+ * the declared width (signed sources sign-extend through the int64
+ * value, e.g. i32 -1 -> i64 -1; unsigned->signed widening re-reads the
+ * zero-extended pattern).
  *
  * Mapping summary: EVAL_VAL_INT -> IRConst_INT (bit pattern normalized
  * to the type's width) or IRConst_ENUM (enum type); EVAL_VAL_BOOL ->

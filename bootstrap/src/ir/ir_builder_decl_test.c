@@ -1022,6 +1022,149 @@ static void test_const_ref_composite_cross_module(void)
     fixture_cleanup_files();
 }
 
+/* MAJOR-2 remediation (reviewer2 t_0234b81a): accepted cross-type
+ * const references must produce type-consistent IR. `const a: i32 = 5;`
+ * reused at a wider declared position (`const b: i64 = a;`,
+ * `var g: i64 = a;`, `const arr: i64[2] = [a, a];`) previously attached
+ * the i32 IRConst directly (AIC-I0501 invariant 3 failures on the
+ * scalar/var forms; silently I32 items inside the I64[2] array). The
+ * reuse path is type-aware: same-type references still dedup, and
+ * cross-type integer references map to the declared type (the convert
+ * phase accepts the widening, spec 11.6 Table 11.1). Covers the three
+ * reproduced forms plus unsigned->signed widening and a negative
+ * i32->i64 bit-pattern conversion, and the plain-literal-in-wider-array
+ * form of the same defect class. */
+static void test_const_ref_cross_type(void)
+{
+    static const char src[] =
+        "module main;\n"
+        "const a: i32 = 5;\n"
+        "const b: i64 = a;\n"
+        "var g: i64 = a;\n"
+        "const arr: i64[2] = [a, a];\n"
+        "const lit: i64[2] = [1, 2];\n"
+        "const u: u32 = 4294967295u32;\n"
+        "const w: i64 = u;\n"
+        "const neg: i32 = -1;\n"
+        "const n64: i64 = neg;\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    IrNode *an, *bn, *gn, *arrn, *litn, *un, *wn, *negn, *n64n;
+    IrConst *av, *bv, *gv, *arrv, *litv, *uv, *wv, *negv, *n64v;
+    DiagRecord **recs = NULL;
+    size_t nrecs = 0;
+
+    bs = pipeline_build(&p, src, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        an = find_decl(b, "main", "main.a");
+        bn = find_decl(b, "main", "main.b");
+        gn = find_decl(b, "main", "main.g");
+        arrn = find_decl(b, "main", "main.arr");
+        litn = find_decl(b, "main", "main.lit");
+        un = find_decl(b, "main", "main.u");
+        wn = find_decl(b, "main", "main.w");
+        negn = find_decl(b, "main", "main.neg");
+        n64n = find_decl(b, "main", "main.n64");
+        CHECK(an != NULL && bn != NULL && gn != NULL && arrn != NULL &&
+              litn != NULL && un != NULL && wn != NULL && negn != NULL &&
+              n64n != NULL);
+        av = global_const_value(an);
+        bv = global_const_value(bn);
+        gv = global_var_init(gn);
+        arrv = global_const_value(arrn);
+        litv = global_const_value(litn);
+        uv = global_const_value(un);
+        wv = global_const_value(wn);
+        negv = global_const_value(negn);
+        n64v = global_const_value(n64n);
+        CHECK(av != NULL && bv != NULL && gv != NULL && arrv != NULL &&
+              litv != NULL && uv != NULL && wv != NULL && negv != NULL &&
+              n64v != NULL);
+        /* control: the i32 source const keeps its own type */
+        if (av != NULL) {
+            CHECK(av->kind == IRC_INT);
+            CHECK(av->type->kind == IRT_I32);
+            CHECK(av->u.int_bits == 5);
+        }
+        /* const ref reused at a wider declared type: b carries I64 5 */
+        if (bv != NULL) {
+            CHECK(bv->kind == IRC_INT);
+            CHECK(bv->type->kind == IRT_I64);
+            CHECK(bv->u.int_bits == 5);
+        }
+        /* global var initialized from an i32 const at an i64 position */
+        if (gv != NULL) {
+            CHECK(gv->kind == IRC_INT);
+            CHECK(gv->type->kind == IRT_I64);
+            CHECK(gv->u.int_bits == 5);
+        }
+        /* array literal of i32 const refs at an i64[2] position: every
+         * item carries the declared element type */
+        if (arrv != NULL) {
+            CHECK(arrv->kind == IRC_ARRAY);
+            CHECK(arrv->type->kind == IRT_ARRAY);
+            if (arrv->type->kind == IRT_ARRAY) {
+                CHECK(arrv->type->u.array.elem->kind == IRT_I64);
+                CHECK(arrv->type->u.array.extent == 2);
+            }
+            CHECK(arrv->u.arr.count == 2);
+            if (arrv->u.arr.count == 2) {
+                CHECK(arrv->u.arr.items[0]->kind == IRC_INT);
+                CHECK(arrv->u.arr.items[0]->type->kind == IRT_I64);
+                CHECK(arrv->u.arr.items[0]->u.int_bits == 5);
+                CHECK(arrv->u.arr.items[1]->kind == IRC_INT);
+                CHECK(arrv->u.arr.items[1]->type->kind == IRT_I64);
+                CHECK(arrv->u.arr.items[1]->u.int_bits == 5);
+            }
+        }
+        /* same defect class: plain i32 literals in an i64[2] position */
+        if (litv != NULL) {
+            CHECK(litv->kind == IRC_ARRAY);
+            CHECK(litv->type->kind == IRT_ARRAY);
+            CHECK(litv->u.arr.count == 2);
+            if (litv->u.arr.count == 2) {
+                CHECK(litv->u.arr.items[0]->type->kind == IRT_I64);
+                CHECK(litv->u.arr.items[0]->u.int_bits == 1);
+                CHECK(litv->u.arr.items[1]->type->kind == IRT_I64);
+                CHECK(litv->u.arr.items[1]->u.int_bits == 2);
+            }
+        }
+        /* unsigned -> signed widening (different sign, target wider):
+         * the bit pattern is re-read as the declared type */
+        if (uv != NULL) {
+            CHECK(uv->kind == IRC_INT);
+            CHECK(uv->type->kind == IRT_U32);
+            CHECK(uv->u.int_bits == 4294967295ULL);
+        }
+        if (wv != NULL) {
+            CHECK(wv->kind == IRC_INT);
+            CHECK(wv->type->kind == IRT_I64);
+            CHECK(wv->u.int_bits == 4294967295ULL);
+        }
+        /* negative i32 -> i64: the int64 EvalInt carries the sign, so
+         * the i64 bit pattern is the sign-extended value */
+        if (negv != NULL) {
+            CHECK(negv->kind == IRC_INT);
+            CHECK(negv->type->kind == IRT_I32);
+            CHECK(negv->u.int_bits == 0xFFFFFFFFULL);
+        }
+        if (n64v != NULL) {
+            CHECK(n64v->kind == IRC_INT);
+            CHECK(n64v->type->kind == IRT_I64);
+            CHECK(n64v->u.int_bits == 0xFFFFFFFFFFFFFFFFULL);
+        }
+        /* the whole graph must pass the project verifier (the scalar
+         * forms previously failed AIC-I0501 invariant 3) */
+        CHECK(verify_build(b, &recs, &nrecs) == IR_OK);
+        ir_records_free(recs, nrecs);
+        ir_build_free(b);
+    }
+    pipeline_free(&p);
+}
+
 /* Module graph edge: runtime modules (rt.*) are mapped as module units
  * with IR_FUNCTION declarations; the noreturn flag is set on
  * rt.proc.exit / rt.trap.report only (contract 4.2). */
@@ -1219,6 +1362,8 @@ int main(void)
     fprintf(stderr, "after test_const_ref_composite\n");
     test_const_ref_composite_cross_module();
     fprintf(stderr, "after test_const_ref_composite_cross_module\n");
+    test_const_ref_cross_type();
+    fprintf(stderr, "after test_const_ref_cross_type\n");
     test_runtime_modules();
     fprintf(stderr, "after test_runtime_modules\n");
     test_defensive_unsupported();

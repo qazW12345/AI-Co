@@ -424,14 +424,25 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
      * (the referenced const's IRConst IS the interned representative).
      * Forward/cross-module references (const not yet filled) fall
      * through to the per-kind branches, which recover the names from
-     * the referenced const's own initializer AST. */
+     * the referenced const's own initializer AST.
+     *
+     * MAJOR-2 (reviewer2 t_0234b81a): the reuse is type-aware - it
+     * applies only when the referenced const's IRConst type is
+     * identical to the declared type at this position. An accepted
+     * cross-type reference (e.g. `const b: i64 = a;` where a: i32, or
+     * an i32 const ref inside an i64[2] array literal) falls through to
+     * the per-kind branches, which map the value to the declared type
+     * (the convert phase accepts the widening; spec 11.6 Table 11.1). */
     if (expr != NULL &&
         (expr->kind == AST_EXPR_IDENT || expr->kind == AST_EXPR_MEMBER)) {
         const NameSymbol *ref = name_symbol_for_node(module, expr);
         if (ref != NULL && ref->kind == NAME_SYM_GLOBAL_CONST) {
             IrNode *ref_node = decl_state_find(ref);
             if (ref_node != NULL && ref_node->kind == IR_GLOBAL_CONST &&
-                ref_node->u.global_const.value != NULL) {
+                ref_node->u.global_const.value != NULL &&
+                expected != NULL &&
+                ir_type_identical(ref_node->u.global_const.value->type,
+                                  expected)) {
                 return ref_node->u.global_const.value;
             }
         }
@@ -439,9 +450,25 @@ IrConst *ir_builder_const_from_eval(BuilderCtx *ctx, const NameModule *module,
     switch (ev->kind) {
 
     case EVAL_VAL_INT: {
-        IrType *t = (ev->type != NULL) ? ir_builder_type_from_type(ctx, ev->type)
-                                       : expected;
+        /* MAJOR-2 (reviewer2 t_0234b81a): the declared type at the
+         * value position is authoritative for the constant's IR type.
+         * When the position carries a scalar integer or enum type (the
+         * accepted cross-type forms are convert-phase integer
+         * widenings, spec 11.6 Table 11.1), the value is re-read as
+         * that type: the int64 EvalValue's bit pattern is masked to the
+         * declared width, which for signed sources sign-extends through
+         * the int64 value (i32 -1 -> i64 -1). The value's own type is
+         * used only when the position has no declared scalar type
+         * (untyped positions; enum vs integer is carried by expected
+         * when it is an enum type). */
+        IrType *t = NULL;
         uint64_t bits = (uint64_t)ev->u.i.v;
+        if (expected != NULL &&
+            (expected->kind == IRT_ENUM || ir_type_width(expected) > 0)) {
+            t = expected;
+        } else if (ev->type != NULL) {
+            t = ir_builder_type_from_type(ctx, ev->type);
+        }
         if (t == NULL) {
             return NULL;
         }
