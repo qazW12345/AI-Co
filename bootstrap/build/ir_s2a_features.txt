@@ -1,0 +1,71 @@
+# bootstrap/build/ir_s2a_features.txt
+# WP-M0-S2a-IR-A (AI-Co pre-codegen stopgap) build/test fragment.
+# Owned by S2a-IR-A; extended by the serial sub-cards S2a-IR-B1/B2/B3/C
+# (split record docs/planning/AI-CO-PLANNER-S2A-IR-SPLIT-2026-08-13.md).
+#
+# IMPORTANT: this fragment is DOCUMENTATION ONLY. It intentionally
+# contributes NO source lines to the build-stage0-msvc.cmd /
+# build-stage0-clang.cmd fragment aggregation (CONVENTIONS.md sec. 3):
+# every non-blank line below starts with '#', and the entry points
+# treat '#'-prefixed lines as comments and blank lines as ignored, so
+# the aggregate compiler build is unchanged by this file's presence.
+# The test program ir_s2a_features_test.c is NOT listed in any
+# aggregate fragment and must NEVER be (it is a standalone test with
+# its own main(); it is built explicitly with the library sources, per
+# the header comment of bootstrap/src/ir/ir_s2a_features_test.c).
+#
+# ---------------------------------------------------------------------------
+# BUILD/TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#
+# The test program is compiled EXPLICITLY (not via fragment aggregation)
+# together with the full front-end + IR library source list. The source
+# list is the authoritative one in the header comment of
+# bootstrap/src/ir/ir_s2a_features_test.c (lines "Build (from the
+# repository root; MSVC example)"); the invocation below mirrors it.
+#
+# MSVC entry point (build-stage0-msvc.cmd):
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-s2a-ir' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/ir/ir_s2a_features_test.c \
+#     bootstrap/src/ir/ir_builder_cause.c \
+#     bootstrap/src/ir/ir_builder_stmt.c bootstrap/src/ir/ir_builder_expr.c \
+#     bootstrap/src/ir/ir_builder_decl.c bootstrap/src/ir/ir_builder_core.c \
+#     bootstrap/src/ir/ir_core.c bootstrap/src/ir/ir_dump.c \
+#     bootstrap/src/sema/fn_main.c bootstrap/src/sema/fn_core.c \
+#     bootstrap/src/sema/stmt_reach.c bootstrap/src/sema/stmt_core.c \
+#     bootstrap/src/sema/expr_ops.c bootstrap/src/sema/expr_core.c \
+#     bootstrap/src/const/eval_fail_rec.c bootstrap/src/const/eval_fail_arith.c \
+#     bootstrap/src/const/eval_core.c \
+#     bootstrap/src/types/optype.c bootstrap/src/types/convert.c \
+#     bootstrap/src/types/layout.c bootstrap/src/types/type_identity.c \
+#     bootstrap/src/types/type_tables.c \
+#     bootstrap/src/name/name.c bootstrap/src/ast/ast.c \
+#     bootstrap/src/parse/parse.c bootstrap/src/lex/lex.c \
+#     bootstrap/src/load/load.c bootstrap/src/diag/diag.c \
+#     bootstrap/src/diag/diag_codes.c bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-s2a-ir/ir_s2a_features_test.exe
+#
+# Clang entry point (build-stage0-clang.cmd): identical source list,
+# output directory bootstrap\\stage0\\clang-s2a-ir:
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\clang-s2a-ir' \
+#     ./bootstrap/build/build-stage0-clang.cmd <same source list>
+#   ./bootstrap/stage0/clang-s2a-ir/ir_s2a_features_test.exe
+#
+# Deterministic flags are the entry points' own (MSVC: cl /nologo
+# /std:c17 /O2 /W4 ... /link /Brepro; Clang: clang-cl /nologo /std:c17
+# /O2 /W4 /Brepro ...; CONVENTIONS.md sec. 2.2). Fresh builds must be
+# /W4 warning-free on both toolchains.
+#
+# ---------------------------------------------------------------------------
+# EXPECTED OUTPUT (S2a-IR-A features 1-3: cases C1d/C1a/C1b/C1c/C2a/C2b/C3a)
+# ---------------------------------------------------------------------------
+#
+#   ir_s2a_features_test: 63 checks, 0 failures
+#
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix 16c-owned builder code).
+#
+# Later sub-cards (S2a-IR-B1/B2/B3/C) EXTEND this program with further
+# features/cases and must update this fragment's expected check count
+# (the current 63 = 7 cases x 9 checks per verify_case) accordingly.
