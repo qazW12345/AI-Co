@@ -1,0 +1,23 @@
+# bootstrap/build/ir_builder1c.txt
+# WP-M0-16c1c IR builder Phase B expression mapping/lowering area source
+# list (owned by WP-M0-16c1c). Consumed by build-stage0-msvc.cmd /
+# build-stage0-clang.cmd fragment aggregation (CONVENTIONS.md §3). One
+# source path per line, relative to the repository root. Supersedes the
+# first-level ir_builder.txt entry per manifest §5 (sub-split
+# WP-M0-16c1a..16c1d; letter-suffix fragments ir_builder1a.txt..
+# ir_builder1d.txt per amendment line 55).
+#
+# ir_builder_expr.c depends on ir_builder_decl.c (bootstrap/build/
+# ir_builder1b.txt), ir_builder_core.c (bootstrap/build/ir_builder1a.txt),
+# the WP-M0-16b1 IR core (bootstrap/build/ir1.txt), the WP-M0-06 diag
+# record/span model (bootstrap/build/diag.txt), the WP-M0-12 const
+# evaluator (bootstrap/build/const_a.txt), and the WP-M0-10 name /
+# WP-M0-11 type / WP-M0-09 AST packages; all are included by the
+# aggregate build. The builder lowers expression nodes of the resolved
+# build into the function body IR_BLOCK (contract §5.3-5.4, §6, §12.1).
+#
+# ir_builder_expr_test.c is intentionally NOT listed here: it is a
+# unit-test program with its own main() and is built explicitly together
+# with the library sources (see the build comment at the top of
+# ir_builder_expr_test.c).
+bootstrap/src/ir/ir_builder_expr.c
