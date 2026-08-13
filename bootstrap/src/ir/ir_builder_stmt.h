@@ -31,7 +31,9 @@
  *     block (no statement after a terminator); non-void function tails
  *     terminate (the ir_core_verify invariant-5 analysis is the
  *     structural authority - the mapper maps accepted builds whose
- *     reachability was already verified pre-IR, AIC-E0416); a void
+ *     reachability was already verified pre-IR, AIC-E0416, and refuses,
+ *     with IR_BUILDER_UNSUPPORTED and nothing owned, the tails the
+ *     invariant-5 analysis cannot certify, see gap note 6); a void
  *     function tail may fall off the end. The mapper runs only on
  *     accepted builds (contract 1.3), so the source-level rules are
  *     already enforced; the mapper additionally defends against
@@ -131,6 +133,27 @@
  *      loop, changing observable behavior. Simple pure value
  *      expressions (a load, comparison, call, arithmetic) lower
  *      normally; only intermediate-appending lowerings are refused.
+ *
+ *   6. Non-void function tails whose last mapped statement is an
+ *      always-true loop (while(true) / for(;;)) whose body the
+ *      ir_core_verify invariant-5 analysis cannot certify as
+ *      never-exiting (an empty body; a body ending in an if without
+ *      else; any other body shape whose every path does not provably
+ *      end in a never-exiting form) are refused with
+ *      IR_BUILDER_UNSUPPORTED and nothing owned. The source-level
+ *      reachability analysis (stmt_reach, AIC-E0416; spec sec. 13.5)
+ *      accepts these tails - control cannot reach the statement after
+ *      the loop when no break exits it - but the closed IR's
+ *      invariant-5 certification requires the loop body to provably
+ *      never exit the loop, which the mapper cannot guarantee
+ *      structurally for the listed shapes; a faithful mapping would
+ *      produce a graph that fails ir_core_verify (AIC-I0501). The
+ *      mapper therefore enforces the invariant-5 tail rule itself (a
+ *      local mirror of the read-only ir_core.c analysis, see
+ *      ir_builder_stmt.c) and refuses any non-void tail the analysis
+ *      does not certify (disclosed; routed for Main Designer
+ *      awareness). Certified tails - e.g. `while (true) { continue; }`
+ *      - map and verify normally.
  *
  * Everything else in the accepted surface maps; constructs outside it
  * (malformed case bodies, statements after terminators, break/continue

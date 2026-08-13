@@ -270,6 +270,54 @@ static IrBuilderStatus pipeline_ir_build(Pipeline *p, IrBuild **out)
     return ir_builder_build(p->result, p->build, out);
 }
 
+/* Full-pipeline expectation: the source is accepted by every pre-IR
+ * stage (zero records), but the IR builder must REFUSE it with
+ * IR_BUILDER_UNSUPPORTED and nothing owned. Used for the MAJOR-1
+ * class: non-void tails ending in an always-true loop the
+ * ir_core_verify invariant-5 analysis cannot certify (header gap
+ * note 6). */
+static void expect_ir_builder_refused(const char *src)
+{
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    CHECK(pipeline_accepted(&p, src));
+    if (!pipeline_accepted(&p, src)) {
+        pipeline_free(&p);
+        return;
+    }
+    bs = pipeline_ir_build(&p, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+}
+
+/* Full-pipeline expectation: the source is accepted, the IR builder
+ * succeeds, and the produced graph passes ir_core_verify with no
+ * AIC-I0501. */
+static void expect_ir_builder_verify_ok(const char *src)
+{
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+    DiagRecord **recs = NULL;
+    size_t nrecs = 0;
+    CHECK(pipeline_accepted(&p, src));
+    if (!pipeline_accepted(&p, src)) {
+        pipeline_free(&p);
+        return;
+    }
+    bs = pipeline_ir_build(&p, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        CHECK(ir_core_verify(b, &recs, &nrecs) == IR_OK);
+        ir_records_free(recs, nrecs);
+    }
+    ir_build_free(b);
+    pipeline_free(&p);
+}
+
 /* ---------------------------------------------------------------------------
  * Fixture 1: control flow, local scoping, recursion, switch/loops,
  * break/continue, noreturn tail call.
@@ -569,6 +617,86 @@ static void test_fixture2_call_term(void)
     pipeline_free(&p);
 }
 
+/* MAJOR-1 regression (reviewer2 t_6e6e83af comment 1462 / gate
+ * t_ebe0fd26): the full accepted pipeline accepts non-void tails ending
+ * in an always-true loop (spec sec. 13.5) whose bodies the
+ * ir_core_verify invariant-5 analysis cannot certify as never-exiting
+ * (an empty body; a body ending in an if without else). The mapper must
+ * refuse them with IR_BUILDER_UNSUPPORTED and nothing owned instead of
+ * silently producing a graph that fails verification (AIC-I0501).
+ * Probes A/E/G are reviewer2's failing class; controls F (certified
+ * continue body), B (if/else both return), H (switch all-return +
+ * default), D/I (void tails) still build and verify OK; case C
+ * (exiting break) is still rejected pre-IR at stmt_reach (AIC-E0416). */
+static void test_nonvoid_loop_tail_contract(void)
+{
+    static const char src_a[] =
+        "module main;\n"
+        "fn f() -> i32 { while (true) { } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_e[] =
+        "module main;\n"
+        "fn f() -> i32 { for (;;) { } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_g[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { continue; } } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_f[] =
+        "module main;\n"
+        "fn f() -> i32 { while (true) { continue; } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_b[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { if (c) { return 1; } else { return 2; } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_h[] =
+        "module main;\n"
+        "fn f(n: i32) -> i32 {\n"
+        "  switch (n) {\n"
+        "    case 0: { return 1; }\n"
+        "    case 1: { return 2; }\n"
+        "    default: { return 3; }\n"
+        "  }\n"
+        "}\n"
+        "fn main() -> i32 { return 0; }\n";
+    static const char src_di[] =
+        "module main;\n"
+        "fn f() -> void { while (true) { } }\n"
+        "fn g() -> void { for (;;) { } }\n"
+        "fn main() -> void { }\n";
+    static const char src_c[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { break; } } }\n"
+        "fn main() -> i32 { return 0; }\n";
+    Pipeline p;
+
+    /* Probes A/E/G: accepted pre-IR (zero records through fn_main),
+     * refused by the mapper with nothing owned - never a silent OK
+     * followed by AIC-I0501. */
+    expect_ir_builder_refused(src_a);
+    expect_ir_builder_refused(src_e);
+    expect_ir_builder_refused(src_g);
+
+    /* Controls: certifiable non-void tails and void tails build and
+     * pass ir_core_verify with zero AIC-I0501. */
+    expect_ir_builder_verify_ok(src_f);
+    expect_ir_builder_verify_ok(src_b);
+    expect_ir_builder_verify_ok(src_h);
+    expect_ir_builder_verify_ok(src_di);
+
+    /* Case C: a while(true) with an exiting break - the pre-IR
+     * reachability analysis still rejects it at stmt_reach with
+     * AIC-E0416 (the builder is never reached). */
+    CHECK(!pipeline_accepted(&p, src_c));
+    CHECK(g_fail_stage != NULL &&
+          strcmp(g_fail_stage, "stmt_reach") == 0);
+    CHECK(p.rrn2 > 0 && p.rrecs2 != NULL && p.rrecs2[0] != NULL &&
+          p.rrecs2[0]->code != NULL &&
+          strcmp(p.rrecs2[0]->code, "AIC-E0416") == 0);
+    pipeline_free(&p);
+}
+
 int main(void)
 {
     ir_builder_decl_install();
@@ -581,6 +709,8 @@ int main(void)
     fprintf(stderr, "after test_fixture1_structure\n");
     test_fixture2_call_term();
     fprintf(stderr, "after test_fixture2_call_term\n");
+    test_nonvoid_loop_tail_contract();
+    fprintf(stderr, "after test_nonvoid_loop_tail_contract\n");
 
     /* restore the defensive default stubs (single-build convention) */
     ir_builder_set_module_mapper(NULL);

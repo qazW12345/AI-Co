@@ -17,7 +17,14 @@
  *     non-void tails terminate; no statement after a terminator; void
  *     tail fall-off allowed): the mapper maps accepted builds whose
  *     reachability was verified pre-IR (AIC-E0412/E0416/E0417) and
- *     defensively refuses malformed input with nothing owned;
+ *     defensively refuses malformed input with nothing owned. The
+ *     non-void-tail rule is enforced against the ir_core_verify
+ *     invariant-5 certification (the structural authority): a tail
+ *     the analysis cannot certify - an always-true loop
+ *     (while(true)/for(;;)) whose body does not provably never exit
+ *     the loop - is refused with IR_BUILDER_UNSUPPORTED and nothing
+ *     owned (gap note 6) instead of silently producing a graph that
+ *     fails verification;
  *   - the storage model of contract 4.3: local slots created in
  *     first-declaration order (source order) and registered with
  *     ir_builder_expr_register_local before any statement referencing
@@ -1100,6 +1107,141 @@ static IrBuilderStatus stmt_map_stmt(StmtCtx *s, const AstNode *stmt)
 }
 
 /* ---------------------------------------------------------------------------
+ * Tail-termination certification (mirror of ir_core's invariant-5 analysis)
+ * ------------------------------------------------------------------------- */
+
+/* ir_core_verify's invariant-5 analysis (contract sec. 5.6) is the
+ * structural authority for non-void function tails: every reachable
+ * path through the tail must end in a terminator that does not fall
+ * out of the enclosing construct. Its predicates (cond_is_const_true /
+ * path_block_never_exits / path_seq_never_exits / stmt_seq_terminates
+ * in ir_core.c) are static to the 16b package, which is READ-ONLY for
+ * this package, so the mapper re-implements exactly the predicates it
+ * needs to decide whether a mapped non-void tail will be certified
+ * (the same small local-mirror convention as find_decl_node). Keep in
+ * sync with ir_core.c: a divergence would either refuse a certifiable
+ * tail or, worse, silently accept a tail that fails verification. */
+
+static bool stmt_tail_cond_is_const_true(const IrNode *cond)
+{
+    if (cond == NULL) {
+        return true;   /* absent for-loop condition = true (spec 13.3) */
+    }
+    return cond->kind == IR_BOOL &&
+           cond->u.constant.value != NULL &&
+           cond->u.constant.value->kind == IRC_BOOL &&
+           cond->u.constant.value->u.b;
+}
+
+/* Every path through the statement list of `b` ends in a terminator
+ * that does not exit an enclosing always-true loop (return/call_term/
+ * trap/continue terminate; break exits -> false). Mirrors ir_core.c's
+ * path_block_never_exits / path_seq_never_exits. */
+static bool stmt_tail_path_block_never_exits(const IrNode *b)
+{
+    const IrNode *last;
+    size_t i;
+    if (b == NULL || b->kind != IR_BLOCK || b->u.block.nstmts == 0) {
+        return false;
+    }
+    last = b->u.block.stmts[b->u.block.nstmts - 1];
+    switch (last->kind) {
+    case IR_RETURN: case IR_CALL_TERM: case IR_TRAP: case IR_CONTINUE:
+        return true;
+    case IR_BREAK:
+        return false;
+    case IR_BLOCK:
+        return stmt_tail_path_block_never_exits(last);
+    case IR_IF:
+        return last->u.if_stmt.else_block != NULL &&
+               stmt_tail_path_block_never_exits(
+                   last->u.if_stmt.then_block) &&
+               stmt_tail_path_block_never_exits(
+                   last->u.if_stmt.else_block);
+    case IR_SWITCH:
+        if (last->u.switch_stmt.default_clause == NULL) {
+            return false;
+        }
+        for (i = 0; i < last->u.switch_stmt.ncases; i++) {
+            const IrNode *c = last->u.switch_stmt.cases[i];
+            if (c == NULL || c->kind != IR_CASE ||
+                !stmt_tail_path_block_never_exits(
+                    c->u.case_clause.body)) {
+                return false;
+            }
+        }
+        return stmt_tail_path_block_never_exits(
+            last->u.switch_stmt.default_clause->u.default_clause.body);
+    case IR_WHILE: case IR_FOR: {
+        const IrNode *cond = (last->kind == IR_WHILE)
+                                 ? last->u.while_stmt.cond
+                                 : last->u.for_stmt.cond;
+        const IrNode *body = (last->kind == IR_WHILE)
+                                 ? last->u.while_stmt.body
+                                 : last->u.for_stmt.body;
+        return stmt_tail_cond_is_const_true(cond) &&
+               stmt_tail_path_block_never_exits(body);
+    }
+    default:
+        return false;
+    }
+}
+
+/* Whether a block's statement list terminates: every reachable path
+ * ends in a terminator that does not fall out of the enclosing
+ * construct (the non-void function tail rule of contract sec. 5.6).
+ * `break`/`continue` fall out and never terminate a tail; an
+ * always-true loop whose body provably never exits it terminates the
+ * tail. Mirrors ir_core.c's block_terminates / stmt_seq_terminates. */
+static bool stmt_tail_seq_terminates(const IrNode *block)
+{
+    const IrNode *last;
+    size_t i;
+    if (block == NULL || block->kind != IR_BLOCK ||
+        block->u.block.nstmts == 0) {
+        return false;
+    }
+    last = block->u.block.stmts[block->u.block.nstmts - 1];
+    switch (last->kind) {
+    case IR_RETURN: case IR_CALL_TERM: case IR_TRAP:
+        return true;
+    case IR_BREAK: case IR_CONTINUE:
+        return false;
+    case IR_BLOCK:
+        return stmt_tail_seq_terminates(last);
+    case IR_IF:
+        return last->u.if_stmt.else_block != NULL &&
+               stmt_tail_seq_terminates(last->u.if_stmt.then_block) &&
+               stmt_tail_seq_terminates(last->u.if_stmt.else_block);
+    case IR_SWITCH:
+        if (last->u.switch_stmt.default_clause == NULL) {
+            return false;
+        }
+        for (i = 0; i < last->u.switch_stmt.ncases; i++) {
+            const IrNode *c = last->u.switch_stmt.cases[i];
+            if (c == NULL || c->kind != IR_CASE ||
+                !stmt_tail_seq_terminates(c->u.case_clause.body)) {
+                return false;
+            }
+        }
+        return stmt_tail_seq_terminates(
+            last->u.switch_stmt.default_clause->u.default_clause.body);
+    case IR_WHILE: case IR_FOR: {
+        const IrNode *cond = (last->kind == IR_WHILE)
+                                 ? last->u.while_stmt.cond
+                                 : last->u.for_stmt.cond;
+        const IrNode *body = (last->kind == IR_WHILE)
+                                 ? last->u.while_stmt.body
+                                 : last->u.for_stmt.body;
+        return stmt_tail_cond_is_const_true(cond) &&
+               stmt_tail_path_block_never_exits(body);
+    }
+    default:
+        return false;
+    }
+}
+
+/* ---------------------------------------------------------------------------
  * Body mapper (the 16c1d seam entry)
  * ------------------------------------------------------------------------- */
 
@@ -1152,7 +1294,26 @@ IrBuilderStatus ir_builder_stmt_body(BuilderCtx *ctx,
     if (st != IR_BUILDER_OK) {
         return st;
     }
-    return ctx->build->oom ? IR_BUILDER_OOM : IR_BUILDER_OK;
+    if (ctx->build->oom) {
+        return IR_BUILDER_OOM;
+    }
+    /* Non-void tails must terminate per the ir_core_verify invariant-5
+     * analysis (contract sec. 5.6). The pre-IR reachability analysis
+     * (AIC-E0416; spec sec. 13.5) accepts some non-void tails the
+     * closed IR cannot certify: a tail whose last mapped statement is
+     * an always-true loop (while(true) / for(;;)) whose body does not
+     * provably never exit the loop (an empty body; a body ending in an
+     * if without else; any other body shape whose every path does not
+     * end in a never-exiting form). Such a faithful mapping would
+     * produce a graph that fails ir_core_verify (AIC-I0501), so the
+     * mapper refuses with IR_BUILDER_UNSUPPORTED and nothing owned
+     * (header gap note 6) instead of silently building it. */
+    if (s.fn_node->u.function.ret_type != NULL &&
+        s.fn_node->u.function.ret_type->kind != IRT_VOID &&
+        !stmt_tail_seq_terminates(s.block)) {
+        return IR_BUILDER_UNSUPPORTED;
+    }
+    return IR_BUILDER_OK;
 }
 
 /* ---------------------------------------------------------------------------

@@ -831,6 +831,178 @@ static void test_defensive_terminators(void)
     pipeline_free(&p);
 }
 
+/* MAJOR-1 regression (reviewer2 t_6e6e83af comment 1462 / gate
+ * t_ebe0fd26): a non-void function tail ending in an always-true loop
+ * (while(true) / for(;;)) with no break is accepted by the pre-IR
+ * reachability analysis (spec 13.5) but the ir_core_verify
+ * invariant-5 analysis cannot certify the loop body as never-exiting
+ * when it is empty or ends in an if without else; a faithful mapping
+ * would produce a graph that fails verification (AIC-I0501). The
+ * mapper refuses the class with IR_BUILDER_UNSUPPORTED and nothing
+ * owned (header gap note 6). This pipeline stops before
+ * stmt_core/stmt_reach, so the probes reach the mapper directly
+ * (defensive). Controls whose tails ARE certifiable still build and
+ * verify. */
+static void test_nonvoid_loop_tail_refused(void)
+{
+    static const char src_a[] =
+        "module main;\n"
+        "fn f() -> i32 { while (true) { } }\n";
+    static const char src_e[] =
+        "module main;\n"
+        "fn f() -> i32 { for (;;) { } }\n";
+    static const char src_g[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { continue; } } }\n";
+    static const char src_nested_block[] =
+        "module main;\n"
+        "fn f() -> i32 { { while (true) { } } }\n";
+    static const char src_if_branch[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { if (c) { while (true) { } } "
+        "else { return 1; } }\n";
+    static const char src_else_empty[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { continue; } "
+        "else { } } }\n";
+    static const char src_break_exits[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { break; } } }\n";
+    static const char src_f[] =
+        "module main;\n"
+        "fn f() -> i32 { while (true) { continue; } }\n";
+    static const char src_f2[] =
+        "module main;\n"
+        "fn f() -> i32 { for (;;) { continue; } }\n";
+    static const char src_b[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { if (c) { return 1; } else { return 2; } }\n";
+    static const char src_h[] =
+        "module main;\n"
+        "fn f(n: i32) -> i32 {\n"
+        "  switch (n) {\n"
+        "    case 0: { return 1; }\n"
+        "    case 1: { return 2; }\n"
+        "    default: { return 3; }\n"
+        "  }\n"
+        "}\n";
+    static const char src_void_tails[] =
+        "module main;\n"
+        "fn f() -> void { while (true) { } }\n"
+        "fn g() -> void { for (;;) { } }\n";
+    static const char src_certified_if[] =
+        "module main;\n"
+        "fn f(c: bool) -> i32 { while (true) { if (c) { continue; } "
+        "else { continue; } } }\n";
+    Pipeline p;
+    IrBuild *b = NULL;
+    IrBuilderStatus bs;
+
+    /* Refused: the always-true loop body is not certifiable as
+     * never-exiting (empty body; body ending in an if without else;
+     * any other non-certifiable shape). */
+    bs = pipeline_build(&p, src_a, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_e, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_g, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_nested_block, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_if_branch, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_else_empty, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    /* An exiting break also makes the loop uncertifiable. The full
+     * pipeline rejects this source earlier at stmt_reach (AIC-E0416);
+     * this pipeline stops before that stage, so the mapper's defensive
+     * refusal is what must hold. */
+    bs = pipeline_build(&p, src_break_exits, &b);
+    CHECK(bs == IR_BUILDER_UNSUPPORTED);
+    CHECK(b == NULL);
+    pipeline_free(&p);
+
+    /* Controls: certifiable non-void tails and void tails still build
+     * and verify. */
+    bs = pipeline_build(&p, src_f, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_f2, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_b, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_h, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_void_tails, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+
+    bs = pipeline_build(&p, src_certified_if, &b);
+    CHECK(bs == IR_BUILDER_OK);
+    CHECK(b != NULL);
+    if (bs == IR_BUILDER_OK && b != NULL) {
+        verify_ok(b);
+        ir_build_free(b);
+        b = NULL;
+    }
+    pipeline_free(&p);
+}
+
 /* AC1/AC3: void tail fall-off is allowed; a non-void tail terminates.
  * Full builds pass ir_core_verify; dump/parse/re-dump byte-identical;
  * identical AST -> byte-identical dump (determinism). */
@@ -919,6 +1091,8 @@ int main(void)
     fprintf(stderr, "after test_call_term_noreturn\n");
     test_defensive_terminators();
     fprintf(stderr, "after test_defensive_terminators\n");
+    test_nonvoid_loop_tail_refused();
+    fprintf(stderr, "after test_nonvoid_loop_tail_refused\n");
     test_verify_roundtrip();
     fprintf(stderr, "after test_verify_roundtrip\n");
 
