@@ -1,0 +1,18 @@
+# bootstrap/build/ir_builder1a.txt
+# WP-M0-16c1a IR builder foundation area source list (owned by WP-M0-16c1a).
+# Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd fragment
+# aggregation (CONVENTIONS.md §3). One source path per line, relative to the
+# repository root. Supersedes the first-level ir_builder.txt entry per
+# manifest §5 (sub-split WP-M0-16c1a..16c1d; letter-suffix fragments
+# ir_builder1a.txt..ir_builder1d.txt per amendment line 55).
+#
+# ir_builder_core.c depends on the WP-M0-16b1 IR core (bootstrap/build/ir1.txt)
+# and the WP-M0-06 diag record/span model (bootstrap/build/diag.txt), both
+# included by the aggregate build; it reads the WP-M0-10 name result and
+# WP-M0-11b layout facts as borrowed structs (headers only; the successor
+# packages provide the mapping implementations that use them).
+#
+# ir_builder_core_test.c is intentionally NOT listed here: it is a unit-test
+# program with its own main() and is built explicitly together with the
+# library sources (see the build comment at the top of ir_builder_core_test.c).
+bootstrap/src/ir/ir_builder_core.c
