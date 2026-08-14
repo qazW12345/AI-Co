@@ -11,7 +11,7 @@ The AI-Co repository is licensed under the **GNU General Public License version 
 - Human Sponsor (Marcel) directed the change on 2026-08-14: "I would like to use the GPL 3.0 license."
 - Scope confirmed by Marcel on 2026-08-14: the license applies to the **AI-Co repository** (the public one). It does not extend to the Sneedworks organization root repository or its governance documents, which remain unlicensed/internal.
 - Replaces the current placeholder `LICENSE` file ("NO LICENSE GRANTED ... until Marcel approves a license").
-- Copyright holder line: `Copyright (C) 2026 Marcel` (default; holder name is the Human Sponsor, adjust on Marcel's direction if a different legal name is preferred).
+- Copyright holder line: `Copyright (C) 2026 qazW12345` (GitHub handle per Marcel's direction 2026-08-14; handle preferred over a personal legal name for now).
 
 ## Context
 
