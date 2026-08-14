@@ -486,7 +486,10 @@ static void test_overflow_branch(void)
     CHECK(strstr(d, ".Ltrap0:") != NULL);
     CHECK(strstr(d, "sub rsp, $32") != NULL);
     CHECK(strstr(d, "mov rcx, $2050") != NULL);
-    CHECK(strstr(d, "lea rdx, [.Lmsg0]") != NULL);
+    /* rt_trap.h ABI: RDX = message_data (the .Lmsg0 message TEXT, not a
+     * str pair image) and R8 = message_len (statically known byte length
+     * of the message text "AIC-R0802 at test.ai:4:1" = 24 bytes) */
+    CHECK(strstr(d, "lea rdx, [.Lmsg0]\n  mov r8, $24") != NULL);
     CHECK(strstr(d, "call fn") != NULL);
     /* deterministic message text carries code + span */
     CHECK(strstr(d, "; .Lmsg0 = \"AIC-R0802 at test.ai:4:1\"") != NULL);
@@ -537,6 +540,9 @@ static void test_div_zero_branch(void)
     CHECK(strstr(d, ";   .Ltrap0 AIC-R0803 code=2051 span=test.ai:4:1")
           != NULL);
     CHECK(strstr(d, "mov rcx, $2051") != NULL);
+    /* rt_trap.h ABI: R8 carries the message byte length (24 = strlen of
+     * "AIC-R0803 at test.ai:4:1") */
+    CHECK(strstr(d, "lea rdx, [.Lmsg0]\n  mov r8, $24") != NULL);
     free(d);
     ir_build_free(b);
 }
@@ -563,6 +569,7 @@ static void test_shift_count_branch(void)
     CHECK(strstr(d, ";   .Ltrap0 AIC-R0804 code=2052 span=test.ai:4:1")
           != NULL);
     CHECK(strstr(d, "mov rcx, $2052") != NULL);
+    CHECK(strstr(d, "lea rdx, [.Lmsg0]\n  mov r8, $24") != NULL);
     free(d);
     ir_build_free(b);
 }
@@ -587,6 +594,7 @@ static void test_bool_byte_branch(void)
     CHECK(strstr(d, ";   .Ltrap0 AIC-R0805 code=2053 span=test.ai:4:1")
           != NULL);
     CHECK(strstr(d, "mov rcx, $2053") != NULL);
+    CHECK(strstr(d, "lea rdx, [.Lmsg0]\n  mov r8, $24") != NULL);
     free(d);
     ir_build_free(b);
 }
@@ -610,10 +618,15 @@ static void test_trap_marker_sites(void)
     CHECK(strstr(d, ";   .Ltrap0 AIC-R0801 code=2049 span=test.ai:5:1")
           != NULL);
     CHECK(strstr(d, "mov rcx, $2049") != NULL);
+    /* rt_trap.h ABI: R8 = message_len (24 = strlen of
+     * "AIC-R0801 at test.ai:5:1") */
+    CHECK(strstr(d, "lea rdx, [.Lmsg0]\n  mov r8, $24") != NULL);
     /* usr: user trap -> the caller's u32 code is passed (sites restart
      * per function, so this function's site is .Ltrap0) */
     CHECK(strstr(d, ";   .Ltrap0 user code=7 span=test.ai:7:1") != NULL);
     CHECK(strstr(d, "mov rcx, $7") != NULL);
+    /* R8 = message_len (26 = strlen of "user trap 7 at test.ai:7:1") */
+    CHECK(strstr(d, "lea rdx, [.Lmsg1]\n  mov r8, $26") != NULL);
     CHECK(strstr(d, "; .Lmsg1 = \"user trap 7 at test.ai:7:1\"") != NULL);
     free(d);
     ir_build_free(b);

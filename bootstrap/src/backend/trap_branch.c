@@ -178,6 +178,7 @@ const char *trap_op_text(TrapOp op)
     case TRAP_OP_SUB_RSP:     return "sub";
     case TRAP_OP_MOV_CODE:    return "mov";
     case TRAP_OP_LEA_MSG:     return "lea";
+    case TRAP_OP_MOV_LEN:     return "mov";
     case TRAP_OP_CALL_REPORT: return "call";
     default:                  return "?";
     }
@@ -426,11 +427,23 @@ static bool emit_trap_paths(TrapOutput *to, const TrapFunction *tf)
                        site->numeric_code, site->ir_node_id)) {
             return false;
         }
-        /* message str pair image address -> RDX (composite argument is
-         * address-resident per the 17b2 convention) */
+        /* message text address -> RDX (message_data; .LmsgN is the
+         * message TEXT constant, not a str pair image -- rt_trap.h) */
         if (!emit_insn(to, TRAP_OP_LEA_MSG, NULL, NULL, TRAP_COND_JMP,
                        site->msg_index, site->ir_node_id)) {
             return false;
+        }
+        /* message byte length -> R8 (message_len; statically known from
+         * the message constant) */
+        {
+            const char *msg =
+                (site->msg_index >= 0 && (size_t)site->msg_index < to->nmsgs)
+                    ? to->msgs[site->msg_index] : NULL;
+            int64_t len = msg != NULL ? (int64_t)strlen(msg) : 0;
+            if (!emit_insn(to, TRAP_OP_MOV_LEN, NULL, NULL, TRAP_COND_JMP,
+                           len, site->ir_node_id)) {
+                return false;
+            }
         }
         /* call rt.trap.report; nothing after (noreturn) */
         if (!emit_insn(to, TRAP_OP_CALL_REPORT, NULL, NULL, TRAP_COND_JMP,
@@ -1346,6 +1359,8 @@ static bool dump_trap_insn(DiagBuf *b, const TrapInsn *ti)
     case TRAP_OP_LEA_MSG:
         return t_printf(b, "  lea rdx, [.Lmsg%lld]\n",
                         (long long)ti->imm);
+    case TRAP_OP_MOV_LEN:
+        return t_printf(b, "  mov r8, $%lld\n", (long long)ti->imm);
     case TRAP_OP_CALL_REPORT:
         return t_printf(b, "  call fn%lld\n", (long long)ti->imm);
     default:

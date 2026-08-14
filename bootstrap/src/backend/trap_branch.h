@@ -34,8 +34,9 @@
  *     cmp+jae before a variable-count shift, bool-byte cmp+ja after a bool
  *     load), and at the end of each function the trap paths: for each site,
  *     `.LtrapN:` then `sub rsp, $32` (the report call's shadow space),
- *     `mov rcx, $<code>`, `lea rdx, [.LmsgN]` (the message str pair image
- *     address), and `call rt.trap.report` (noreturn; nothing after);
+ *     `mov rcx, $<code>`, `lea rdx, [.LmsgN]` (the message text
+ *     address -- message_data), `mov r8, $<len>` (the message byte
+ *     length), and `call rt.trap.report` (noreturn; nothing after);
  *   - a byte-deterministic trap assembly dump (trap_asm_dump) that renders
  *     the trap-branched stream and the per-function site plan as stable
  *     text. Identical inputs produce byte-identical dump bytes (acceptance
@@ -82,10 +83,14 @@
  *      $32` (the 32-byte shadow space the report call's caller must
  *      reserve, sec. 15.7; RSP is 16-byte aligned and never restored --
  *      rt.trap.report is noreturn), `mov rcx, $<code>` (stable numeric
- *      code), `lea rdx, [.LmsgN]` (address of the message str pair image,
- *      the composite-argument convention of 17b2), and `call rt.trap.report`
- *      with nothing after it (noreturn; no epilogue, frame is never
- *      corrupted). Trap paths are reachable only via the trap branches.
+ *      code), `lea rdx, [.LmsgN]` (address of the message text --
+ *      message_data, per rt_trap.h; .LmsgN is the message TEXT constant,
+ *      not a str pair image), `mov r8, $<len>` (the message byte length,
+ *      statically known from the message constant), and `call
+ *      rt.trap.report` with nothing after it (noreturn; no epilogue,
+ *      frame is never corrupted). This is exactly rt_trap.h's conforming
+ *      compiler emission: RCX=code, RDX=message_data, R8=message_len.
+ *      Trap paths are reachable only via the trap branches.
  *
  * Determinism. trap_branch_build iterates only the physical stream in
  * emission order, the framed stream in emission order, and the IR's
@@ -143,7 +148,9 @@ typedef enum TrapOp {
     TRAP_OP_CMP_IMM,     /* cmp <src1>, $<imm>   (flag-setter) */
     TRAP_OP_SUB_RSP,     /* sub rsp, $imm (imm = 32; report-call shadow) */
     TRAP_OP_MOV_CODE,    /* mov rcx, $imm (imm = numeric trap code) */
-    TRAP_OP_LEA_MSG,     /* lea rdx, [.Lmsg<imm>] (imm = message index) */
+    TRAP_OP_LEA_MSG,     /* lea rdx, [.Lmsg<imm>] (imm = message index;
+                          * .LmsgN is the message TEXT, not a pair image) */
+    TRAP_OP_MOV_LEN,     /* mov r8, $imm (imm = message byte length) */
     TRAP_OP_CALL_REPORT  /* call fn<report> (imm = report fn id) */
 } TrapOp;
 

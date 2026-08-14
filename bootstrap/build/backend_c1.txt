@@ -14,8 +14,9 @@
 # add/sub/mul/neg, divisor-zero test+jz before idiv, shift-count cmp+jae
 # before a variable-count shift, invalid-bool-byte cmp+ja after a bool
 # load), and the trap paths at the end of each function (`.LtrapN:` +
-# 32-byte shadow + `mov rcx,$<code>` + `lea rdx,[.LmsgN]` + `call
-# rt.trap.report`, noreturn). It depends on the
+# 32-byte shadow + `mov rcx,$<code>` + `lea rdx,[.LmsgN]` (message text
+# address) + `mov r8,$<len>` (message byte length) + `call
+# rt.trap.report` -- RCX/RDX/R8 per rt_trap.h, noreturn). It depends on the
 # call emission output (bootstrap/build/backend_b2.txt), the frame layout
 # output (bootstrap/build/backend_b1.txt), and the isel_core selection
 # output (bootstrap/build/backend_a1.txt), plus the IR/diag packages, all
