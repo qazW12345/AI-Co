@@ -1,0 +1,58 @@
+# bootstrap/build/backend_b2.txt
+# WP-M0-17b2 register allocation and call emission area source list
+# (owned by WP-M0-17b2). Consumed by build-stage0-msvc.cmd /
+# build-stage0-clang.cmd fragment aggregation (CONVENTIONS.md §3). One
+# source path per line; tests are built explicitly and are NOT listed.
+#
+# call.c implements deterministic simple register allocation and call
+# emission on the 17b1 framed stream (spec §15.7 Microsoft x64 internal
+# convention; §14.3 x86-64 target): per-function call-owned spill area
+# and slice-pair temps below the frame, the final prologue
+# (push rbp; mov rbp,rsp; [save callee-saved]; sub rsp,total),
+# incoming-parameter copies (register args 0-3, stack args 4+, composite
+# params copied by value), the two-scratch-register (R10/R11) body
+# lowering with the special-register obligations (idiv RAX/RDX pair,
+# variable shifts in CL, REP MOVSB/STOSB in RDI/RSI/RCX), call sequences
+# (RCX/RDX/R8/R9, stack args above the 32-byte shadow space, 16-byte
+# aligned RSP at every call site, RAX result capture), and the epilogue
+# (mov rsp,rbp; [restore callee-saved]; pop rbp; ret). It depends on the
+# frame layout output (bootstrap/build/backend_b1.txt) and the isel_core
+# selection output (bootstrap/build/backend_a1.txt), plus the IR/diag
+# packages, all included by the aggregate build.
+#
+# Boundary (manifest WP-M0-17b2): register allocation and call emission
+# only. Excluded and owned by later packages: frame layout (17b1);
+# instruction selection (17a1); x86-64 coverage/constraint checks (17a2,
+# AIC-B0601); trap branches/checked-op emission (17c, ISEL_TRAP and the
+# loop pseudo-ops ISEL_STRCMP/ISEL_SLICEEQ/ISEL_UTF8/ISEL_PTRDIFF pass
+# through call.c as annotated markers); COFF emission (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# call.c is included here so the future driver build picks it up.
+bootstrap/src/backend/call.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17b2' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/call_test.c \
+#     bootstrap/src/backend/call.c \
+#     bootstrap/src/backend/frame.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17b2/call_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17b2.)
+#
+# EXPECTED OUTPUT:
+#   call_test: 319 checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix frame/isel_core/ir-owned
+# code). Fresh /W4 builds must be warning-free on both toolchains, and
+# two independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
