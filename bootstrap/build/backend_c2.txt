@@ -1,0 +1,70 @@
+# bootstrap/build/backend_c2.txt
+# WP-M0-17c2 checked-op emission area source list (owned by
+# WP-M0-17c2). Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd
+# fragment aggregation (CONVENTIONS.md §3). One source path per line;
+# tests are built explicitly and are NOT listed.
+#
+# trap_checked.c implements checked-operation emission with span/cause
+# preservation on trap records (spec §14.3/§15.5/§15.8; IR contract
+# §8.2/§8.4) on top of the 17c1 trap-branched stream: the deterministic
+# multi-instruction check sequences for the complex checked ops that 17c1
+# passed through as annotated markers (null deref AIC-R0809, index bounds
+# AIC-R0807, cast range AIC-R0801 -- discovered from the IR_CAST node's
+# trap_code since isel_core emits the narrowing MOV without a trap
+# annotation -- slice bounds AIC-R0807/R0808, UTF-8 validation AIC-R0806,
+# pointer difference AIC-R0810, pointer-arith overflow AIC-R0816), and
+# the trap-record span/cause preservation (every CheckedSite carries the
+# failing IR node's primary span AND its full cause chain, root cause
+# first; the emitted message text is derived from code + span + causes).
+# It depends on the trap branch output (bootstrap/build/backend_c1.txt),
+# the call emission output (bootstrap/build/backend_b2.txt), the frame
+# layout output (bootstrap/build/backend_b1.txt), and the isel_core
+# selection output (bootstrap/build/backend_a1.txt), plus the IR/diag
+# packages, all included by the aggregate build.
+#
+# Boundary (manifest WP-M0-17c2): checked-op emission and span/cause
+# preservation only. Excluded and owned by other packages: trap branch
+# structure (17c1, trap_branch.* -- the trap sites and paths); instruction
+# selection (17a); frame/regalloc (17b); COFF emission (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# trap_checked.c is included here so the future driver build picks it up.
+#
+# NOTE (17c1 dependency defect, escalated): the committed 17c1
+# trap_branch.c append_site grows the per-function site array only when
+# nsites % 8 == 0 (initial malloc is a single TrapSite), so a function
+# with 2-8 trap sites writes past the allocation (heap-buffer-overflow,
+# ASan-verified during 17c2 verification). 17c1's tests never caught it
+# because every 17c1 test function has exactly one trap site. The 17c2
+# test builds therefore use one obligation per function (the same pattern
+# 17c1 used); the multi-site scenario is a backend constraint escalated
+# to the Planner so WP-M0-18/19 depend on a fixed site plan.
+bootstrap/src/backend/trap_checked.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17c2' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/trap_checked_test.c \
+#     bootstrap/src/backend/trap_checked.c \
+#     bootstrap/src/backend/trap_branch.c \
+#     bootstrap/src/backend/call.c \
+#     bootstrap/src/backend/frame.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17c2/trap_checked_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17c2.)
+#
+# EXPECTED OUTPUT:
+#   trap_checked_test: <N> checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix call/frame/isel_core/ir-owned
+# code). Fresh /W4 builds must be warning-free on both toolchains, and
+# two independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
