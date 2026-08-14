@@ -4,10 +4,12 @@
 **Owner:** Process Engineer
 **Affected-rule owner:** Main Designer (OM §6.1 amendment and watchdog implementation; Hermes platform `block_task` loop-breaker change as Hermes runtime owner); Coordinator (triage resolution practice)
 **Approver:** Marcel, Human Sponsor (adoption of the OM amendment and any Hermes runtime modification)
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Date:** 2026-08-14
 **Supersedes:** None (amends the process governed by OM §6.1 v1.1.10 watchdog rules; does not change review verdict authority, gate rules, or completion rules)
 **Review date:** 2026-09-14 (30 days from adoption) or on first recurrence of the covered hazard class, whichever comes first
+
+**Correction record (v0.1.1, 2026-08-14):** per reviewer2 MIN-1 on review t_e09e0754 (verdict PASS WITH MINOR FINDINGS on t_a74a593c @ d2bb309; gate t_b1e46217), the §2.3 board-wide history row for t_b174081d and the interpretation count were corrected: the first blocked event on t_b174081d (08-12 01:54:41) was `Downstream gap: accepted parser (WP-M0-09) rejects missing initializer as AIC-S0101...` (kind needs_input) — NOT a review-required at 24f8f39; the `block_loop_detected` (08-12 03:00:44) fired on the second block (`review-required: WP-M0-13a2 Initializers implemented (commit 24f8f39...)`, kind needs_input) because kind matched while the reason changed completely. Correct classification: **changed-reason false positive** (same class as t_d1a99094). Corrected count: **FOUR of six events (t_31f94221, t_d1a99094, t_b174081d, t_44c69fe9) show changed reason/artifact**; only TWO (t_434a486e, t_d2121da3) are same-commit continuations. Date column corrected for t_d1a99094/t_b174081d (BLD events 08-12, not 08-11); §6 limitation count updated (two, not three, unchanged-commit events). Root-cause conclusion, 17c2 analysis, and proposal content unchanged; text-level correction, no re-review required under the Pass-with-Minors path.
 
 ## 1. Problem and desired outcome
 
@@ -59,11 +61,11 @@ The task direction assumed the guard lives in `governance/runtime/scripts/kanban
 | t_434a486e (WP-M0-08 lexer) | 2026-08-10 | review-required e1929bc re-blocked after continuation (same kind, same commit, re-verified) | kind-only false positive; human-resolved; card done |
 | t_d2121da3 (WP-M0-09 parser) | 2026-08-10 | review-required 70efe05 re-blocked after continuation (same kind, same commit, re-verified) | kind-only false positive; human-resolved; card done |
 | t_31f94221 (WP-M0-03-fix2→fix3) | 2026-08-11 | reason **changed** fix2 → fix3 (new remediation round), same kind | **changed-artifact false positive; card still in triage** |
-| t_d1a99094 (OM v1.1.7 adoption) | 2026-08-11 | reason class changed `human-required:` → `review-required:` (Marcel gate passed, then review requested), same kind | **changed-reason false positive; resolved via triage; archived** |
-| t_b174081d (WP-M0-13a2) | 2026-08-11 | review-required 24f8f39 re-blocked after continuation (same kind, same commit) | kind-only false positive; human-resolved; card done |
+| t_d1a99094 (OM v1.1.7 adoption) | 2026-08-12 | reason class changed `human-required:` → `review-required:` (Marcel gate passed, then review requested), same kind | **changed-reason false positive; resolved via triage; archived** |
+| t_b174081d (WP-M0-13a2) | 2026-08-12 | first block `Downstream gap: accepted parser (WP-M0-09) rejects missing initializer...` (needs_input); BLD fired on second block `review-required: 24f8f39` (same kind, reason changed completely) | **changed-reason false positive; human-resolved; card done** |
 | t_44c69fe9 (WP-M0-17c2) | 2026-08-14 | review-required 8c2d3fb after gate DEFERRED on 0ad8411 (changed artifact, same kind) | **changed-artifact false positive; 124-min stall** |
 
-**Interpretation:** all six observed `block_loop_detected` events fired at `recurrences=2, limit=2`; none is a demonstrated cron-spin loop. At least three (t_31f94221, t_d1a99094, t_44c69fe9) show changed reason/artifact between the two blocks; the remaining three are legitimate continuation re-verifications that the guard also interrupted. The kind-only `same_cause` test is the common root cause. The guard's anti-loop purpose is not in dispute — the signal it uses is wrong.
+**Interpretation:** all six observed `block_loop_detected` events fired at `recurrences=2, limit=2`; none is a demonstrated cron-spin loop. **FOUR of six (t_31f94221, t_d1a99094, t_b174081d, t_44c69fe9) show changed reason/artifact between the two blocks**; only TWO (t_434a486e, t_d2121da3) are legitimate same-commit continuation re-verifications that the guard also interrupted. The kind-only `same_cause` test is the common root cause. The guard's anti-loop purpose is not in dispute — the signal it uses is wrong.
 
 ### 2.4 Existing artifact-identity machinery (the model to reuse)
 
@@ -179,7 +181,7 @@ No change is proposed to review verdicts, acceptance criteria, the M0 manifest, 
 - Requirements confidence: High (explicit Main Designer direction; verified mechanism and timeline).
 - Architecture confidence: High (process-control analysis; platform change is a small, well-scoped edit to one function plus a constant).
 - Verification confidence: High for the mechanism facts (DB events, source lines, six board-wide instances); High for the 17c2 stall duration (124 min measured between BLD event and manual re-review card creation).
-- Limitations: the platform change requires modifying the Hermes install, which is outside the Sneedworks repo; the org's versioned copy pattern covers the router only. The compensating control (§4.3) is the org-owned mitigation that works even before the platform change lands. Three of six observed events had *unchanged* commits between blocks (continuation re-verifications) — the artifact-identity test treats those as same-artifact and would still let the breaker fire at N=3; if continuation re-verifications are a distinct legitimate class, a follow-up may exempt them via a separate signal (e.g. circuit-breaker continuation evidence per Rule W3). This limitation is recorded for the review date.
+- Limitations: the platform change requires modifying the Hermes install, which is outside the Sneedworks repo; the org's versioned copy pattern covers the router only. The compensating control (§4.3) is the org-owned mitigation that works even before the platform change lands. Two of six observed events had *unchanged* commits between blocks (continuation re-verifications) — the artifact-identity test treats those as same-artifact and would still let the breaker fire at N=3; if continuation re-verifications are a distinct legitimate class, a follow-up may exempt them via a separate signal (e.g. circuit-breaker continuation evidence per Rule W3). This limitation is recorded for the review date.
 
 ## 7. Follow-up routing
 
