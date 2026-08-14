@@ -38,7 +38,7 @@ bootstrap/src/backend/isel_core.c
 # bootstrap\\stage0\\clang-17a1.)
 #
 # EXPECTED OUTPUT:
-#   isel_core_test: 407 checks, 0 failures
+#   isel_core_test: 431 checks, 0 failures
 # exit code 0. Any FAIL line or non-zero exit is a defect (report per
 # package record sec. 9: REPORT, do not fix ir_core-owned code).
 # Fresh /W4 builds must be warning-free on both toolchains, and two

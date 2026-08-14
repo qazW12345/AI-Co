@@ -17,7 +17,7 @@
  *      composite pseudo-ops select the documented opcodes and operands;
  *   5. trap-obligation preservation - checked ops carry their registry
  *      trap code on the selected instruction (R0802/R0803/R0804/R0805/
- *      R0807/R0809/R0810/R0816);
+ *      R0806/R0807/R0808/R0809/R0810/R0816);
  *   6. ordering - the instruction stream preserves the canonical
  *      traversal order (module -> decls -> function -> statements ->
  *      expressions in evaluation order);
@@ -599,7 +599,9 @@ static void test_constants(void)
     cn = mk(b, IR_NULL, "c.ai", 3);
     cn->type = ir_type_ptr(b, ir_type_i32(b));
     {
-        /* use the bool and null through an expression stmt to emit them */
+        /* use the bool through an expression stmt; the null literal is
+         * emitted through its own expression stmt (movq $0) so the
+         * IR_NULL selection path is actually exercised */
         IrNode *land = mk(b, IR_LAND, "c.ai", 3);
         land->type = ir_type_bool(b);
         land->u.binary.left = cb;
@@ -607,7 +609,9 @@ static void test_constants(void)
         IrNode *es = mk(b, IR_EXPR_STMT, "c.ai", 3);
         es->u.expr_stmt.expr = land;
         ir_block_add_stmt(b, body, es);
-        (void)cn;
+        IrNode *esn = mk(b, IR_EXPR_STMT, "c.ai", 4);
+        esn->u.expr_stmt.expr = cn;
+        ir_block_add_stmt(b, body, esn);
     }
     ret = mk_return(b, "c.ai", mk_local(b, "c.ai", ir_type_i64(b), s));
     ir_block_add_stmt(b, body, ret);
@@ -672,6 +676,55 @@ static void test_trap_obligations(void)
     decl2->u.local_decl.slot_index = s0;
     decl2->u.local_decl.init = deref;
     ir_block_add_stmt(b, body, decl2);
+    /* bool load (R0805): a load whose result type is bool */ {
+        IrNode *bload = mk(b, IR_LOAD, "t.ai", 7);
+        bload->type = ir_type_bool(b);
+        bload->u.load.lvalue =
+            mk_local(b, "t.ai", ir_type_ptr(b, ir_type_bool(b)), s0);
+        IrNode *es = mk(b, IR_EXPR_STMT, "t.ai", 7);
+        es->u.expr_stmt.expr = bload;
+        ir_block_add_stmt(b, body, es);
+    }
+    /* str slice (R0808): IR_SLICE whose base type is str */ {
+        IrNode *sl = mk(b, IR_SLICE, "t.ai", 8);
+        sl->type = ir_type_str(b);
+        sl->u.slice.base = mk_local(b, "t.ai", ir_type_str(b), s0);
+        sl->u.slice.start = mk_int(b, "t.ai", ir_type_usize(b), 1);
+        sl->u.slice.end = NULL;
+        IrNode *es = mk(b, IR_EXPR_STMT, "t.ai", 8);
+        es->u.expr_stmt.expr = sl;
+        ir_block_add_stmt(b, body, es);
+    }
+    /* u8[] -> str cast (R0806): UTF-8 validation pseudo */ {
+        IrNode *uc = mk(b, IR_CAST, "t.ai", 9);
+        uc->type = ir_type_str(b);
+        uc->u.cast_wrap.value =
+            mk_local(b, "t.ai", ir_type_slice(b, ir_type_u8(b)), s1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "t.ai", 9);
+        es->u.expr_stmt.expr = uc;
+        ir_block_add_stmt(b, body, es);
+    }
+    /* ptr add (R0816): pointer arithmetic with element scale */ {
+        IrNode *pa = mk(b, IR_PTR_ADD, "t.ai", 10);
+        pa->type = ir_type_ptr(b, ir_type_i32(b));
+        pa->u.ptr_arith.ptr =
+            mk_local(b, "t.ai", ir_type_ptr(b, ir_type_i32(b)), s0);
+        pa->u.ptr_arith.offset = mk_int(b, "t.ai", ir_type_usize(b), 2);
+        IrNode *es = mk(b, IR_EXPR_STMT, "t.ai", 10);
+        es->u.expr_stmt.expr = pa;
+        ir_block_add_stmt(b, body, es);
+    }
+    /* ptr diff (R0810): byte difference with element-size pseudo */ {
+        IrNode *pd = mk(b, IR_PTR_DIFF, "t.ai", 11);
+        pd->type = ir_type_i64(b);
+        pd->u.binary.left =
+            mk_local(b, "t.ai", ir_type_ptr(b, ir_type_i32(b)), s0);
+        pd->u.binary.right =
+            mk_local(b, "t.ai", ir_type_ptr(b, ir_type_i32(b)), s1);
+        IrNode *es = mk(b, IR_EXPR_STMT, "t.ai", 11);
+        es->u.expr_stmt.expr = pd;
+        ir_block_add_stmt(b, body, es);
+    }
     ret = mk_return(b, "t.ai", mk_local(b, "t.ai", ir_type_i32(b), s0));
     ir_block_add_stmt(b, body, ret);
     fn->u.function.body = body;
@@ -686,6 +739,11 @@ static void test_trap_obligations(void)
         CHECK(strstr(d, "trap=AIC-R0804") != NULL);   /* shl */
         CHECK(strstr(d, "trap=AIC-R0807") != NULL);   /* index */
         CHECK(strstr(d, "trap=AIC-R0809") != NULL);   /* deref */
+        CHECK(strstr(d, "trap=AIC-R0805") != NULL);   /* bool load */
+        CHECK(strstr(d, "trap=AIC-R0806") != NULL);   /* u8[] -> str cast */
+        CHECK(strstr(d, "trap=AIC-R0808") != NULL);   /* str slice */
+        CHECK(strstr(d, "trap=AIC-R0810") != NULL);   /* ptr diff */
+        CHECK(strstr(d, "trap=AIC-R0816") != NULL);   /* ptr add */
         free(d);
     }
     ir_build_free(b);
