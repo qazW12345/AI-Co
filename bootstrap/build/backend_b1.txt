@@ -1,0 +1,47 @@
+# bootstrap/build/backend_b1.txt
+# WP-M0-17b1 stack frame layout and prologue/epilogue area source list
+# (owned by WP-M0-17b1). Consumed by build-stage0-msvc.cmd /
+# build-stage0-clang.cmd fragment aggregation (CONVENTIONS.md §3). One
+# source path per line; tests are built explicitly and are NOT listed.
+#
+# frame.c implements the frame obligations (spec §15.7 Microsoft x64
+# internal convention; §14.3 x86-64 target): deterministic per-function
+# slot layout below RBP, the frame-pointer prologue/epilogue instruction
+# sequences, main entry setup, and noreturn handling. It depends on the
+# isel_core selection output (bootstrap/build/backend_a1.txt) and the
+# IR/diag packages, all included by the aggregate build.
+#
+# Boundary (manifest WP-M0-17b1): frame layout and prologue/epilogue
+# only. Excluded and owned by later packages: register allocation/call
+# emission (17b2, call.*); instruction selection (17a1); x86-64
+# coverage/constraint checks (17a2, AIC-B0601); trap branches (17c);
+# COFF emission (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# frame.c is included here so the future driver build picks it up.
+bootstrap/src/backend/frame.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17b1' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/frame_test.c \
+#     bootstrap/src/backend/frame.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17b1/frame_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17b1.)
+#
+# EXPECTED OUTPUT:
+#   frame_test: 300 checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix isel_core/ir-owned code).
+# Fresh /W4 builds must be warning-free on both toolchains, and two
+# independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
