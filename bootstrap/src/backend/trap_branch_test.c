@@ -458,6 +458,36 @@ static IrBuild *make_trap_marker_build(void)
     return b;
 }
 
+/* f() -> void { trap; trap; ... } with `n` IR_TRAP statements, each at a
+ * distinct source line (5..5+n-1). Every statement becomes an ISEL_TRAP
+ * marker and therefore one unconditional trap site; the function exercises
+ * the site-plan growth path with n obligations (WP-M0-17c1 regression:
+ * append_site heap-buffer-overflow for functions with 2-8 trap sites). */
+static IrBuild *make_trap_count_build(int64_t n)
+{
+    IrBuild *b = ir_build_new();
+    IrNode *mod, *f, *body;
+    int64_t i;
+    CHECK(b != NULL);
+    if (b == NULL) {
+        return NULL;
+    }
+    mod = mk_module(b, "test", "test.ai");
+    f = mk_fn(b, "test.ai", "f", ir_type_void(b));
+    body = mk_block(b, "test.ai", 3);
+    for (i = 0; i < n; i++) {
+        IrNode *trap = mk(b, IR_TRAP, "test.ai", 5 + i);
+        trap->u.trap.code = "AIC-R0801";
+        trap->u.trap.has_user_code = false;
+        ir_block_add_stmt(b, body, trap);
+    }
+    f->u.function.body = body;
+    ir_module_add_decl(b, mod, f);
+    declare_trap_report(b, mod);
+    ir_build_add_module(b, mod);
+    return b;
+}
+
 /* ---------------------------------------------------------------------------
  * Tests
  * ------------------------------------------------------------------------- */
@@ -632,6 +662,98 @@ static void test_trap_marker_sites(void)
     ir_build_free(b);
 }
 
+/* Shared multi-site plan verification: `n` unconditional trap sites in one
+ * function must all be recorded (code/numeric_code/span per site), the dump
+ * must show sites=n and one site-plan line per site, and every trap path
+ * must exist. Exercises the append_site growth boundaries (2 = past the
+ * initial-1 write, 8 = last slot of the initial 8-element block, 9 =
+ * realloc boundary). */
+static void check_site_count(int64_t n)
+{
+    IrBuild *b = make_trap_count_build(n);
+    TrapOutput *to = NULL;
+    char *d = NULL;
+    size_t dn = 0;
+    int64_t i;
+    CHECK(b != NULL);
+    if (b == NULL) {
+        return;
+    }
+    d = trap_dump(b, &dn, &to);
+    CHECK(d != NULL);
+    if (d == NULL) {
+        ir_build_free(b);
+        return;
+    }
+    /* dump: per-function site plan with sites=n and one .Ltrap<k> line per
+     * site (code + numeric code + span; unconditional traps are AIC-R0801
+     * with spans at lines 5..5+n-1) */
+    {
+        char want[96];
+        snprintf(want, sizeof(want), "sites=%lld", (long long)n);
+        CHECK(strstr(d, want) != NULL);
+    }
+    for (i = 0; i < n; i++) {
+        char want[128];
+        snprintf(want, sizeof(want),
+                 ";   .Ltrap%lld AIC-R0801 code=2049 span=test.ai:%lld:1",
+                 (long long)i, (long long)(5 + i));
+        CHECK(strstr(d, want) != NULL);
+        /* trap path label */
+        snprintf(want, sizeof(want), ".Ltrap%lld:", (long long)i);
+        CHECK(strstr(d, want) != NULL);
+        /* report-call code argument */
+        snprintf(want, sizeof(want), "mov rcx, $2049");
+        CHECK(strstr(d, want) != NULL);
+    }
+    /* accessor plan: the first function (f) carries exactly n sites, each
+     * with the correct code, numeric code, and span */
+    if (to != NULL) {
+        CHECK(trap_function_count(to) >= 2);   /* f + rt.trap.report */
+        if (trap_function_count(to) >= 1) {
+            const TrapFunction *tf = trap_function_at(to, 0);
+            if (tf != NULL) {
+                CHECK(tf->nsites == (size_t)n);
+                CHECK(tf->sites != NULL);
+                for (i = 0; i < n; i++) {
+                    const TrapSite *s = trap_function_site(tf, (size_t)i);
+                    CHECK(s != NULL);
+                    if (s != NULL) {
+                        CHECK(s->site_index == i);
+                        CHECK(s->code != NULL);
+                        CHECK(strcmp(s->code, "AIC-R0801") == 0);
+                        CHECK(s->numeric_code == 2049);
+                        CHECK(s->span != NULL);
+                        CHECK(s->span->file != NULL);
+                        CHECK(strcmp(s->span->file, "test.ai") == 0);
+                        CHECK(s->span->start.line == 5 + i);
+                        CHECK(s->span->start.col == 1);
+                        CHECK(s->unconditional);
+                    }
+                }
+            }
+        }
+    }
+    free(d);
+    trap_output_free(to);
+    ir_build_free(b);
+}
+
+static void test_site_plan_2_sites(void)
+{
+    check_site_count(2);
+}
+
+static void test_site_plan_8_sites(void)
+{
+    check_site_count(8);
+}
+
+static void test_site_plan_9_sites(void)
+{
+    check_site_count(9);
+}
+
 static void test_site_plan_and_determinism(void)
 {
     IrBuild *b1 = make_overflow_build();
@@ -717,6 +839,12 @@ int main(void)
     fprintf(stderr, "after test_bool_byte_branch\n");
     test_trap_marker_sites();
     fprintf(stderr, "after test_trap_marker_sites\n");
+    test_site_plan_2_sites();
+    fprintf(stderr, "after test_site_plan_2_sites\n");
+    test_site_plan_8_sites();
+    fprintf(stderr, "after test_site_plan_8_sites\n");
+    test_site_plan_9_sites();
+    fprintf(stderr, "after test_site_plan_9_sites\n");
     test_site_plan_and_determinism();
     fprintf(stderr, "after test_site_plan_and_determinism\n");
     fprintf(stderr, "trap_branch_test: %d checks, %d failures\n",

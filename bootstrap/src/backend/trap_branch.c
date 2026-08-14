@@ -324,13 +324,14 @@ static bool append_site(TrapFunction *tf, TrapOutput *to,
     TrapSite *p;
     char msg[512];
     int n;
-    if (tf->nsites == 0) {
-        tf->sites = (TrapSite *)malloc(sizeof(TrapSite));
-        if (tf->sites == NULL) {
-            to->oom = true;
-            return false;
-        }
-    } else if (tf->nsites % 8 == 0) {
+    /* Grow whenever the site count is a multiple of 8, from the start:
+     * the first append reallocates the NULL site pointer into an
+     * 8-element block (realloc(NULL, 8*sizeof) == initial allocation),
+     * and every 8 further sites grow the block by 8. This is the
+     * corrected pattern of trap_checked.c append_site (WP-M0-17c2);
+     * the former nsites==0 single-element malloc let sites 1..7 write
+     * past the allocation (heap-buffer-overflow). */
+    if (tf->nsites % 8 == 0) {
         TrapSite *q = (TrapSite *)realloc(
             tf->sites, (tf->nsites + 8) * sizeof(TrapSite));
         if (q == NULL) {
