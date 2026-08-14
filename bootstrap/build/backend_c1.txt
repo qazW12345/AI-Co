@@ -1,0 +1,60 @@
+# bootstrap/build/backend_c1.txt
+# WP-M0-17c1 trap branch emission area source list (owned by
+# WP-M0-17c1). Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd
+# fragment aggregation (CONVENTIONS.md §3). One source path per line;
+# tests are built explicitly and are NOT listed.
+#
+# trap_branch.c implements deterministic trap branches for runtime-failable
+# checked operations on the 17b2 physical stream (spec §14.3/§15.5/§15.8;
+# Microsoft x64 internal convention §15.7): a per-function trap-site plan
+# (one deterministic trap site per trap obligation in stream order: label,
+# stable AIC-Rxxxx code, the numeric u32 code passed to rt.trap.report, and
+# the failing operation's source span), the trap branches at the obligation
+# sites (unconditional jmp for the ISEL_TRAP marker; overflow jo/jc after
+# add/sub/mul/neg, divisor-zero test+jz before idiv, shift-count cmp+jae
+# before a variable-count shift, invalid-bool-byte cmp+ja after a bool
+# load), and the trap paths at the end of each function (`.LtrapN:` +
+# 32-byte shadow + `mov rcx,$<code>` + `lea rdx,[.LmsgN]` + `call
+# rt.trap.report`, noreturn). It depends on the
+# call emission output (bootstrap/build/backend_b2.txt), the frame layout
+# output (bootstrap/build/backend_b1.txt), and the isel_core selection
+# output (bootstrap/build/backend_a1.txt), plus the IR/diag packages, all
+# included by the aggregate build.
+#
+# Boundary (manifest WP-M0-17c1): trap branch emission, stable codes and
+# source spans only. Excluded and owned by later packages: checked-op
+# emission details (17c2, trap_checked.* -- the multi-instruction check
+# sequences for ISEL_SLICE/ISEL_UTF8/ISEL_PTRDIFF/index bounds/null
+# deref/cast range and span/cause preservation on trap records); COFF
+# emission (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# trap_branch.c is included here so the future driver build picks it up.
+bootstrap/src/backend/trap_branch.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17c1' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/trap_branch_test.c \
+#     bootstrap/src/backend/trap_branch.c \
+#     bootstrap/src/backend/call.c \
+#     bootstrap/src/backend/frame.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17c1/trap_branch_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17c1.)
+#
+# EXPECTED OUTPUT:
+#   trap_branch_test: <N> checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix call/frame/isel_core/ir-owned
+# code). Fresh /W4 builds must be warning-free on both toolchains, and
+# two independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
