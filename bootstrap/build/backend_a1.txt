@@ -1,0 +1,46 @@
+# bootstrap/build/backend_a1.txt
+# WP-M0-17a1 instruction-selection core area source list (owned by
+# WP-M0-17a1). Consumed by build-stage0-msvc.cmd / build-stage0-clang.cmd
+# fragment aggregation (CONVENTIONS.md §3). One source path per line,
+# lexicographically sorted; tests are built explicitly and are NOT listed.
+#
+# isel_core.c implements the deterministic IR -> x86-64 instruction
+# selection core (spec §14.1(7)/§14.3; IR contract docs/contracts/
+# IR-CONTRACT-2026-08-12.md): canonical traversal order, gapless
+# deterministic virtual-register usage, deterministic labels, and a
+# byte-deterministic assembly dump (isel_asm_dump). It depends on the IR
+# core (bootstrap/build/ir1.txt) and the diag span/buffer model
+# (bootstrap/build/diag.txt), both included by the aggregate build.
+#
+# Boundary (manifest WP-M0-17a1): instruction selection and deterministic
+# output only. Excluded and owned by later packages: x86-64+SSE2
+# coverage/constraint checks (17a2, AIC-B0601); frame layout/regalloc
+# (17b); trap branches (17c); COFF emission (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# isel_core.c is included here so the future driver build picks it up.
+bootstrap/src/backend/isel_core.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17a1' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/isel_core_test.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17a1/isel_core_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17a1.)
+#
+# EXPECTED OUTPUT:
+#   isel_core_test: 407 checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix ir_core-owned code).
+# Fresh /W4 builds must be warning-free on both toolchains, and two
+# independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
