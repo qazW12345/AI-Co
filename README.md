@@ -33,14 +33,17 @@ See:
 - [`docs/adr/ADR-002-minimal-core-language-semantics.md`](docs/adr/ADR-002-minimal-core-language-semantics.md)
 - [`docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md`](docs/adr/ADR-003-safety-wrapping-and-host-boundaries.md) — superseded history
 - [`docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md`](docs/adr/ADR-004-human-sponsor-bootstrap-resolutions.md)
-- [`spec/AI-CO-LANGUAGE-SPECIFICATION.md`](spec/AI-CO-LANGUAGE-SPECIFICATION.md) — Proposed v0.1.1
-- [`spec/DIAGNOSTIC-CONTRACT.md`](spec/DIAGNOSTIC-CONTRACT.md) — Proposed v0.1.1
+- [`docs/adr/ADR-005-rt-io-standard-stream-failure-contract.md`](docs/adr/ADR-005-rt-io-standard-stream-failure-contract.md)
+- [`spec/AI-CO-LANGUAGE-SPECIFICATION.md`](spec/AI-CO-LANGUAGE-SPECIFICATION.md) — Accepted v0.1.6
+- [`spec/DIAGNOSTIC-CONTRACT.md`](spec/DIAGNOSTIC-CONTRACT.md) — Accepted v0.1.1
 - [`spec/OPEN-QUESTIONS.md`](spec/OPEN-QUESTIONS.md) — resolution and monitoring record
 - [`research/ENVIRONMENT_BASELINE_2026-08-08.md`](research/ENVIRONMENT_BASELINE_2026-08-08.md)
 
+Repository layout: [`bootstrap/src/`](bootstrap/src) (Stage-0 compiler source), [`tests/`](tests) (conformance/negative/smoke harness and corpora), [`spec/`](spec) (normative specifications and contracts), [`docs/adr/`](docs/adr) (accepted architecture decision records).
+
 ## Status
 
-Architecture establishment and specification drafting. No compiler implementation has begun.
+Architecture establishment and specification drafting are complete; the language specification is Accepted. Stage-0 implementation is in progress: the compiler front end, semantic layers, canonical IR, and IR validation are complete; x86-64 backend work is underway (WP-M0-17), followed by COFF emission, driver/linker integration, and the Stage-0 integration gate (WP-M0-20). Milestone acceptance is pending WP-M0-20.
 
 ## Governance
 
@@ -48,4 +51,6 @@ AI-Co is a Sneedworks project. Project work follows the Sneedworks Constitution 
 
 ## License
 
-No license has been selected yet. The repository is publicly visible, but no permission grant should be inferred until Marcel approves a license.
+Licensed under the GNU General Public License v3.0 (GPL-3.0) — see [LICENSE](LICENSE).
+
+The GPL covers the compiler implementation, specifications, tests, and documentation in this repository. AI-Co programs compiled by the compiler are the user's own copyright; GPL does not extend to compiler output.
