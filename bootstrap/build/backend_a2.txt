@@ -1,0 +1,54 @@
+# bootstrap/build/backend_a2.txt
+# WP-M0-17a2 x86-64+SSE2 instruction coverage and constraints area
+# source list (owned by WP-M0-17a2). Consumed by build-stage0-msvc.cmd /
+# build-stage0-clang.cmd fragment aggregation (CONVENTIONS.md §3). One
+# source path per line; tests are built explicitly and are NOT listed.
+#
+# isel_x64.c implements the x86-64+SSE2 instruction coverage and
+# backend constraint enforcement (spec §14.1(7)/§14.3; ADR-001):
+#   - the closed coverage registry (x86-64 baseline + SSE2 licensed
+#     subset + 17a1 pseudo-ops + known out-of-baseline AVX2/host
+#     instructions) with deterministic lookups;
+#   - the AIC-B0601 backend-constraint-violation record factory
+#     (DIAGNOSTIC-CONTRACT §11.6);
+#   - x64_verify_constraints, the selection-wide baseline check that
+#     reports any uncovered/out-of-baseline instruction with the
+#     originating IR node's span, sorted with the contract §9
+#     comparator.
+# It depends on the isel_core selection output (bootstrap/build/
+# backend_a1.txt) and the IR/diag packages, all included by the
+# aggregate build.
+#
+# Boundary (manifest WP-M0-17a2): coverage and constraint checks only.
+# Excluded and owned by later packages: selection core/order (17a1);
+# frame layout/regalloc (17b); trap branches (17c); COFF emission
+# (WP-M0-18).
+#
+# NOTE: the aggregate build currently fails at LINK (LNK1561, no main())
+# until the WP-M0-19 driver exists; that is a pre-existing condition of
+# the milestone, not a defect of this area. Compile-cleanliness of the
+# aggregate (all sources, /W4, both toolchains) is verified per package;
+# isel_x64.c is included here so the future driver build picks it up.
+bootstrap/src/backend/isel_x64.c
+# ---------------------------------------------------------------------------
+# TEST INVOCATION (both toolchains; run from the repository root)
+# ---------------------------------------------------------------------------
+#   STAGE0_OUT_DIR='bootstrap\\stage0\\msvc-17a2' \
+#     ./bootstrap/build/build-stage0-msvc.cmd \
+#     bootstrap/src/backend/isel_x64_test.c \
+#     bootstrap/src/backend/isel_x64.c \
+#     bootstrap/src/backend/isel_core.c \
+#     bootstrap/src/ir/ir_core.c \
+#     bootstrap/src/diag/diag.c bootstrap/src/diag/diag_codes.c \
+#     bootstrap/src/diag/diag_emit.c
+#   ./bootstrap/stage0/msvc-17a2/isel_x64_test.exe
+# (Clang entry point: identical source list, output directory
+# bootstrap\\stage0\\clang-17a2.)
+#
+# EXPECTED OUTPUT:
+#   isel_x64_test: 1335 checks, 0 failures
+# exit code 0. Any FAIL line or non-zero exit is a defect (report per
+# package record sec. 9: REPORT, do not fix isel_core/ir-owned code).
+# Fresh /W4 builds must be warning-free on both toolchains, and two
+# independent fresh builds must produce byte-identical executables
+# (deterministic build; verified md5-identical).
