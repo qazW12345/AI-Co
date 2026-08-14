@@ -29,7 +29,9 @@
  *     composite params copied by value via REP MOVSB), the body lowered
  *     to physical registers with values spilled to call-owned slots,
  *     call sequences (arg moves, call, RAX result capture), and the
- *     epilogue (mov rsp,rbp; [restore callee-saved]; pop rbp; ret);
+ *     epilogue (RAX return-value load while RBP still addresses the
+ *     current frame; mov rsp,rbp; [restore callee-saved and RSP back
+ *     to RBP]; pop rbp; ret);
  *   - a byte-deterministic physical assembly dump (call_asm_dump) that
  *     renders the plan and the stream as stable text. Identical inputs
  *     produce byte-identical dump bytes (acceptance criterion 1:
@@ -186,6 +188,7 @@ typedef enum CallOp {
     CALL_OP_PUSH_RBP,      /* push rbp */
     CALL_OP_MOV_RBP_RSP,   /* mov rbp, rsp */
     CALL_OP_SUB_RSP,       /* sub rsp, imm  (imm = reservation size) */
+    CALL_OP_ADD_RSP,       /* add rsp, imm  (imm = reservation size) */
     CALL_OP_MOV_RSP_RBP,   /* mov rsp, rbp */
     CALL_OP_POP_RBP,       /* pop rbp */
     CALL_OP_PUSH_REG,      /* save a callee-saved register (imm = X64Reg) */
@@ -202,8 +205,8 @@ typedef struct CallInsn {
     IselCond cond;     /* ISEL_JCC / ISEL_SETCC condition; else 0 */
     int scale;         /* ISEL_LEA scale / ISEL_SLICEEQ element size */
     bool mod;          /* ISEL_IDIV: true when lowering IR_MOD */
-    int64_t imm;       /* CALL_OP_SUB_RSP: bytes; CALL_OP_PUSH/POP_REG:
-                        * X64Reg value */
+    int64_t imm;       /* CALL_OP_SUB_RSP / CALL_OP_ADD_RSP: bytes;
+                        * CALL_OP_PUSH/POP_REG: X64Reg value */
     IselInsn pseudo;   /* CALL_OP_PSEUDO: the original (vreg) instruction
                         * (shallow copy; note/trap pointers borrowed) */
     int64_t ir_node_id;/* originating IR node id (deterministic trace) */

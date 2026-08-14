@@ -833,19 +833,27 @@ static void test_return_value_rax(void)
         CHECK(cf_g->nvregs == 1);
         CHECK(cf_g->spill_bytes == 8);
     }
-    /* walk: every ISEL_RET is preceded by the return-value move into
-     * RAX, which is preceded by the epilogue pop of rbp */
+    /* walk: every ISEL_RET loads the return value into RAX BEFORE
+     * the epilogue frame restore: mov rax,[rbp-off] (i-3),
+     * mov rsp,rbp (i-2), pop rbp (i-1), ret (i). Reading the spill
+     * slot before pop rbp keeps RBP on the current frame, so the
+     * return value comes from the function's own slot (spec sec.
+     * 15.7 "RAX return"); a load after pop rbp would read the
+     * caller's frame. */
     for (i = 0; i < call_output_count(co); i++) {
         const CallInsn *ci = call_output_insn(co, i);
         if (ci->op == CALL_OP_BODY && ci->isel == ISEL_RET) {
-            CHECK(i >= 2);
-            if (i >= 2) {
-                const CallInsn *prev = call_output_insn(co, i - 1);
-                const CallInsn *before = call_output_insn(co, i - 2);
-                CHECK(prev->op == CALL_OP_BODY && prev->isel == ISEL_MOV &&
-                      prev->dst.kind == CALL_OPR_REG &&
-                      prev->dst.id == X64_REG_RAX);
-                CHECK(before->op == CALL_OP_POP_RBP);
+            CHECK(i >= 3);
+            if (i >= 3) {
+                const CallInsn *rax_load = call_output_insn(co, i - 3);
+                const CallInsn *restore = call_output_insn(co, i - 2);
+                const CallInsn *pop = call_output_insn(co, i - 1);
+                CHECK(rax_load->op == CALL_OP_BODY &&
+                      rax_load->isel == ISEL_MOV &&
+                      rax_load->dst.kind == CALL_OPR_REG &&
+                      rax_load->dst.id == X64_REG_RAX);
+                CHECK(restore->op == CALL_OP_MOV_RSP_RBP);
+                CHECK(pop->op == CALL_OP_POP_RBP);
             }
         }
     }
@@ -988,6 +996,53 @@ static void test_composite_params_and_callee_saved(void)
     CHECK(strstr(d, "rep movsb") != NULL);
     CHECK(strstr(d, "pop rdi") != NULL);
     CHECK(strstr(d, "pop rsi") != NULL);
+    /* CRIT-2 regression: the callee-saved epilogue restores RSP to
+     * RBP (add rsp,total) AFTER the register pops and BEFORE pop rbp,
+     * so pop rbp reads [rbp] (the saved caller rbp) and ret pops the
+     * correct return address. Without this, pop rbp reads
+     * [rbp-total] (inside the reservation). */
+    {
+        const char *p_rdi = strstr(d, "pop rdi");
+        const char *p_rsi = strstr(d, "pop rsi");
+        const char *p_add = strstr(d, "add rsp, $");
+        const char *p_rbp = strstr(d, "pop rbp");
+        CHECK(p_rdi != NULL && p_rsi != NULL);
+        if (p_rdi != NULL && p_rsi != NULL) {
+            CHECK(p_rsi > p_rdi);   /* LIFO: rdi pushed last, popped first */
+        }
+        CHECK(p_add != NULL);       /* RSP restore to RBP is emitted */
+        if (p_add != NULL && p_rsi != NULL && p_rbp != NULL) {
+            CHECK(p_add > p_rsi);   /* restore after the register pops */
+            CHECK(p_add < p_rbp);   /* ... and before pop rbp */
+        }
+    }
+    /* CRIT-2 structural walk over the physical stream: the ADD_RSP
+     * (RSP back to RBP) sits between the callee-saved pops and the
+     * pop rbp of every function that saves registers. */
+    {
+        size_t k;
+        bool saw_pop_rdi = false, saw_pop_rsi = false;
+        bool saw_add_rsp = false, saw_pop_rbp = false;
+        for (k = 0; k < call_output_count(co); k++) {
+            const CallInsn *ci = call_output_insn(co, k);
+            if (ci->op == CALL_OP_POP_REG && ci->imm == X64_REG_RDI) {
+                saw_pop_rdi = true;
+            }
+            if (ci->op == CALL_OP_POP_REG && ci->imm == X64_REG_RSI) {
+                saw_pop_rsi = true;
+                CHECK(saw_pop_rdi);
+            }
+            if (ci->op == CALL_OP_ADD_RSP) {
+                saw_add_rsp = true;
+                CHECK(saw_pop_rsi);
+            }
+            if (ci->op == CALL_OP_POP_RBP) {
+                saw_pop_rbp = true;
+                CHECK(saw_add_rsp);
+            }
+        }
+        CHECK(saw_pop_rdi && saw_pop_rsi && saw_add_rsp && saw_pop_rbp);
+    }
     /* f's call passes the local slice address in RCX (local_s vreg 2:
      * frame 16 + 8*(2+1) = 40) */
     CHECK(strstr(d, "mov rcx, [rbp-40]") != NULL);

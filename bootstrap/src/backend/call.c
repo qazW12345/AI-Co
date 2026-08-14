@@ -415,6 +415,9 @@ typedef struct CallCtx {
                                 * the marker block) */
     const CallFunction *cf;    /* == &cf_storage */
     size_t slice_count;        /* ISEL_SLICE counter for pair temps */
+    bool epilogue_pending;     /* the framed stream's MOV_RSP_RBP /
+                                * POP_RBP epilogue steps were seen and
+                                * deferred until the ISEL_RET body */
 } CallCtx;
 
 /* The spill slot for vreg v: [rbp - frame_size - 8*(v+1)]. */
@@ -1090,6 +1093,74 @@ static bool emit_param_copies(CallCtx *ctx)
 }
 
 /* ---------------------------------------------------------------------------
+ * Epilogue restore
+ *
+ * frame.c emits the epilogue steps (FRAME_OP_MOV_RSP_RBP followed by
+ * FRAME_OP_POP_RBP) BEFORE the ISEL_RET body in the framed stream.
+ * call_build defers them (ctx->epilogue_pending) so the ISEL_RET
+ * handler can load the return value into RAX first, while RBP still
+ * addresses the current frame (spec sec. 15.7 "RAX return"), and
+ * only then restore the frame:
+ *
+ *   mov rsp, rbp
+ *   [sub rsp, total+saved_bytes]   (only when callee-saved saved)
+ *   [pop rdi; pop rsi]             (only the saved registers)
+ *   [add rsp, total]               (RSP back to RBP before pop rbp)
+ *   pop rbp
+ *
+ * The add rsp,total is what lets `pop rbp` read [rbp] (the saved
+ * caller rbp) instead of [rbp-total] (inside the reservation), so
+ * `ret` pops the correct return address (callee-saved contract).
+ * ------------------------------------------------------------------------- */
+
+static bool emit_epilogue_restore(CallCtx *ctx)
+{
+    const CallFunction *cf = ctx->cf;
+    int64_t fn_id = ctx->fn != NULL ? ctx->fn->id : 0;
+    if (!emit_insn(ctx->out, CALL_OP_MOV_RSP_RBP, ISEL_COMMENT,
+                   call_operand_none(), call_operand_none(),
+                   call_operand_none(), ISEL_COND_E, 0, false,
+                   0, fn_id)) {
+        return false;
+    }
+    if (cf->saved_bytes > 0) {
+        if (!emit_insn(ctx->out, CALL_OP_SUB_RSP, ISEL_COMMENT,
+                       call_operand_none(), call_operand_none(),
+                       call_operand_none(), ISEL_COND_E, 0, false,
+                       cf->total + cf->saved_bytes, fn_id)) {
+            return false;
+        }
+        if (cf->saves_rdi) {
+            if (!emit_insn(ctx->out, CALL_OP_POP_REG, ISEL_COMMENT,
+                           call_operand_none(), call_operand_none(),
+                           call_operand_none(), ISEL_COND_E, 0, false,
+                           X64_REG_RDI, fn_id)) {
+                return false;
+            }
+        }
+        if (cf->saves_rsi) {
+            if (!emit_insn(ctx->out, CALL_OP_POP_REG, ISEL_COMMENT,
+                           call_operand_none(), call_operand_none(),
+                           call_operand_none(), ISEL_COND_E, 0, false,
+                           X64_REG_RSI, fn_id)) {
+                return false;
+            }
+        }
+        /* RSP back to RBP before pop rbp (CRIT-2 resolution) */
+        if (!emit_insn(ctx->out, CALL_OP_ADD_RSP, ISEL_COMMENT,
+                       call_operand_none(), call_operand_none(),
+                       call_operand_none(), ISEL_COND_E, 0, false,
+                       cf->total, fn_id)) {
+            return false;
+        }
+    }
+    return emit_insn(ctx->out, CALL_OP_POP_RBP, ISEL_COMMENT,
+                     call_operand_none(), call_operand_none(),
+                     call_operand_none(), ISEL_COND_E, 0, false,
+                     0, fn_id);
+}
+
+/* ---------------------------------------------------------------------------
  * Body instruction dispatch
  * ------------------------------------------------------------------------- */
 
@@ -1122,9 +1193,12 @@ static bool lower_body_insn(CallCtx *ctx, const IselInsn *insn)
     case ISEL_CALL:
         return lower_call(ctx, insn);
     case ISEL_RET:
-        /* the epilogue steps precede the RET in the framed stream; the
-         * return value is placed in RAX here (nothing clobbers it after
-         * the pops) */
+        /* the return value is placed in RAX BEFORE the epilogue frame
+         * restore (spec sec. 15.7 "RAX return"): the framed stream
+         * carries the epilogue steps (MOV_RSP_RBP / POP_RBP) before
+         * this body, so call_build deferred them (ctx->epilogue_pending)
+         * and they are emitted here after the load, while RBP still
+         * addresses the current frame */
         if (insn->src1.kind == ISEL_OP_VREG) {
             if (!emit_body_insn(ctx->out, ISEL_MOV,
                                 cop_reg(X64_REG_RAX, 8),
@@ -1133,6 +1207,12 @@ static bool lower_body_insn(CallCtx *ctx, const IselInsn *insn)
                                 insn->ir_node_id)) {
                 return false;
             }
+        }
+        if (ctx->epilogue_pending) {
+            if (!emit_epilogue_restore(ctx)) {
+                return false;
+            }
+            ctx->epilogue_pending = false;
         }
         return emit_body_insn(ctx->out, ISEL_RET, call_operand_none(),
                               call_operand_none(), call_operand_none(),
@@ -1277,6 +1357,7 @@ CallStatus call_build(const IrBuild *build, const FrameOutput *fr,
             ctx.fn = fn;
             ctx.cf = &ctx.cf_storage;
             ctx.slice_count = 0;
+            ctx.epilogue_pending = false;
             if (fn->u.function.body != NULL) {
                 /* final prologue: push rbp; mov rbp, rsp; sub rsp, total;
                  * [save callee-saved] */
@@ -1338,58 +1419,28 @@ CallStatus call_build(const IrBuild *build, const FrameOutput *fr,
                 }
                 break;
             case FRAME_OP_MOV_RSP_RBP:
-                /* epilogue restore: drop the frame, then the saved
-                 * callee-saved registers, then the saved rbp */
-                if (!emit_insn(co, CALL_OP_MOV_RSP_RBP, ISEL_COMMENT,
-                               call_operand_none(), call_operand_none(),
-                               call_operand_none(), ISEL_COND_E, 0, false,
-                               0, ctx.fn->id)) {
-                    co->oom = true;
-                    i = fr->count;
-                    break;
-                }
-                if (ctx.cf->saved_bytes > 0) {
-                    if (!emit_insn(co, CALL_OP_SUB_RSP, ISEL_COMMENT,
-                                   call_operand_none(), call_operand_none(),
-                                   call_operand_none(), ISEL_COND_E, 0,
-                                   false,
-                                   ctx.cf->total + ctx.cf->saved_bytes,
-                                   ctx.fn->id)) {
-                        co->oom = true;
-                        i = fr->count;
-                        break;
-                    }
-                    if (ctx.cf->saves_rdi) {
-                        if (!emit_insn(co, CALL_OP_POP_REG, ISEL_COMMENT,
-                                       call_operand_none(),
-                                       call_operand_none(),
-                                       call_operand_none(), ISEL_COND_E, 0,
-                                       false, X64_REG_RDI, ctx.fn->id)) {
-                            co->oom = true;
-                            i = fr->count;
-                            break;
-                        }
-                    }
-                    if (ctx.cf->saves_rsi) {
-                        if (!emit_insn(co, CALL_OP_POP_REG, ISEL_COMMENT,
-                                       call_operand_none(),
-                                       call_operand_none(),
-                                       call_operand_none(), ISEL_COND_E, 0,
-                                       false, X64_REG_RSI, ctx.fn->id)) {
-                            co->oom = true;
-                            i = fr->count;
-                            break;
-                        }
-                    }
-                }
+                /* epilogue restore: frame.c emits these steps before
+                 * the ISEL_RET body. They are deferred
+                 * (ctx->epilogue_pending) and emitted by the ISEL_RET
+                 * handler AFTER the return value is loaded into RAX
+                 * (CRIT-1 resolution: [rbp-off] must be read while
+                 * RBP still addresses the current frame). */
+                ctx.epilogue_pending = true;
                 break;
             case FRAME_OP_POP_RBP:
-                if (!emit_insn(co, CALL_OP_POP_RBP, ISEL_COMMENT,
-                               call_operand_none(), call_operand_none(),
-                               call_operand_none(), ISEL_COND_E, 0, false,
-                               0, ctx.fn->id)) {
-                    co->oom = true;
-                    i = fr->count;
+                /* part of the deferred epilogue restore (always paired
+                 * with FRAME_OP_MOV_RSP_RBP by frame.c); emitted with
+                 * it by the ISEL_RET handler. Defensive: a lone pop
+                 * rbp (unreachable on verified framed streams) is
+                 * still emitted so the restore never gets lost. */
+                if (!ctx.epilogue_pending) {
+                    if (!emit_insn(co, CALL_OP_POP_RBP, ISEL_COMMENT,
+                                   call_operand_none(), call_operand_none(),
+                                   call_operand_none(), ISEL_COND_E, 0,
+                                   false, 0, ctx.fn->id)) {
+                        co->oom = true;
+                        i = fr->count;
+                    }
                 }
                 break;
             default:
@@ -1761,6 +1812,8 @@ static bool dump_phys_line(DiagBuf *b, const CallInsn *ci)
         return s_append_cstr(b, "  mov rbp, rsp\n");
     case CALL_OP_SUB_RSP:
         return s_printf(b, "  sub rsp, $%lld\n", (long long)ci->imm);
+    case CALL_OP_ADD_RSP:
+        return s_printf(b, "  add rsp, $%lld\n", (long long)ci->imm);
     case CALL_OP_MOV_RSP_RBP:
         return s_append_cstr(b, "  mov rsp, rbp\n");
     case CALL_OP_POP_RBP:

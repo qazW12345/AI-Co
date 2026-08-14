@@ -15,7 +15,9 @@
 # variable shifts in CL, REP MOVSB/STOSB in RDI/RSI/RCX), call sequences
 # (RCX/RDX/R8/R9, stack args above the 32-byte shadow space, 16-byte
 # aligned RSP at every call site, RAX result capture), and the epilogue
-# (mov rsp,rbp; [restore callee-saved]; pop rbp; ret). It depends on the
+# (return value loaded into RAX while RBP still addresses the current
+# frame; mov rsp,rbp; [restore callee-saved]; add rsp,total; pop rbp;
+# ret). It depends on the
 # frame layout output (bootstrap/build/backend_b1.txt) and the isel_core
 # selection output (bootstrap/build/backend_a1.txt), plus the IR/diag
 # packages, all included by the aggregate build.
@@ -50,7 +52,7 @@ bootstrap/src/backend/call.c
 # bootstrap\\stage0\\clang-17b2.)
 #
 # EXPECTED OUTPUT:
-#   call_test: 319 checks, 0 failures
+#   call_test: 333 checks, 0 failures
 # exit code 0. Any FAIL line or non-zero exit is a defect (report per
 # package record sec. 9: REPORT, do not fix frame/isel_core/ir-owned
 # code). Fresh /W4 builds must be warning-free on both toolchains, and
