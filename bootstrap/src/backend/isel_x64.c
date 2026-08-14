@@ -248,6 +248,7 @@ IselX64Feature x64_opcode_feature(IselOpcode op)
     case ISEL_UTF8:
     case ISEL_PTRDIFF:
     case ISEL_TRAP:
+    case ISEL_LABEL:
         return ISEL_X64_PSEUDO;
     case ISEL_MOV:
     case ISEL_LEA:
@@ -270,7 +271,6 @@ IselX64Feature x64_opcode_feature(IselOpcode op)
     case ISEL_SETCC:
     case ISEL_JMP:
     case ISEL_JCC:
-    case ISEL_LABEL:
     case ISEL_CALL:
     case ISEL_RET:
         return ISEL_X64_BASE;

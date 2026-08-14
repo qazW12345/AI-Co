@@ -11,8 +11,9 @@
  *      1: "generated instruction set uses only x86-64 + SSE2; no
  *      AVX2/host-specific instructions required");
  *   2. opcode coverage - every IselOpcode of the 17a1 closed set maps to
- *      a registered, within-baseline entry (no instruction-selection
- *      gaps at the coverage layer);
+ *      a registered, within-baseline entry whose feature class agrees
+ *      with the registry (no instruction-selection gaps at the coverage
+ *      layer; regression for MIN-1: ISEL_LABEL classifies PSEUDO);
  *   3. baseline queries - x64_check_mnemonic classifies x86-64, SSE2,
  *      pseudo, AVX2/higher, host-specific, and unknown mnemonics;
  *   4. constraint records - x64_constraint_record emits a valid
@@ -754,8 +755,17 @@ static void test_opcode_coverage(void)
         const char *text = isel_opcode_text(op);
         CHECK(f != ISEL_X64_UNKNOWN);
         CHECK(x64_opcode_within_baseline(op));
-        /* every opcode's dump-rendered base name is registered */
-        CHECK(x64_insn_info(text) != NULL);
+        /* every opcode's dump-rendered base name is registered, and its
+         * feature class agrees with the registry entry (MIN-1 regression:
+         * ISEL_LABEL must classify PSEUDO, matching the registry "label"
+         * entry and the dump's pseudo marker rendering) */
+        {
+            const IselX64InsnInfo *reg = x64_insn_info(text);
+            CHECK(reg != NULL);
+            if (reg != NULL) {
+                CHECK(reg->feature == f);
+            }
+        }
         /* pseudo classification matches the 17a1 pseudo set */
         if (f == ISEL_X64_PSEUDO) {
             CHECK(x64_opcode_is_pseudo(op));

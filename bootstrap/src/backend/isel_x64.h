@@ -136,7 +136,8 @@ typedef struct IselX64InsnInfo {
  * entry (ISEL_X64_UNKNOWN). */
 const IselX64InsnInfo *x64_insn_info(const char *mnemonic);
 
-/* Registry iteration (deterministic sorted table order). */
+/* Registry iteration (deterministic table order, grouped by feature
+ * class). */
 const IselX64InsnInfo *x64_insn_at(size_t index);
 size_t x64_insn_count(void);
 
